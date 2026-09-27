@@ -139,7 +139,7 @@ impl<'a> Prepared<'a> {
         let mut order = filled(points.len(), 0)?;
         let mut max_diagonal: f64 = 0.0;
         for (index, &point) in points.iter().enumerate() {
-            if index % 256 == 0 {
+            if CONTROLLED && index % 256 == 0 {
                 budget.step_by((points.len() - index).min(256))?;
             }
             diagonals[index] = diagonal(point)?;
@@ -161,7 +161,7 @@ impl<'a> Prepared<'a> {
         reserve(&mut representatives, points.len())?;
         reserve(&mut multiplicities, points.len())?;
         for (position, &index) in order.iter().enumerate() {
-            if position % 256 == 0 {
+            if CONTROLLED && position % 256 == 0 {
                 budget.step_by((order.len() - position).min(256))?;
             }
             if representatives
@@ -187,6 +187,7 @@ impl<'a> Prepared<'a> {
         })
     }
 
+    #[inline]
     fn window(&self, birth: f64, radius: f64) -> std::ops::Range<usize> {
         let lower = (birth - radius).next_down();
         let upper = (birth + radius).next_up();
@@ -216,6 +217,8 @@ struct Pair<'a, 'p> {
 }
 
 impl<'a, 'p> Pair<'a, 'p> {
+    // Keep dense preparation in the specialized caller.
+    #[inline(always)]
     fn new<const CONTROLLED: bool>(
         first: &'p Prepared<'a>,
         second: &'p Prepared<'a>,
@@ -251,6 +254,8 @@ impl<'a, 'p> Pair<'a, 'p> {
         Ok(result)
     }
 
+    // Specialized matchers also need to inline this per-edge lookup.
+    #[inline(always)]
     fn cross(&self, left: usize, right: usize) -> f64 {
         if self.dense.is_empty() {
             cross(self.first.points[left], self.second.points[right])
@@ -371,7 +376,7 @@ pub(crate) fn distance_with_options(
         second,
         _options,
         _stats,
-        &mut WorkBudget::new(&crate::execution::Execution::default())?,
+        &mut WorkBudget::unlimited(),
     )
 }
 
@@ -413,7 +418,7 @@ fn solve<const CONTROLLED: bool>(
         } else if total >= 128 {
             let mut window_pairs = 0_usize;
             for (position, &index) in first.order.iter().enumerate() {
-                if position % 256 == 0 {
+                if CONTROLLED && position % 256 == 0 {
                     budget.step_by((first.order.len() - position).min(256))?;
                 }
                 window_pairs = window_pairs

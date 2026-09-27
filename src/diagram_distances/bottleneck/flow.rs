@@ -74,7 +74,9 @@ impl Dinic {
                     break;
                 }
                 let node = self.queue[head];
-                budget.step_by(self.edges[node].len().max(1))?;
+                if CONTROLLED {
+                    budget.step_by(self.edges[node].len().max(1))?;
+                }
                 for edge in &self.edges[node] {
                     if edge.capacity > 0 && self.levels[edge.target] == NONE {
                         self.levels[edge.target] = self.levels[node] + 1;
@@ -96,7 +98,9 @@ impl Dinic {
                         break;
                     }
                     let mut found = false;
-                    budget.step_by(self.edges[node].len() - self.cursors[node])?;
+                    if CONTROLLED {
+                        budget.step_by(self.edges[node].len() - self.cursors[node])?;
+                    }
                     while self.cursors[node] < self.edges[node].len() {
                         let edge = self.edges[node][self.cursors[node]];
                         record! { _stats.adjacency_checks += 1; }

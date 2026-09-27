@@ -145,7 +145,9 @@ impl Graph {
         let mut rows = Vec::new();
         let mut used = buffer(self.columns, false)?;
         for row in 0..self.rows {
-            budget.step_by(self.row_work(row))?;
+            if CONTROLLED {
+                budget.step_by(self.row_work(row))?;
+            }
             let mut active = false;
             for edge in self.edges(row) {
                 active = true;
@@ -157,7 +159,7 @@ impl Graph {
         }
         let mut columns = Vec::new();
         for (column, present) in used.into_iter().enumerate() {
-            if column % 256 == 0 {
+            if CONTROLLED && column % 256 == 0 {
                 budget.step_by((self.columns - column).min(256))?;
             }
             if present {
@@ -233,8 +235,9 @@ pub(super) fn generate<const CONTROLLED: bool>(
     for (row, &point) in first.iter().enumerate() {
         budget.step()?;
         if sweep {
-            budget.step_by(window(point).len())?;
-            for &column in &order[window(point)] {
+            let range = window(point);
+            budget.step_by(range.len())?;
+            for &column in &order[range] {
                 record! { _stats.candidate_pairs += 1; }
                 let (value, direct) = saving(point, second[column], metric)?;
                 direct_cost_required |= direct;
@@ -283,7 +286,9 @@ pub(super) fn components<const CONTROLLED: bool>(
 ) -> Result<Vec<Component>> {
     let mut reverse = buffer(graph.columns, Vec::new())?;
     for row in 0..graph.rows {
-        budget.step_by(graph.row_work(row))?;
+        if CONTROLLED {
+            budget.step_by(graph.row_work(row))?;
+        }
         for edge in graph.edges(row) {
             push(&mut reverse[edge.column], row)?;
         }
@@ -296,7 +301,9 @@ pub(super) fn components<const CONTROLLED: bool>(
         .try_reserve_exact(sum_size(graph.rows, graph.columns)?)
         .map_err(|_| allocation())?;
     for start in 0..graph.rows {
-        budget.step_by(graph.row_work(start))?;
+        if CONTROLLED {
+            budget.step_by(graph.row_work(start))?;
+        }
         if row_seen[start] || graph.edges(start).next().is_none() {
             continue;
         }
@@ -312,7 +319,9 @@ pub(super) fn components<const CONTROLLED: bool>(
             let (is_row, index) = queue[next];
             next += 1;
             if is_row {
-                budget.step_by(graph.row_work(index))?;
+                if CONTROLLED {
+                    budget.step_by(graph.row_work(index))?;
+                }
                 push(&mut component.rows, index)?;
                 for edge in graph.edges(index) {
                     if !col_seen[edge.column] {
@@ -321,7 +330,9 @@ pub(super) fn components<const CONTROLLED: bool>(
                     }
                 }
             } else {
-                budget.step_by(reverse[index].len().max(1))?;
+                if CONTROLLED {
+                    budget.step_by(reverse[index].len().max(1))?;
+                }
                 push(&mut component.columns, index)?;
                 for &row in &reverse[index] {
                     if !row_seen[row] {
@@ -354,7 +365,7 @@ pub(super) fn groups<const CONTROLLED: bool>(
     let mut unique: Vec<Point> = Vec::new();
     let mut multiplicity: Vec<usize> = Vec::new();
     for (position, index) in order.into_iter().enumerate() {
-        if position % 256 == 0 {
+        if CONTROLLED && position % 256 == 0 {
             budget.step_by((points.len() - position).min(256))?;
         }
         if unique

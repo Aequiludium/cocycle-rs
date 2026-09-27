@@ -223,7 +223,9 @@ pub(super) fn solve<const CONTROLLED: bool>(
         degree[0] = rows.len();
         degree[sink] = columns.len();
         for &row in &rows {
-            budget.step_by(graph.row_work(row))?;
+            if CONTROLLED {
+                budget.step_by(graph.row_work(row))?;
+            }
             let node = row_base + row_map[row];
             degree[node] = 1;
             for edge in graph.edges(row) {
@@ -256,7 +258,9 @@ pub(super) fn solve<const CONTROLLED: bool>(
     }
     let mut potential = buffer(nodes, 0.0_f64)?;
     for &row in &rows {
-        budget.step_by(graph.row_work(row))?;
+        if CONTROLLED {
+            budget.step_by(graph.row_work(row))?;
+        }
         let node = row_base + row_map[row];
         for edge in graph.edges(row) {
             let other = column_base + column_map[edge.column];
@@ -307,7 +311,9 @@ pub(super) fn solve<const CONTROLLED: bool>(
         scratch.distance[0] = 0.0;
         scratch.enqueue(0.0, 0)?;
         while let Some(QueueItem { distance, node }) = scratch.heap.pop() {
-            budget.step_by(network.edges(node).len().max(1))?;
+            if CONTROLLED {
+                budget.step_by(network.edges(node).len().max(1))?;
+            }
             if distance != scratch.distance[node] {
                 continue;
             }
@@ -383,7 +389,9 @@ pub(super) fn solve<const CONTROLLED: bool>(
     }
     let mut flows = Vec::new();
     for (local, &row) in rows.iter().enumerate() {
-        budget.step_by(network.edges(row_base + local).len().max(1))?;
+        if CONTROLLED {
+            budget.step_by(network.edges(row_base + local).len().max(1))?;
+        }
         for edge in network.edges(row_base + local) {
             if edge.destination < column_base || edge.destination >= sink {
                 continue;

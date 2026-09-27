@@ -218,7 +218,7 @@ impl Workspace {
         self.right.fill(NONE);
         self.seen.fill(0);
         for vertex in 0..graph.size {
-            if vertex % 256 == 0 {
+            if CONTROLLED && vertex % 256 == 0 {
                 budget.step_by((graph.size - vertex).min(256))?;
             }
             self.order[vertex] = vertex;
@@ -227,7 +227,9 @@ impl Workspace {
         self.order
             .sort_unstable_by_key(|&vertex| (self.degrees[vertex], vertex));
         for &left in &self.order {
-            budget.step_by(self.degrees[left].max(1))?;
+            if CONTROLLED {
+                budget.step_by(self.degrees[left].max(1))?;
+            }
             let mut cursor = graph.cursor(left);
             while let Some(right) = graph.next(&mut cursor) {
                 if self.right[right] == NONE {

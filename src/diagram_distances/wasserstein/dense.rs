@@ -22,7 +22,9 @@ pub(super) fn certified_greedy<const CONTROLLED: bool>(
     let mut row_max = buffer(graph.rows, 0.0_f64)?;
     let mut column_max = buffer(graph.columns, 0.0_f64)?;
     for (row, maximum) in row_max.iter_mut().enumerate() {
-        budget.step_by(graph.row_work(row))?;
+        if CONTROLLED {
+            budget.step_by(graph.row_work(row))?;
+        }
         for edge in graph.edges(row) {
             *maximum = maximum.max(edge.saving);
             column_max[edge.column] = column_max[edge.column].max(edge.saving);
@@ -40,7 +42,7 @@ pub(super) fn certified_greedy<const CONTROLLED: bool>(
     let mut column_match = buffer(graph.columns, None)?;
     let mut weight = buffer(graph.rows, 0.0)?;
     for (position, (row, edge)) in edges.into_iter().enumerate() {
-        if position % 256 == 0 {
+        if CONTROLLED && position % 256 == 0 {
             budget.step_by((graph.edge_count - position).min(256))?;
         }
         if matching[row].is_none() && column_match[edge.column].is_none() {
@@ -49,7 +51,9 @@ pub(super) fn certified_greedy<const CONTROLLED: bool>(
             weight[row] = edge.saving;
         }
     }
-    budget.step_by(sum_size(graph.rows, graph.columns)?)?;
+    if CONTROLLED {
+        budget.step_by(sum_size(graph.rows, graph.columns)?)?;
+    }
     let row_bound = row_max.iter().zip(&weight).all(|(a, b)| a == b);
     let column_bound = column_max
         .iter()
@@ -79,10 +83,14 @@ pub(super) fn dense_sap<const CONTROLLED: bool>(
     let values = match &graph.storage {
         Storage::Dense(values) => values,
         Storage::Csr { .. } => {
-            budget.step_by(product(graph.rows, graph.columns)?)?;
+            if CONTROLLED {
+                budget.step_by(product(graph.rows, graph.columns)?)?;
+            }
             lookup = buffer(product(graph.rows, graph.columns)?, 0.0)?;
             for row in 0..graph.rows {
-                budget.step_by(graph.row_work(row))?;
+                if CONTROLLED {
+                    budget.step_by(graph.row_work(row))?;
+                }
                 for edge in graph.edges(row) {
                     lookup[row * graph.columns + edge.column] = edge.saving;
                 }

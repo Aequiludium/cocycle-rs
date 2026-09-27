@@ -430,7 +430,7 @@ impl<'a, 'p, 'q> Oracle<'a, 'p, 'q> {
             self.right.fill(NONE);
         } else if self.used && radius < self.radius {
             for left in 0..self.pair.size {
-                if left % 256 == 0 {
+                if CONTROLLED && left % 256 == 0 {
                     budget.step_by((self.pair.size - left).min(256))?;
                 }
                 let right = self.left[left];
@@ -453,7 +453,7 @@ impl<'a, 'p, 'q> Oracle<'a, 'p, 'q> {
         while size < self.pair.size && self.bfs(radius, _stats, budget)? {
             let before = size;
             for left in 0..self.pair.size {
-                if left % 256 == 0 {
+                if CONTROLLED && left % 256 == 0 {
                     budget.step_by((self.pair.size - left).min(256))?;
                 }
                 if self.left[left] == NONE {

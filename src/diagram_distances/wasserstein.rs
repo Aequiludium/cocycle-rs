@@ -160,13 +160,17 @@ fn solve_components<const CONTROLLED: bool>(
     let mut matching = buffer(graph.rows, None)?;
     let mut column_map = buffer(graph.columns, 0)?;
     for component in components(graph, budget)? {
-        budget.step_by(sum_size(component.rows.len(), component.columns.len())?)?;
+        if CONTROLLED {
+            budget.step_by(sum_size(component.rows.len(), component.columns.len())?)?;
+        }
         record! { _stats.components += 1; }
         if component.rows.len() == 1 || component.columns.len() == 1 {
             let mut best = 0.0;
             let mut pair = None;
             for &row in &component.rows {
-                budget.step_by(graph.row_work(row))?;
+                if CONTROLLED {
+                    budget.step_by(graph.row_work(row))?;
+                }
                 for edge in graph.edges(row) {
                     if edge.saving > best {
                         best = edge.saving;
@@ -185,7 +189,9 @@ fn solve_components<const CONTROLLED: bool>(
         }
         let mut candidates = buffer(component.rows.len(), Vec::new())?;
         for (local, &row) in component.rows.iter().enumerate() {
-            budget.step_by(graph.row_work(row))?;
+            if CONTROLLED {
+                budget.step_by(graph.row_work(row))?;
+            }
             for edge in graph.edges(row) {
                 push(
                     &mut candidates[local],
@@ -252,7 +258,7 @@ pub(crate) fn distance_with_options(
         metric,
         _options,
         _stats,
-        &mut WorkBudget::new(&crate::execution::Execution::default())?,
+        &mut WorkBudget::unlimited(),
     )
 }
 

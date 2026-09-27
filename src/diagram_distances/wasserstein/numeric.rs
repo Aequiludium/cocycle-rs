@@ -44,7 +44,7 @@ pub(super) fn prepare<const CONTROLLED: bool>(
         .try_reserve_exact(input.len())
         .map_err(|_| allocation())?;
     for (index, &[birth, death]) in input.iter().enumerate() {
-        if index % 256 == 0 {
+        if CONTROLLED && index % 256 == 0 {
             budget.step_by((input.len() - index).min(256))?;
         }
         let b = birth / scale;
@@ -151,7 +151,7 @@ pub(super) fn from_flows<const CONTROLLED: bool>(
     let mut total = 0.0;
     let mut correction = 0.0;
     for (index, &(row, column, count)) in flows.iter().enumerate() {
-        if index % 256 == 0 {
+        if CONTROLLED && index % 256 == 0 {
             budget.step_by((flows.len() - index).min(256))?;
         }
         row_used[row] = sum_size(row_used[row], count)?;
@@ -163,7 +163,7 @@ pub(super) fn from_flows<const CONTROLLED: bool>(
         )?;
     }
     for (row, &point) in first.iter().enumerate() {
-        if row % 256 == 0 {
+        if CONTROLLED && row % 256 == 0 {
             budget.step_by((first.len() - row).min(256))?;
         }
         let remaining =
@@ -181,7 +181,7 @@ pub(super) fn from_flows<const CONTROLLED: bool>(
         }
     }
     for (column, &point) in second.iter().enumerate() {
-        if column % 256 == 0 {
+        if CONTROLLED && column % 256 == 0 {
             budget.step_by((second.len() - column).min(256))?;
         }
         let remaining = column_capacity[column]
@@ -216,7 +216,7 @@ pub(super) fn from_matching<const CONTROLLED: bool>(
         .try_reserve_exact(first.len().min(second.len()))
         .map_err(|_| allocation())?;
     for (row, column) in matching.into_iter().enumerate() {
-        if row % 256 == 0 {
+        if CONTROLLED && row % 256 == 0 {
             budget.step_by((first.len() - row).min(256))?;
         }
         if let Some(column) = column {

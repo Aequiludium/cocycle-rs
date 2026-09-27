@@ -50,6 +50,8 @@ impl<'a> Execution<'a> {
 
 // Distance kernels specialize the unlimited case so their inner loops carry no
 // runtime polling branches. Construction keeps the existing controlled default.
+// Callers also guard count-only lookups: an unused charge argument can otherwise
+// retain indexing checks or duplicate a search even when step_by is a no-op.
 pub(crate) struct WorkBudget<'a, const CONTROLLED: bool = true> {
     limits: Execution<'a>,
     used: u64,
@@ -81,7 +83,7 @@ impl WorkBudget<'static, false> {
 }
 
 impl<const CONTROLLED: bool> WorkBudget<'_, CONTROLLED> {
-    #[inline]
+    #[inline(always)]
     pub(crate) fn check(&self) -> Result<()> {
         if !CONTROLLED {
             return Ok(());
@@ -103,13 +105,13 @@ impl<const CONTROLLED: bool> WorkBudget<'_, CONTROLLED> {
         }
         Ok(())
     }
-    #[inline]
+    #[inline(always)]
     pub(crate) fn step(&mut self) -> Result<()> {
         self.step_by(1)
     }
 
     /// Charge a batch before doing its work, without overflowing the counter.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn step_by(&mut self, count: usize) -> Result<()> {
         if !CONTROLLED {
             return Ok(());
