@@ -2,6 +2,11 @@
 
 ## 0.1.0 (unreleased)
 
+- Add `_with` variants of all three raw and context-aware diagram distances.
+  One `Execution` budget spans preparation, matching and accumulation, with
+  cooperative work limits and cancellation. Existing entry points retain their
+  unlimited behavior; matching routes remain private.
+
 - Separate owned boundary computation from filtered-source validation and keep
   exact flag selection in a private dispatch module. Explicit and approximate
   Rips call simplicial algorithms directly. Add a persistence-reduction contributor
