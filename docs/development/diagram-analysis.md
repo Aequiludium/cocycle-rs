@@ -17,6 +17,7 @@ already computed input to this part of the library.
 | `IntervalEnd::Essential` | Never dies in the complete supplied filtration |
 | `IntervalEnd::RightCensored { through: t }` | Known alive at the inclusive cutoff `t`; eventual death is unknown |
 | `PersistenceDiagram` | Validated interval multiset, computed dimensions and coverage |
+| `DiagramDimension` | Borrowed logical view of one computed dimension, including empty ones |
 | `ComputedDimensions` | Nonempty set of computed dimensions, including computed empty ones |
 | `Coverage` | Complete source or a computation known only through a cutoff |
 
@@ -26,6 +27,12 @@ rejected. `PersistenceDiagram::new(q, ...)` records every dimension through q.
 `with_dimensions` accepts an explicit set, including H1-only or gapped results.
 Querying an absent dimension is an error even below `max_dimension()`; use
 `computed_dimensions().contains(k)` or `.iter()` instead of inferring membership.
+
+Read values through `diagram.intervals()` or `diagram.dimension(k)?.iter()`.
+Both retain canonical ordering and multiplicity without exposing storage rows or
+allocating an intermediate interval buffer. `diagram.interval(i)` resolves a
+canonical logical ordinal; `len()` and `is_empty()` describe the diagram or view.
+When retaining an iterator across statements, bind its dimension view first.
 
 A complete diagram rejects censored intervals. A truncated diagram rejects
 essential intervals: survival at a cutoff alone cannot certify essentiality.
@@ -64,8 +71,8 @@ use cocycle::diagram::{Coverage, IntervalEnd, PersistenceDiagram, PersistenceInt
 use cocycle::{Error, Result};
 
 fn finite_interval_count(diagram: &PersistenceDiagram, dimension: usize) -> Result<usize> {
-    let intervals = diagram.intervals_in_dimension(dimension)?;
-    Ok(intervals
+    let view = diagram.dimension(dimension)?;
+    Ok(view.iter()
         .filter(|interval| matches!(interval.end(), IntervalEnd::Finite(_)))
         .count())
 }
@@ -113,7 +120,7 @@ custom trait, lifetime parameter or builder is needed.
 
 [Lifetime statistics](../../src/descriptors/lifetime_statistics.rs) extends this
 pattern with sums, maxima and entropy. Read its documented contract, then the
-loop over `intervals_in_dimension`. The summary records excluded endpoint counts
+loops over a logical dimension view. The summary records excluded endpoint counts
 so users know what was measured. Compensated summation and overflow checks keep
 floating-point behavior explicit; a valid pair of endpoints does not guarantee
 that their difference is representable as `f64`.

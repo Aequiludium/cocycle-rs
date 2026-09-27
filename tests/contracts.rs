@@ -216,10 +216,7 @@ fn generic_intervals_allow_signed_scales_and_high_dimensions() {
         vec![interval, essential(usize::MAX, -2.0)],
     )
     .unwrap();
-    assert_eq!(
-        diagram.intervals_in_dimension(usize::MAX).unwrap().count(),
-        1
-    );
+    assert_eq!(diagram.dimension(usize::MAX).unwrap().iter().count(), 1);
 }
 
 #[test]
@@ -288,13 +285,13 @@ fn interval_and_coverage_zeros_are_canonical() {
 fn empty_diagrams_distinguish_absent_intervals_from_uncomputed_dimensions() {
     let h0 = PersistenceDiagram::new(0, Coverage::Complete, vec![]).unwrap();
     assert_eq!(h0.max_dimension(), 0);
-    assert_eq!(h0.intervals_in_dimension(0).unwrap().count(), 0);
+    assert_eq!(h0.dimension(0).unwrap().iter().count(), 0);
     assert!(matches!(
-        h0.intervals_in_dimension(1),
+        h0.dimension(1),
         Err(Error::DimensionNotComputed { .. })
     ));
     let h1 = PersistenceDiagram::new(1, Coverage::Through(2.0), vec![]).unwrap();
-    assert_eq!(h1.intervals_in_dimension(1).unwrap().count(), 0);
+    assert_eq!(h1.dimension(1).unwrap().iter().count(), 0);
     assert_eq!(h1.coverage(), Coverage::Through(2.0));
 }
 
@@ -338,29 +335,31 @@ fn a_gap_is_uncomputed_even_when_below_the_maximum() {
     use cocycle::diagram::ComputedDimensions;
     let dimensions = ComputedDimensions::new(vec![1, 3]).unwrap();
     let intervals = vec![essential(1, 0.)];
-    let buffer = intervals.as_ptr();
     let diagram =
         PersistenceDiagram::with_dimensions(dimensions.clone(), Coverage::Complete, intervals)
             .unwrap();
-    assert_eq!(diagram.intervals().as_ptr(), buffer);
     assert_eq!(diagram.max_dimension(), 3);
     assert_eq!(diagram.computed_dimensions(), &dimensions);
-    assert_eq!(diagram.intervals_in_dimension(3).unwrap().count(), 0);
+    assert_eq!(diagram.dimension(3).unwrap().iter().count(), 0);
     for missing in [0, 2, 4] {
         assert!(
-            matches!(diagram.intervals_in_dimension(missing), Err(Error::DimensionNotComputed { requested, .. }) if requested == missing)
+            matches!(diagram.dimension(missing), Err(Error::DimensionNotComputed { requested, .. }) if requested == missing)
         );
         assert!(
             matches!(PersistenceDiagram::with_dimensions(dimensions.clone(), Coverage::Complete, vec![essential(missing, 0.)]), Err(Error::DimensionNotComputed { requested, .. }) if requested == missing)
         );
     }
-    let contiguous =
-        PersistenceDiagram::new(3, Coverage::Complete, diagram.intervals().to_vec()).unwrap();
+    let contiguous = PersistenceDiagram::new(
+        3,
+        Coverage::Complete,
+        diagram.intervals().collect::<Vec<_>>(),
+    )
+    .unwrap();
     assert_ne!(diagram, contiguous);
     let empty =
         PersistenceDiagram::with_dimensions(dimensions, Coverage::Complete, vec![]).unwrap();
-    assert_eq!(empty.intervals_in_dimension(1).unwrap().count(), 0);
-    assert!(empty.intervals_in_dimension(0).is_err());
+    assert_eq!(empty.dimension(1).unwrap().iter().count(), 0);
+    assert!(empty.dimension(0).is_err());
 }
 
 #[test]
@@ -371,8 +370,8 @@ fn generic_diagrams_do_not_assume_rips_connectivity_or_births() {
         vec![essential(0, -1.0), essential(0, 3.0), essential(1, 4.0)],
     )
     .unwrap();
-    assert_eq!(diagram.intervals_in_dimension(0).unwrap().count(), 2);
-    assert_eq!(diagram.intervals_in_dimension(1).unwrap().count(), 1);
+    assert_eq!(diagram.dimension(0).unwrap().iter().count(), 2);
+    assert_eq!(diagram.dimension(1).unwrap().iter().count(), 1);
 }
 
 #[test]
@@ -421,7 +420,7 @@ fn truncated_diagrams_check_every_endpoint_against_the_cutoff() {
         vec![finite(0, 0.0, 2.0), censored(1, 2.0, 2.0)],
     )
     .unwrap();
-    assert_eq!(valid.intervals().len(), 2);
+    assert_eq!(valid.len(), 2);
 }
 
 #[test]
@@ -451,29 +450,85 @@ fn canonical_order_retains_multiplicity_and_ignores_input_permutation() {
     for _ in 0..input.len() {
         input.rotate_left(1);
         let diagram = PersistenceDiagram::new(1, Coverage::Complete, input.clone()).unwrap();
-        assert_eq!(diagram.intervals(), expected.as_slice());
-        assert_eq!(diagram.intervals_in_dimension(0).unwrap().count(), 5);
-        assert_eq!(diagram.intervals_in_dimension(1).unwrap().count(), 1);
+        assert_eq!(diagram.intervals().collect::<Vec<_>>(), expected.as_slice());
+        assert_eq!(diagram.dimension(0).unwrap().iter().count(), 5);
+        assert_eq!(diagram.dimension(1).unwrap().iter().count(), 1);
     }
     input.reverse();
     assert_eq!(
         PersistenceDiagram::new(1, Coverage::Complete, input)
             .unwrap()
-            .intervals(),
+            .intervals()
+            .collect::<Vec<_>>(),
         expected
     );
 }
 
 #[test]
-fn construction_takes_ownership_of_the_interval_buffer() {
+fn logical_iteration_and_ordinals_preserve_owned_values() {
+    let expected = vec![
+        finite(0, -2.0, 2.0),
+        finite(0, -2.0, 2.0),
+        essential(0, 0.0),
+    ];
     let diagram = {
-        let values = vec![finite(0, 0.0, 2.0), essential(0, 0.0)];
-        let original_buffer = values.as_ptr();
-        let diagram = PersistenceDiagram::new(0, Coverage::Complete, values).unwrap();
-        assert_eq!(diagram.intervals().as_ptr(), original_buffer);
-        diagram
+        let values = expected.iter().rev().copied().collect();
+        PersistenceDiagram::new(0, Coverage::Complete, values).unwrap()
     };
-    assert_eq!(diagram.intervals().len(), 2);
+    assert_eq!(diagram.len(), 3);
+    assert!(!diagram.is_empty());
+    let actual: Vec<PersistenceInterval> = diagram.intervals().collect();
+    assert_eq!(actual, expected);
+    for (index, value) in expected.into_iter().enumerate() {
+        assert_eq!(diagram.interval(index), Some(value));
+    }
+    assert_eq!(diagram.interval(diagram.len()), None);
+    assert_eq!(diagram.interval(usize::MAX), None);
+    let empty = PersistenceDiagram::new(0, Coverage::Complete, vec![]).unwrap();
+    assert!(empty.is_empty());
+    assert_eq!(empty.len(), 0);
+    assert_eq!(empty.intervals().next(), None);
+    assert_eq!(empty.interval(0), None);
+}
+
+#[test]
+fn dimension_views_preserve_empty_domains_multiplicity_and_censored_endpoints() {
+    use cocycle::diagram::{ComputedDimensions, DiagramDimension};
+    let finite = finite(1, -4., -2.);
+    let censored = censored(3, -3., -1.);
+    let diagram = PersistenceDiagram::with_dimensions(
+        ComputedDimensions::new(vec![0, 1, 3, 5, usize::MAX]).unwrap(),
+        Coverage::Through(-1.),
+        vec![censored, finite, censored],
+    )
+    .unwrap();
+    assert_eq!(diagram.coverage(), Coverage::Through(-1.));
+    assert_eq!(
+        diagram.intervals().collect::<Vec<_>>(),
+        [finite, censored, censored]
+    );
+    for (dimension, expected) in [
+        (0, vec![]),
+        (1, vec![finite]),
+        (3, vec![censored, censored]),
+        (5, vec![]),
+        (usize::MAX, vec![]),
+    ] {
+        let view: DiagramDimension<'_> = diagram.dimension(dimension).unwrap();
+        assert_eq!(view.dimension(), dimension);
+        assert_eq!(view.len(), expected.len());
+        assert_eq!(view.is_empty(), expected.is_empty());
+        let values: Vec<PersistenceInterval> = view.iter().collect();
+        assert_eq!(values, expected);
+        assert_eq!(view.iter().collect::<Vec<_>>(), expected);
+    }
+    for missing in [2, 4, 6] {
+        assert!(matches!(diagram.dimension(missing),
+            Err(Error::DimensionNotComputed { requested, .. }) if requested == missing));
+    }
+    for (index, value) in diagram.intervals().enumerate() {
+        assert_eq!(diagram.interval(index), Some(value));
+    }
 }
 
 #[test]

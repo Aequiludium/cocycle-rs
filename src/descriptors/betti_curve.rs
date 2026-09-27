@@ -20,7 +20,7 @@ pub fn betti_curve(
     dimension: usize,
     grid: &[f64],
 ) -> Result<Vec<usize>> {
-    let intervals = diagram.intervals_in_dimension(dimension)?;
+    let view = diagram.dimension(dimension)?;
     for (index, &value) in grid.iter().enumerate() {
         if !value.is_finite() {
             return Err(Error::InvalidGrid {
@@ -49,7 +49,7 @@ pub fn betti_curve(
     }
     let mut births = Vec::new();
     let mut deaths = Vec::new();
-    for interval in intervals {
+    for interval in view.iter() {
         births.try_reserve(1).map_err(|_| Error::AllocationFailed {
             context: "Betti births",
         })?;

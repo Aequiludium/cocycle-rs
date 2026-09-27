@@ -545,7 +545,8 @@ coboundaries. This construction defines a dual basis for the requested scale,
 not a promise that the returned cochain entries remain unchanged at another
 scale. No shortest-support or canonical-across-algorithms claim is made.
 
-Output identities are indices into one result's sorted interval multiset.
+Output identities are ordinals in one result's canonical logical interval sequence,
+resolved through `PersistenceDiagram::interval(index)` independently of storage layout.
 Repeated intervals retain distinct indices; request positions distinguish repeated
 queries. Terms contain original, increasing simplex vertices and canonical
 nonzero coefficients. Queries outside known coverage or computed dimensions fail.

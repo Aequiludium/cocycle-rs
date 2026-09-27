@@ -86,7 +86,7 @@ fn cellular_integer_incidence_can_change_homology_with_the_field() -> Result<()>
             Coverage::Complete,
             &mut WorkBudget::new(&Execution::default())?,
         )?;
-        let h1 = actual.intervals_in_dimension(1)?.next().unwrap();
+        let h1 = actual.dimension(1)?.iter().next().unwrap();
         assert_eq!(h1.birth(), -2.);
         assert_eq!(
             h1.end(),
@@ -96,10 +96,7 @@ fn cellular_integer_incidence_can_change_homology_with_the_field() -> Result<()>
                 IntervalEnd::Finite(1.)
             }
         );
-        assert_eq!(
-            actual.intervals_in_dimension(2)?.count(),
-            usize::from(prime == 2)
-        );
+        assert_eq!(actual.dimension(2)?.iter().count(), usize::from(prime == 2));
     }
     Ok(())
 }

@@ -57,6 +57,7 @@ pub fn finite_lifetime_summary(
     diagram: &PersistenceDiagram,
     dimension: usize,
 ) -> Result<LifetimeSummary> {
+    let view = diagram.dimension(dimension)?;
     let mut summary = LifetimeSummary {
         finite_count: 0,
         total_persistence: 0.0,
@@ -66,7 +67,7 @@ pub fn finite_lifetime_summary(
         excluded_censored_count: 0,
     };
     let mut compensation = 0.0;
-    for interval in diagram.intervals_in_dimension(dimension)? {
+    for interval in view.iter() {
         match interval.end() {
             IntervalEnd::Essential => summary.excluded_essential_count += 1,
             IntervalEnd::RightCensored { .. } => summary.excluded_censored_count += 1,
@@ -97,7 +98,7 @@ pub fn finite_lifetime_summary(
     }
     if summary.finite_count > 0 {
         let mut entropy = 0.0;
-        for interval in diagram.intervals_in_dimension(dimension)? {
+        for interval in view.iter() {
             if let IntervalEnd::Finite(death) = interval.end() {
                 let probability = (death - interval.birth()) / summary.total_persistence;
                 // Extreme ratios may round to zero; their limiting contribution is zero.

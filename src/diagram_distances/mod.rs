@@ -178,13 +178,13 @@ struct Points {
 }
 
 fn points(diagram: &PersistenceDiagram, dimension: usize) -> Result<Points> {
-    let intervals = diagram.intervals_in_dimension(dimension)?;
+    let view = diagram.dimension(dimension)?;
     if let Coverage::Through(through) = diagram.coverage() {
         return Err(Error::IncompleteDiagram { through });
     }
     let mut finite = Vec::new();
     let mut essential = Vec::new();
-    for interval in intervals {
+    for interval in view.iter() {
         match interval.end() {
             IntervalEnd::Finite(death) => {
                 finite.try_reserve(1).map_err(|_| Error::AllocationFailed {

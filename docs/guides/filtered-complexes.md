@@ -55,7 +55,7 @@ let complex = SimplicialComplex::new(vec![
 ])?;
 let requests = [RepresentativeRequest::new(1, 0.3, RepresentativeSelection::Both)?];
 let result = complex.persistence().representatives(&requests).compute()?;
-let h1 = result.diagram().intervals_in_dimension(1)?.next().unwrap();
+let h1 = result.diagram().dimension(1)?.iter().next().unwrap();
 assert_eq!(h1.birth(), 0.25);
 assert_eq!(h1.end(), IntervalEnd::Finite(1. / 3.));
 assert_eq!(complex.max_filtration_value(), Some(1. / 3.));
@@ -104,7 +104,7 @@ impl FilteredComplex for Square {
     }
 }
 let result = PersistenceBuilder::from_complex(&Square).compute()?;
-let h1 = result.diagram().intervals_in_dimension(1)?.next().unwrap();
+let h1 = result.diagram().dimension(1)?.iter().next().unwrap();
 assert_eq!((h1.birth(), h1.end()), (1., IntervalEnd::Finite(2.)));
 # Ok::<(), cocycle::Error>(())
 ```

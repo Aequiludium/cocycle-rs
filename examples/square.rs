@@ -11,7 +11,10 @@ fn main() -> Result<()> {
     let input = PointCloudView::new(&coordinates, 4, 2)?;
     let result = RipsBuilder::from_points(input).persistence().compute()?;
     let diagram = result.diagram();
-    println!("Intervals: {:?}", diagram.intervals());
+    println!("Intervals:");
+    for interval in diagram.intervals() {
+        println!("{interval:?}");
+    }
     println!("H1 summary: {:?}", finite_lifetime_summary(diagram, 1)?);
     println!(
         "H1 Betti curve at [0, 1, sqrt(2), 2]: {:?}",
