@@ -43,7 +43,7 @@ fn square_workflows_preserve_fields_bases_context_and_source_ownership() -> Resu
             assert_eq!(direct.context(), explicit.context());
             assert_eq!(direct.representatives().unwrap().len(), 2);
             assert_eq!(explicit.representatives().unwrap().len(), 2);
-            let interval = direct.diagram().intervals_in_dimension(1)?.next().unwrap();
+            let interval = direct.diagram().dimension(1)?.iter().next().unwrap();
             assert_eq!(
                 (interval.birth(), interval.end()),
                 (1., IntervalEnd::Finite(2.))
@@ -52,7 +52,7 @@ fn square_workflows_preserve_fields_bases_context_and_source_ownership() -> Resu
         rips.persistence().compute()?
     };
     assert_eq!(result.diagram().coverage(), Coverage::Complete);
-    assert_eq!(result.diagram().intervals_in_dimension(1)?.count(), 1);
+    assert_eq!(result.diagram().dimension(1)?.iter().count(), 1);
     Ok(())
 }
 #[test]
@@ -209,7 +209,7 @@ fn direct_point_analysis_does_not_process_edges_above_its_cutoff() -> Result<()>
             .max_filtration_value(0.5)
             .field(PrimeField::new(prime)?)
             .compute_with(&execution)?;
-        assert_eq!(result.diagram().intervals().len(), 32);
+        assert_eq!(result.diagram().len(), 32);
         assert_eq!(result.diagram().coverage(), Coverage::Through(0.5));
         assert_eq!(result.context().construction_cutoff(), Some(100.));
     }
@@ -233,7 +233,7 @@ fn scale_and_dimension_truncation_are_independent() -> Result<()> {
         .compute()?;
     let direct = rips.persistence().max_homology_dimension(2).compute()?;
     assert_eq!(explicit.diagram(), direct.diagram());
-    let h2 = direct.diagram().intervals_in_dimension(2)?.next().unwrap();
+    let h2 = direct.diagram().dimension(2)?.iter().next().unwrap();
     assert_eq!((h2.birth(), h2.end()), (1., IntervalEnd::Finite(2.)));
     let truncated = rips.max_edge_length(1.);
     assert!(matches!(
@@ -290,7 +290,8 @@ fn supplied_flag_expansion_preserves_essentiality_and_isolates() -> Result<()> {
     assert_eq!(
         explicit
             .diagram()
-            .intervals_in_dimension(0)?
+            .dimension(0)?
+            .iter()
             .filter(|i| i.end() == IntervalEnd::Essential)
             .count(),
         2
@@ -298,7 +299,8 @@ fn supplied_flag_expansion_preserves_essentiality_and_isolates() -> Result<()> {
     assert_eq!(
         explicit
             .diagram()
-            .intervals_in_dimension(1)?
+            .dimension(1)?
+            .iter()
             .next()
             .unwrap()
             .end(),
@@ -371,7 +373,7 @@ fn empty_duplicate_and_singleton_inputs_are_owned_and_reusable() -> Result<()> {
         assert_eq!(explicit.context().vertex_count(), n);
         assert!(explicit.is_dimension_complete());
         let result = rips.persistence().max_homology_dimension(3).compute()?;
-        assert_eq!(result.diagram().intervals().len(), expected);
+        assert_eq!(result.diagram().len(), expected);
         assert_eq!(
             result,
             explicit.persistence().max_homology_dimension(3).compute()?
@@ -489,7 +491,7 @@ fn expanded_negative_cutoff_does_not_create_zero_born_components() -> Result<()>
         RepresentativeSelection::Both,
     )?];
     let early = expanded.persistence().max_filtration_value(-1.).compute()?;
-    assert!(early.diagram().intervals().is_empty());
+    assert!(early.diagram().is_empty());
     assert_eq!(early.diagram().coverage(), Coverage::Through(-1.));
     let bases = expanded
         .persistence()

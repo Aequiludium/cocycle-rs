@@ -220,7 +220,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut payload = String::new();
     timed(&mut phases[4], || {
         payload.push('[');
-        for (i, interval) in result.diagram().intervals().iter().enumerate() {
+        for (i, interval) in result.diagram().intervals().enumerate() {
             if i > 0 {
                 payload.push(',');
             }

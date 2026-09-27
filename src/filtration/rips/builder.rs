@@ -47,7 +47,7 @@ impl Input<'_> {
 /// let filtration = rips.build_complex(2)?;
 /// assert!(filtration.complex().find(&[0, 1]).is_some());
 /// let result = rips.persistence().compute()?;
-/// assert_eq!(result.diagram().intervals_in_dimension(1)?.count(), 1);
+/// assert_eq!(result.diagram().dimension(1)?.iter().count(), 1);
 /// # Ok::<(), cocycle::Error>(())
 /// ```
 #[derive(Clone, Copy, Debug)]

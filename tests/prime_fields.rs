@@ -145,7 +145,6 @@ fn verify_basis(
         let expected: BTreeSet<_> = result
             .diagram()
             .intervals()
-            .iter()
             .enumerate()
             .filter(|(_, i)| i.dimension() == q && i.birth() <= scale && active(i.end(), scale))
             .map(|(i, _)| i)
@@ -179,7 +178,7 @@ fn verify_basis(
                         });
                         assert_eq!(sum, 0, "cycle not closed");
                     }
-                    let interval = result.diagram().intervals()[rep.interval_index()];
+                    let interval = result.diagram().interval(rep.interval_index()).unwrap();
                     for term in rep.terms() {
                         for &a in term.vertices() {
                             for &b in term.vertices() {
@@ -376,7 +375,7 @@ fn torsion_changes_the_diagram_and_representatives() {
         for q in [1, 2] {
             assert_eq!(betti(&graph, q, 1., p), usize::from(p == 2));
             assert_eq!(
-                result.diagram().intervals_in_dimension(q).unwrap().count(),
+                result.diagram().dimension(q).unwrap().iter().count(),
                 usize::from(p == 2)
             );
         }
@@ -473,8 +472,9 @@ fn request_validation_censoring_and_execution_are_explicit() {
     assert!(
         result
             .diagram()
-            .intervals_in_dimension(1)
+            .dimension(1)
             .unwrap()
+            .iter()
             .all(|i| i.end() == IntervalEnd::RightCensored { through: 1. })
     );
     let outside = [RepresentativeRequest::new(1, 2., RepresentativeSelection::Both).unwrap()];
@@ -551,6 +551,20 @@ fn duplicate_intervals_and_selections_keep_local_identity() {
     .unwrap();
     verify_basis(&graph, &result, &queries);
     assert_eq!(result.representatives().unwrap().len(), 30);
+    let expected_ends = [
+        IntervalEnd::Finite(1.),
+        IntervalEnd::Finite(1.),
+        IntervalEnd::Essential,
+        IntervalEnd::Essential,
+        IntervalEnd::Essential,
+    ];
+    for representative in result.representatives().unwrap() {
+        let index = representative.interval_index();
+        let interval = result.diagram().interval(index).unwrap();
+        assert_eq!(interval.dimension(), 0);
+        assert_eq!(interval.birth(), 0.);
+        assert_eq!(interval.end(), expected_ends[index]);
+    }
     let repeated = result
         .representatives()
         .unwrap()

@@ -108,11 +108,10 @@ fn cone_stopping_preserves_user_coverage_and_closed_boundary() {
         let result = crate::persistence::rips_from_dissimilarities(input, &options).unwrap();
         if (1.0..5.0).contains(&cutoff) {
             assert_eq!(result.coverage(), Coverage::Through(cutoff));
-            assert_eq!(result.intervals().len(), 4);
+            assert_eq!(result.len(), 4);
             assert!(
                 result
                     .intervals()
-                    .iter()
                     .any(|bar| bar.end() == IntervalEnd::RightCensored { through: cutoff })
             );
         }

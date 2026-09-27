@@ -246,7 +246,6 @@ fn coverage_and_dimension_are_independent_and_no_bound_for_large_epsilon() {
         result
             .diagram()
             .intervals()
-            .iter()
             .any(|i| matches!(i.end(), IntervalEnd::RightCensored { through: 1. }))
     );
     assert!(
@@ -289,7 +288,7 @@ fn empty_singleton_duplicate_inputs_and_execution_limits() {
         let opts = PersistenceOptions::new(4, None).unwrap();
         let result =
             compute_expanded_sparse_rips(&expanded, &opts, &ExecutionLimits::default()).unwrap();
-        assert_eq!(result.diagram().intervals().len(), usize::from(n > 0));
+        assert_eq!(result.diagram().len(), usize::from(n > 0));
     }
     let input = blocker_input();
     let opts = PersistenceOptions::new(2, None).unwrap();
@@ -414,7 +413,6 @@ fn noncontiguous_h1_representatives_are_closed_dual_and_owned() {
     let h1: Vec<_> = result
         .diagram()
         .intervals()
-        .iter()
         .filter(|i| i.dimension() == 1)
         .collect();
     assert_eq!(h1.len(), 1);

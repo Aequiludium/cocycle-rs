@@ -56,8 +56,9 @@ fn original_range_is_not_inferred_from_the_largest_retained_edge() {
     assert!(
         result
             .diagram()
-            .intervals_in_dimension(1)
+            .dimension(1)
             .unwrap()
+            .iter()
             .any(|i| matches!(i.end(), IntervalEnd::RightCensored { through: 1.5 }))
     );
     assert!(matches!(
@@ -74,8 +75,9 @@ fn original_range_is_not_inferred_from_the_largest_retained_edge() {
     assert!(
         result
             .diagram()
-            .intervals_in_dimension(1)
+            .dimension(1)
             .unwrap()
+            .iter()
             .any(|i| i.end() == IntervalEnd::Essential)
     );
     assert_eq!(

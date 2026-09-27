@@ -43,7 +43,7 @@ fn empty_singleton_pair_duplicates_and_filled_triangle() {
     for (n, values, expected) in cases {
         let diagram = compute(&values, n, 1, None);
         assert_eq!(diagram.coverage(), Coverage::Complete);
-        assert_eq!(diagram.intervals(), expected);
+        assert_eq!(diagram.intervals().collect::<Vec<_>>(), expected);
     }
 }
 
@@ -53,31 +53,45 @@ fn square_loop_dies_at_the_diagonal_and_is_censored_at_a_smaller_cutoff() {
     let values = [1., diagonal, 1., 1., diagonal, 1.];
     let mut full = vec![finite(0, 0., 1.); 3];
     full.extend([alive(0, 0., None), finite(1, 1., diagonal)]);
-    assert_eq!(compute(&values, 4, 1, None).intervals(), full);
+    assert_eq!(
+        compute(&values, 4, 1, None).intervals().collect::<Vec<_>>(),
+        full
+    );
     let mut partial = vec![finite(0, 0., 1.); 3];
     partial.extend([alive(0, 0., Some(1.)), alive(1, 1., Some(1.))]);
-    assert_eq!(compute(&values, 4, 1, Some(1.)).intervals(), partial);
+    assert_eq!(
+        compute(&values, 4, 1, Some(1.))
+            .intervals()
+            .collect::<Vec<_>>(),
+        partial
+    );
     let isolated = compute(&values, 4, 1, Some(0.5));
-    assert_eq!(isolated.intervals(), vec![alive(0, 0., Some(0.5)); 4]);
+    assert_eq!(
+        isolated.intervals().collect::<Vec<_>>(),
+        vec![alive(0, 0., Some(0.5)); 4]
+    );
     for cutoff in [diagonal, 2.0] {
         let result = compute(&values, 4, 1, Some(cutoff));
         assert_eq!(result.coverage(), Coverage::Complete);
-        assert_eq!(result.intervals(), full);
+        assert_eq!(result.intervals().collect::<Vec<_>>(), full);
     }
 }
 
 #[test]
 fn top_skeleton_homology_is_not_exported() {
     let diagram = compute(&[1.; 6], 4, 1, None);
-    assert_eq!(diagram.intervals_in_dimension(1).unwrap().count(), 0);
-    assert!(diagram.intervals().iter().all(|bar| bar.dimension() <= 1));
-    assert_eq!(diagram.intervals().len(), 4);
+    assert_eq!(diagram.dimension(1).unwrap().iter().count(), 0);
+    assert!(diagram.intervals().all(|bar| bar.dimension() <= 1));
+    assert_eq!(diagram.len(), 4);
 }
 
 #[test]
 fn zero_cutoff_merges_duplicate_vertices_without_zero_length_bars() {
     let diagram = compute(&[0., 1., 1.], 3, 1, Some(0.));
-    assert_eq!(diagram.intervals(), vec![alive(0, 0., Some(0.)); 2]);
+    assert_eq!(
+        diagram.intervals().collect::<Vec<_>>(),
+        vec![alive(0, 0., Some(0.)); 2]
+    );
 }
 
 #[test]
@@ -100,7 +114,7 @@ fn complete_bipartite_filtrations_preserve_quadratic_interval_multiplicity() {
             };
             expected.extend(vec![h1; (a - 1) * (b - 1)]);
             let diagram = compute(&values, n, 1, cutoff);
-            assert_eq!(diagram.intervals(), expected);
+            assert_eq!(diagram.intervals().collect::<Vec<_>>(), expected);
             assert_eq!(
                 diagram.coverage(),
                 if complete {
@@ -115,8 +129,9 @@ fn complete_bipartite_filtrations_preserve_quadratic_interval_multiplicity() {
 
 fn betti(diagram: &PersistenceDiagram, dimension: usize, t: f64) -> usize {
     diagram
-        .intervals_in_dimension(dimension)
+        .dimension(dimension)
         .unwrap()
+        .iter()
         .filter(|bar| {
             bar.birth() <= t
                 && match bar.end() {
@@ -241,14 +256,16 @@ fn vertex_permutations_and_scaling_preserve_the_expected_diagram() {
     let scaled: Vec<_> = values.iter().map(|d| 3.0 * d).collect();
     let expected_bars: Vec<_> = expected
         .intervals()
-        .iter()
         .map(|bar| match bar.end() {
             IntervalEnd::Finite(death) => finite(bar.dimension(), 3. * bar.birth(), 3. * death),
             IntervalEnd::Essential => alive(bar.dimension(), 3. * bar.birth(), None),
             _ => unreachable!(),
         })
         .collect();
-    assert_eq!(compute(&scaled, 4, 1, None).intervals(), expected_bars);
+    assert_eq!(
+        compute(&scaled, 4, 1, None).intervals().collect::<Vec<_>>(),
+        expected_bars
+    );
 }
 
 // Exhaustive partial matching, including the diagonal, independent of PH reduction.
@@ -282,8 +299,9 @@ fn matches_within(
 fn bounded_distance_perturbations_obey_the_diagram_stability_bound() {
     let finite_bars = |diagram: &PersistenceDiagram, dimension| {
         diagram
-            .intervals_in_dimension(dimension)
+            .dimension(dimension)
             .unwrap()
+            .iter()
             .filter_map(|bar| match bar.end() {
                 IntervalEnd::Finite(death) => Some((bar.birth(), death)),
                 _ => None,
@@ -317,9 +335,7 @@ fn bounded_distance_perturbations_obey_the_diagram_stability_bound() {
             for diagram in [&a, &b] {
                 let essential: Vec<_> = diagram
                     .intervals()
-                    .iter()
                     .filter(|bar| bar.end() == IntervalEnd::Essential)
-                    .copied()
                     .collect();
                 assert_eq!(essential, vec![alive(0, 0., None)]);
             }

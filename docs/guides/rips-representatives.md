@@ -84,7 +84,8 @@ outlive its source buffers and expanded complex.
 Each representative records:
 
 - The request's position, kind, scale, dimension and field characteristic.
-- `interval_index`, a position in this result's sorted diagram. Repeated intervals
+- `interval_index`, an ordinal in this result's canonical logical interval sequence,
+  resolved by `result.diagram().interval(index)`. Repeated intervals
   have distinct indices. These IDs are local to the result, not cross-run identifiers.
 - Nonzero canonical coefficients and increasing original vertex indices, with
   terms sorted lexicographically. A coefficient of 2 over F3 represents minus one.

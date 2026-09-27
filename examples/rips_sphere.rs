@@ -23,7 +23,7 @@ fn main() -> cocycle::Result<()> {
         .persistence()
         .max_homology_dimension(2)
         .compute()?;
-    let sphere = result.diagram().intervals_in_dimension(2)?.next().unwrap();
+    let sphere = result.diagram().dimension(2)?.iter().next().unwrap();
     assert_eq!(sphere.birth(), 1.);
     assert_eq!(sphere.end(), IntervalEnd::Finite(2.));
     println!(

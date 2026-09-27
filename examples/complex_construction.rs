@@ -70,7 +70,10 @@ fn main() -> Result<()> {
     }
     // The engine reads actual vertex births; no Rips-specific assumptions apply.
     let result = complex.persistence().max_homology_dimension(1).compute()?;
-    println!("Intervals: {:?}", result.diagram().intervals());
+    println!("Intervals:");
+    for interval in result.diagram().intervals() {
+        println!("{interval:?}");
+    }
     Ok(())
 }
 
@@ -111,7 +114,6 @@ mod tests {
             let pairs: Vec<_> = result
                 .diagram()
                 .intervals()
-                .iter()
                 .map(|i| (i.dimension(), i.birth(), i.end()))
                 .collect();
             // Minima -2 and -1 merge at 0. At 1 the final two edges close a loop.
@@ -126,7 +128,7 @@ mod tests {
         }
         let result = complex.persistence().max_filtration_value(-0.5).compute()?;
         assert_eq!(result.diagram().coverage(), Coverage::Through(-0.5));
-        assert_eq!(result.diagram().intervals().len(), 2);
+        assert_eq!(result.diagram().len(), 2);
         for interval in result.diagram().intervals() {
             assert_eq!(interval.dimension(), 0);
             assert_eq!(interval.end(), IntervalEnd::RightCensored { through: -0.5 });
@@ -169,8 +171,8 @@ mod tests {
         }
         assert_eq!(coefficients, [0; 3]);
         let result = complex.persistence().field(PrimeField::new(3)?).compute()?;
-        assert_eq!(result.diagram().intervals().len(), 1);
-        let interval = &result.diagram().intervals()[0];
+        assert_eq!(result.diagram().len(), 1);
+        let interval = &result.diagram().interval(0).unwrap();
         assert_eq!(
             (interval.dimension(), interval.birth(), interval.end()),
             (0, 2.0, IntervalEnd::Essential)
@@ -185,18 +187,12 @@ mod tests {
         assert_eq!(complex.dimension(), Some(0));
         assert_eq!(complex.vertex_count(), 2);
         let result = complex.persistence().compute()?;
-        let births: Vec<_> = result
-            .diagram()
-            .intervals()
-            .iter()
-            .map(|i| i.birth())
-            .collect();
+        let births: Vec<_> = result.diagram().intervals().map(|i| i.birth()).collect();
         assert_eq!(births, [-3.0, 4.0]);
         assert!(
             result
                 .diagram()
                 .intervals()
-                .iter()
                 .all(|i| i.end() == IntervalEnd::Essential)
         );
         Ok(())

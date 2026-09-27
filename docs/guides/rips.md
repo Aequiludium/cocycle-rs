@@ -54,7 +54,7 @@ fn main() -> cocycle::Result<()> {
     let input = DissimilarityView::new(&distances, 2)?;
     let result = RipsBuilder::from_distance_matrix(input.into()).persistence().compute()?;
     let diagram = result.diagram();
-    assert_eq!(diagram.intervals_in_dimension(0)?.count(), 2);
+    assert_eq!(diagram.dimension(0)?.iter().count(), 2);
     Ok(())
 }
 ```
@@ -80,9 +80,20 @@ Approximation uses a separate [builder](sparse-rips.md) with explicit hypotheses
 
 ## Reading a diagram
 
-`diagram.intervals()` exposes deterministic, sorted intervals with multiplicity.
-`intervals_in_dimension(k)` rejects dimensions that were not computed. An empty
-computed dimension is different from an uncomputed dimension.
+`diagram.intervals()` yields interval values in canonical logical order, preserving
+multiplicity. `diagram.len()` counts intervals and `diagram.interval(i)` resolves a
+zero-based logical ordinal, returning `None` out of bounds. Storage layout and
+element addresses are private implementation details.
+
+`diagram.dimension(k)?` returns a borrowed `DiagramDimension` with `dimension()`,
+`len()`, `is_empty()` and `iter()` methods. Its iterator also yields values; an
+empty computed dimension is valid, while an uncomputed dimension is an error.
+Keep the view in a local binding when retaining its iterator across statements.
+
+The pre-release API replaces `intervals_in_dimension(k)?` with
+`dimension(k)?.iter()`, and slice indexing with `interval(i)`. Use the diagram's
+`len()`/`is_empty()` instead of querying its iterator as a slice. Neither full nor
+dimension iteration materializes an intermediate interval vector.
 
 | Endpoint | Meaning |
 | --- | --- |
