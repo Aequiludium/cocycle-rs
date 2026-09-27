@@ -12,17 +12,25 @@ use crate::filtration::Coverage;
 ///
 /// Computed dimensions are explicitly declared, even if their interval lists are
 /// empty. [`Self::new`] declares `0..=max_dimension`; [`Self::with_dimensions`]
-/// supports noncontiguous sets. The multiset is sorted deterministically; multiplicities are
-/// preserved. No original input, simplex IDs or matrix indices are retained.
+/// supports noncontiguous sets. Intervals form a canonical logical sequence ordered
+/// by dimension, birth, endpoint kind (finite, essential, censored), then endpoint
+/// value. Multiplicities are preserved. No original input, simplex IDs or matrix
+/// indices are retained.
+///
+/// Access returns logical values, without guaranteeing contiguous storage, physical
+/// interval rows, stable element addresses, backing-buffer reuse, an AoS/SoA layout,
+/// or a particular physical partition by dimension or endpoint kind.
 ///
 /// ```
 /// use cocycle::diagram::{Coverage, IntervalEnd, PersistenceDiagram, PersistenceInterval};
 ///
 /// let intervals = vec![PersistenceInterval::new(1, 1.0, IntervalEnd::Finite(2.0))?];
 /// let diagram = PersistenceDiagram::new(1, Coverage::Complete, intervals)?;
-/// assert_eq!(diagram.intervals_in_dimension(0)?.count(), 0);
-/// assert_eq!(diagram.intervals_in_dimension(1)?.count(), 1);
-/// assert!(diagram.intervals_in_dimension(2).is_err());
+/// assert!(diagram.dimension(0)?.is_empty());
+/// let h1 = diagram.dimension(1)?;
+/// assert_eq!(h1.len(), 1);
+/// assert_eq!(diagram.interval(0), h1.iter().next());
+/// assert!(diagram.dimension(2).is_err());
 /// # Ok::<(), cocycle::Error>(())
 /// ```
 #[derive(Clone, Debug, PartialEq)]
@@ -42,7 +50,8 @@ impl PersistenceDiagram {
     ///
     /// Sorting is by dimension, birth, endpoint kind (finite, essential, censored),
     /// and then endpoint value. Equal intervals are retained. Validation and
-    /// sorting take O(m log m) time for m intervals and do not copy the vector.
+    /// sorting take O(m log m) time for m intervals. The input buffer's allocation
+    /// and element addresses are not part of the diagram's contract.
     ///
     /// # Errors
     /// Returns an error for a non-finite cutoff, an interval outside the computed
@@ -70,8 +79,8 @@ impl PersistenceDiagram {
     /// let diagram = PersistenceDiagram::with_dimensions(
     ///     ComputedDimensions::new(vec![1, 3])?, Coverage::Complete, vec![],
     /// )?;
-    /// assert_eq!(diagram.intervals_in_dimension(3)?.count(), 0);
-    /// assert!(diagram.intervals_in_dimension(2).is_err());
+    /// assert!(diagram.dimension(3)?.is_empty());
+    /// assert!(diagram.dimension(2).is_err());
     /// # Ok::<(), cocycle::Error>(())
     /// ```
     ///
@@ -118,20 +127,42 @@ impl PersistenceDiagram {
         self.coverage
     }
 
-    /// All intervals, in deterministic order and with multiplicities preserved.
-    pub fn intervals(&self) -> &[PersistenceInterval] {
-        &self.intervals
+    /// Number of logical intervals, counting repeated intervals separately.
+    pub fn len(&self) -> usize {
+        self.intervals.len()
     }
 
-    /// Iterate over intervals in a computed dimension, which may have no intervals.
+    /// Whether the diagram contains no intervals, independently of computed dimensions.
+    pub fn is_empty(&self) -> bool {
+        self.intervals.is_empty()
+    }
+
+    /// Iterate over interval values in canonical logical order, preserving multiplicity.
+    ///
+    /// Creates an iterator in O(1) time; traversal takes O(n) time for n intervals,
+    /// with O(1) auxiliary space and no heap allocation or intermediate interval buffer.
+    pub fn intervals(&self) -> impl Iterator<Item = PersistenceInterval> + '_ {
+        self.intervals.iter().copied()
+    }
+
+    /// Resolve a zero-based ordinal in the canonical logical interval sequence.
+    ///
+    /// Repeated intervals occupy distinct ordinals. Returns `None` when `index`
+    /// is out of bounds; the ordinal is not a physical storage address.
+    pub fn interval(&self, index: usize) -> Option<PersistenceInterval> {
+        self.intervals.get(index).copied()
+    }
+
+    /// Borrow a logical view of a computed dimension, which may have no intervals.
+    ///
+    /// After checking dimension membership, locating the view takes O(log(n + 1))
+    /// time for n diagram intervals. Creation uses O(1) auxiliary space and no
+    /// heap allocation. The view iterates only its selected intervals.
     ///
     /// # Errors
     /// Returns [`Error::DimensionNotComputed`] for a dimension absent from the
     /// declared set, including gaps below the maximum. Empty does not mean uncomputed.
-    pub fn intervals_in_dimension(
-        &self,
-        dimension: usize,
-    ) -> Result<impl Iterator<Item = &PersistenceInterval>> {
+    pub fn dimension(&self, dimension: usize) -> Result<DiagramDimension<'_>> {
         if !self.dimensions.contains(dimension) {
             return Err(Error::DimensionNotComputed {
                 requested: dimension,
@@ -144,7 +175,47 @@ impl PersistenceDiagram {
         let end = self
             .intervals
             .partition_point(|interval| interval.dimension() <= dimension);
-        Ok(self.intervals[start..end].iter())
+        Ok(DiagramDimension {
+            dimension,
+            intervals: &self.intervals[start..end],
+        })
+    }
+}
+
+/// A borrowed logical view of one computed homology dimension.
+///
+/// Obtained through [`PersistenceDiagram::dimension`]. An empty view still records
+/// a computed dimension. Iteration yields values in the diagram's canonical order,
+/// preserving multiplicity; it does not expose a slice or guarantee physical rows,
+/// addresses, allocation identity, or a storage layout.
+#[derive(Debug)]
+pub struct DiagramDimension<'a> {
+    dimension: usize,
+    intervals: &'a [PersistenceInterval],
+}
+
+impl DiagramDimension<'_> {
+    /// Homology dimension recorded by this view, including when it is empty.
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    /// Number of logical intervals in this dimension, including repetitions.
+    pub fn len(&self) -> usize {
+        self.intervals.len()
+    }
+
+    /// Whether this computed dimension contains no intervals.
+    pub fn is_empty(&self) -> bool {
+        self.intervals.is_empty()
+    }
+
+    /// Iterate over interval values in canonical logical order.
+    ///
+    /// Creates an iterator in O(1) time; traversal takes O(k) time for k selected
+    /// intervals, with O(1) auxiliary space and no heap allocation.
+    pub fn iter(&self) -> impl Iterator<Item = PersistenceInterval> + '_ {
+        self.intervals.iter().copied()
     }
 }
 

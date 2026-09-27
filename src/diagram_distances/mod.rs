@@ -350,13 +350,13 @@ fn points<const CONTROLLED: bool>(
     budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<Points> {
     budget.step()?;
-    let intervals = diagram.intervals_in_dimension(dimension)?;
+    let view = diagram.dimension(dimension)?;
     if let Coverage::Through(through) = diagram.coverage() {
         return Err(Error::IncompleteDiagram { through });
     }
     let mut finite = Vec::new();
     let mut essential = Vec::new();
-    for interval in intervals {
+    for interval in view.iter() {
         budget.step()?;
         match interval.end() {
             IntervalEnd::Finite(death) => {

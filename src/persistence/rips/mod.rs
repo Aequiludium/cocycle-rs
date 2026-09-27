@@ -47,7 +47,7 @@ pub use options::RipsOptions;
 /// use cocycle::persistence::{RipsOptions, rips_from_dissimilarities};
 /// let input = DissimilarityView::new(&[2.0], 2)?;
 /// let diagram = rips_from_dissimilarities(input, &RipsOptions::default())?;
-/// assert_eq!(diagram.intervals_in_dimension(0)?.count(), 2);
+/// assert_eq!(diagram.dimension(0)?.iter().count(), 2);
 /// # Ok::<(), cocycle::Error>(())
 /// ```
 pub fn rips_from_dissimilarities(

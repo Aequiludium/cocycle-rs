@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     print!("],\"intervals\":[");
     if let Some(result) = &result {
-        for (i, interval) in result.diagram().intervals().iter().enumerate() {
+        for (i, interval) in result.diagram().intervals().enumerate() {
             if i > 0 {
                 print!(",");
             }

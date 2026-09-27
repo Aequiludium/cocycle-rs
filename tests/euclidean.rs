@@ -50,7 +50,7 @@ fn stable_norm_handles_large_and_tiny_representable_distances() {
             &RipsOptions::new(0, None).unwrap(),
         )
         .unwrap();
-        let IntervalEnd::Finite(death) = diagram.intervals()[0].end() else {
+        let IntervalEnd::Finite(death) = diagram.interval(0).unwrap().end() else {
             panic!()
         };
         assert!((death / (5. * scale) - 1.).abs() < 1e-14);
@@ -74,7 +74,7 @@ fn empty_singleton_and_duplicate_clouds_remain_distinct_inputs() {
             &RipsOptions::default(),
         )
         .unwrap();
-        assert_eq!(diagram.intervals().len(), expected);
+        assert_eq!(diagram.len(), expected);
         assert_eq!(diagram.coverage(), Coverage::Complete);
     }
 }

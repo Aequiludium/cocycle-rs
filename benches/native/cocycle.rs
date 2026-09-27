@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Coverage::Through(t) => print!("\"coverage\":[\"through\",{t}],"),
     }
     print!("\"intervals\":[");
-    for (i, bar) in diagram.intervals().iter().enumerate() {
+    for (i, bar) in diagram.intervals().enumerate() {
         if i > 0 {
             print!(",");
         }
