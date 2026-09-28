@@ -39,17 +39,73 @@ essential intervals: survival at a cutoff alone cannot certify essentiality.
 The library does not verify the mathematical origin of a manually supplied diagram;
 the caller must declare its coverage truthfully.
 
+## Dimension-level consumer contract
+
+Every diagram consumer, including future statistics, transforms and exporters,
+must distinguish **computed but empty** from **not computed**. The declared
+`computed_dimensions()` set determines availability independently of interval
+presence. `max_dimension()` is only the greatest member: neither `k <= max_dimension()`
+nor the presence or absence of intervals establishes membership.
+
+For a single dimension, obtain `diagram.dimension(k)?` before consuming intervals.
+An absent dimension returns `Error::DimensionNotComputed`, including gaps below
+the maximum and missing dimensions below the first member. An empty view is valid:
+Betti curves return zeros, lifetime summaries have zero counts and total with
+`None` maximum and entropy, and distances between two empty dimensions are zero.
+Other operation requirements still apply, including coverage and compatible
+context. Earlier context, cancellation or work-limit failures retain their
+documented precedence; dimension errors do not override them.
+
+For all-dimension traversal, use `diagram.computed_dimensions().iter()`, never
+`0..=diagram.max_dimension()` or the dimensions inferred from nonempty intervals.
+This example visits a nonempty H1 and an empty H3 without inventing H0 or H2:
+
 ```rust
-use cocycle::diagram::{ComputedDimensions, Coverage, PersistenceDiagram};
+use cocycle::diagram::{ComputedDimensions, Coverage, IntervalEnd,
+    PersistenceDiagram, PersistenceInterval};
 use cocycle::descriptors::betti_curve;
-let h1 = PersistenceDiagram::with_dimensions(
-    ComputedDimensions::new(vec![1])?, Coverage::Complete, vec![],
+use cocycle::Error;
+
+let diagram = PersistenceDiagram::with_dimensions(
+    ComputedDimensions::new(vec![1, 3])?, Coverage::Complete,
+    vec![PersistenceInterval::new(1, 0.0, IntervalEnd::Finite(2.0))?],
 )?;
-assert_eq!(betti_curve(&h1, 1, &[0.0])?, vec![0]);
-assert!(betti_curve(&h1, 0, &[0.0]).is_err()); // H0 was not computed.
-assert_eq!(h1.computed_dimensions().iter().collect::<Vec<_>>(), vec![1]);
+let mut counts = Vec::new();
+for dimension in diagram.computed_dimensions().iter() {
+    counts.push((dimension, diagram.dimension(dimension)?.len()));
+}
+assert_eq!(counts, [(1, 1), (3, 0)]);
+assert_eq!(betti_curve(&diagram, 3, &[0.0, 1.0])?, [0, 0]);
+for missing in [0, 2, 4] {
+    assert!(matches!(betti_curve(&diagram, missing, &[]),
+        Err(Error::DimensionNotComputed { requested, .. }) if requested == missing));
+}
 # Ok::<(), cocycle::Error>(())
 ```
+
+Multi-input consumers must validate every requested dimension on every required
+operand. With domains `{1}` and `{1, 3}`, explicitly selecting H1 is valid, while
+selecting H3 returns `DimensionNotComputed` regardless of operand order. Selected
+dimension operations do not require equal full domains. Never silently intersect
+domains and discard requested information. A future whole-domain operation must
+require matching domains or an explicit caller-selected domain, and verify that
+each operand contains every requested member.
+
+The current descriptors and distance facade already obtain logical dimension
+views. New consumers must use that same boundary and preserve multiplicity and
+endpoint semantics without relying on physical interval storage.
+
+Include these cases in every new consumer's tests, as applicable to its API:
+
+| Case | Required assertion |
+| --- | --- |
+| Computed nonempty H1 | Hand-derived result, preserving repeated intervals |
+| Computed empty H3 in `{1, 3}` | Natural empty result even when H1 is nonempty |
+| H4 above the maximum of `{1, 3}` | `DimensionNotComputed` |
+| H2 in the gap of `{1, 3}` | `DimensionNotComputed`, even with an empty query grid |
+| H0 below the first member of `{1, 3}` | `DimensionNotComputed` |
+| All-dimension traversal of `{1, 3}` | Exactly H1 and H3, including empty H3 |
+| Inputs `{1}` and `{1, 3}` | H1 succeeds; H3 fails in both operand orders |
 
 ## Define a small descriptor
 
@@ -147,8 +203,10 @@ cargo run --locked --example diagram_analysis
    diagram and returning an owned result. For a small operation, start with a
    function. Matching algorithms belong in `src/diagram_distances/`; use the
    [distance contribution path](#contribute-diagram-distances) for those operations.
-3. Add tests to `tests/descriptors.rs`, starting from hand-built intervals. Update
-   the relevant mathematical specification and write rustdoc beside the function.
+3. Add tests to `tests/descriptors.rs`, starting from hand-built intervals and the
+   [dimension contract cases](#dimension-level-consumer-contract), including the
+   gap below the maximum. Update the relevant mathematical specification and
+   write rustdoc beside the function.
 4. Work with a maintainer on the export in `src/descriptors/mod.rs`, error variants
    if needed, a usage example and changelog. Allocation and execution policies are
    integration work; numerical assumptions remain part of the algorithm review.
@@ -275,7 +333,9 @@ work, all matching routes and recovery on the same immutable inputs. Discover
 budget thresholds rather than hard-code counts. Measure unlimited-path overhead
 on fixed fixtures, and preserve mathematical/context error semantics.
 
-Put public contracts and hand-derived cases in `tests/diagram_distances.rs`.
+Put public contracts and hand-derived cases in `tests/diagram_distances.rs`,
+including the [dimension contract cases](#dimension-level-consumer-contract)
+for both operands and controlled variants with sufficient work budget.
 Use the private kernel tests for matching invariants and an independent exhaustive
 oracle. Test ties, multiplicity, diagonal costs, essential points, numerical
 boundaries and symmetry. Expected answers must not come from another production
