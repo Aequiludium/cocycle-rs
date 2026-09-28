@@ -1,8 +1,8 @@
 //! Native exact bottleneck kernel, adapted from Topp 1.0.1 (MIT).
 //!
 //! The adaptive gates match Topp commit ffa1da051ca7ac5e313c74cc9fb92a2bcb20c234.
-//! Inputs here contain validated finite, strictly off-diagonal points only.
-//! The facade owns essential points and input/provenance validation.
+//! The kernel materializes its own finite coordinates from a logical dimension
+//! view. The facade validates coverage/context and streams essential matching.
 //!
 //! Copyright (c) 2026 Topp contributors
 //!
@@ -31,6 +31,7 @@ mod geometry;
 #[path = "bottleneck/matching.rs"]
 mod matching;
 
+use crate::diagram::{DiagramDimension, IntervalEnd};
 use crate::execution::WorkBudget;
 use crate::{Error, Result};
 
@@ -44,7 +45,7 @@ pub(crate) use instrumentation::{Diagnostics, Options, Search};
 struct Options {}
 #[cfg(not(any(test, cocycle_distance_bench)))]
 #[derive(Default)]
-struct Diagnostics {}
+pub(crate) struct Diagnostics {}
 
 const NONE: usize = usize::MAX;
 
@@ -350,6 +351,42 @@ fn prefer_mandatory(first: &Prepared<'_>, second: &Prepared<'_>, total: usize, u
     span > 0.0 && upper <= cutoff
 }
 
+pub(crate) fn from_dimensions<const CONTROLLED: bool>(
+    first: &DiagramDimension<'_>,
+    second: &DiagramDimension<'_>,
+    counts: (usize, usize),
+    stats: &mut Diagnostics,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
+    // Coordinates and all indexes stay owned by this kernel. The borrowed
+    // Prepared state below never outlives these private coordinate buffers.
+    let first = coordinates(first, counts.0, budget)?;
+    let second = coordinates(second, counts.1, budget)?;
+    let value = solve(&first, &second, Options::default(), stats, budget)?;
+    record! {
+        stats.preparation_bytes += bytes(&first).saturating_add(bytes(&second));
+        stats.preparation_buffers += usize::from(!first.is_empty()) + usize::from(!second.is_empty());
+    }
+    Ok(value)
+}
+
+fn coordinates<const CONTROLLED: bool>(
+    view: &DiagramDimension<'_>,
+    count: usize,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<Vec<[f64; 2]>> {
+    let mut points = Vec::new();
+    points.try_reserve_exact(count).map_err(|_| allocation())?;
+    for interval in view.iter() {
+        budget.step()?;
+        if let IntervalEnd::Finite(death) = interval.end() {
+            points.push([interval.birth(), death]);
+        }
+    }
+    Ok(points)
+}
+
+#[cfg(test)]
 pub(crate) fn distance<const CONTROLLED: bool>(
     first: &[[f64; 2]],
     second: &[[f64; 2]],
@@ -396,6 +433,10 @@ fn solve<const CONTROLLED: bool>(
         .checked_add(second.points.len())
         .ok_or_else(size_overflow)?;
     record! { _stats.workspace(first.bytes().saturating_add(second.bytes())); }
+    record! {
+        _stats.preparation_bytes = first.bytes().saturating_add(second.bytes());
+        _stats.preparation_buffers = 4 * (usize::from(!first.points.is_empty()) + usize::from(!second.points.is_empty()));
+    }
     if first.points.is_empty() || second.points.is_empty() {
         return Ok(first.max_diagonal.max(second.max_diagonal));
     }

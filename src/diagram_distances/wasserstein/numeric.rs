@@ -2,6 +2,7 @@
 //! Adapted from Topp; the parent module retains the MIT attribution.
 
 use super::{Metric, allocation, buffer, sum_size};
+use crate::diagram::IntervalEnd;
 use crate::execution::WorkBudget;
 use crate::{Error, Result};
 
@@ -35,18 +36,18 @@ pub(super) struct Point {
 }
 
 pub(super) fn prepare<const CONTROLLED: bool>(
-    input: &[[f64; 2]],
+    input: impl Iterator<Item = (f64, IntervalEnd)>,
+    count: usize,
     scale: f64,
     budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<Vec<Point>> {
     let mut result = Vec::new();
-    result
-        .try_reserve_exact(input.len())
-        .map_err(|_| allocation())?;
-    for (index, &[birth, death]) in input.iter().enumerate() {
-        if CONTROLLED && index % 256 == 0 {
-            budget.step_by((input.len() - index).min(256))?;
-        }
+    result.try_reserve_exact(count).map_err(|_| allocation())?;
+    for (birth, end) in input {
+        budget.step()?;
+        let IntervalEnd::Finite(death) = end else {
+            continue;
+        };
         let b = birth / scale;
         let d = death / scale;
         // Scaling by a power of two must be reversible: no implicit quantization
@@ -68,17 +69,14 @@ pub(super) fn prepare<const CONTROLLED: bool>(
 }
 
 pub(super) fn power_scale<const CONTROLLED: bool>(
-    first: &[[f64; 2]],
-    second: &[[f64; 2]],
+    input: impl Iterator<Item = (f64, IntervalEnd)>,
     budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<f64> {
     let mut largest = 0.0_f64;
-    for points in [first, second] {
-        for chunk in points.chunks(256) {
-            budget.step_by(chunk.len())?;
-            for point in chunk {
-                largest = largest.max(point[0].abs()).max(point[1].abs());
-            }
+    for (birth, end) in input {
+        budget.step()?;
+        if let IntervalEnd::Finite(death) = end {
+            largest = largest.max(birth.abs()).max(death.abs());
         }
     }
     if largest == 0.0 || (2.0_f64.powi(-200)..=2.0_f64.powi(200)).contains(&largest) {
