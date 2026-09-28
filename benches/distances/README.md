@@ -2,6 +2,10 @@
 
 [Benchmarks](../README.md) / [Reporting rules](../reporting.md)
 
+The separate [preparation investigation](../reports/distance-preparation.md)
+provides a deterministic public-API counterexample and runtime allocation
+controls. Its warmed-call protocol differs from this suite; do not pool samples.
+
 Use this suite to check bottleneck, W1 and W2 against independent references,
 then compare memory and search choices within Rust and C++. Protocol
 `cocycle-distance-v1` preserves f64 inputs and has its own timing boundary;
