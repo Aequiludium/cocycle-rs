@@ -187,6 +187,19 @@ Review focuses on correctness, public contracts, independent evidence, and wheth
 the change fits the library's scope. Discuss technical choices respectfully and
 make feedback specific and actionable.
 
+The repository policy is recorded in the [CI ruleset](.github/rulesets/main.json)
+and [review ruleset](.github/rulesets/review.json). These files must be applied
+through GitHub's repository settings or API; committing them does not activate
+the rules. CI checks, an up-to-date branch, and protection against force pushes
+and deletion apply to everyone. Pull requests normally require one approval
+from another [code owner](.github/CODEOWNERS); new commits dismiss stale approvals,
+and review conversations must be resolved. Repository administrators may
+explicitly bypass the review rules on a pull request, but cannot bypass CI.
+
+GitHub Actions are pinned to full commit SHAs. Dependabot checks for updates
+weekly; maintainers review these updates through the same pull request process.
+Keep the required check names in the CI ruleset aligned when renaming CI jobs.
+
 ## Documentation ownership
 
 The [documentation index](docs/README.md#organization-and-maintenance) defines
