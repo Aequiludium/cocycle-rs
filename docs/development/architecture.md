@@ -367,10 +367,17 @@ That trait's `impl Iterator` returns make it a static generic interface, not a
 `PersistenceDiagram` owns a nonempty `ComputedDimensions` set. `new(q, ...)`
 records every dimension through q; `with_dimensions` supports H1-only and gapped
 domains. `max_dimension()` is only the greatest member. Consumers query membership
-through `computed_dimensions()` or `intervals_in_dimension`; an absent dimension
+through `computed_dimensions()` or `dimension`; an absent dimension
 is an error even below the maximum. Current builders still compute contiguous
 domains. Representative terms use simplex vertex lists, with persistent-cycle and
 dual cocycle guarantees; generic cell computation still rejects representative requests.
+
+Diagram reads expose a canonical logical sequence of `PersistenceInterval` values,
+not borrowed physical rows. `dimension(k)` returns a borrowed `DiagramDimension`;
+its fields are private and its iterator preserves order and multiplicity. The
+current internal AoS vector remains unchanged. Neither diagram nor dimension
+iteration allocates an intermediate interval buffer. Representatives address
+canonical ordinals resolved by `interval(index)`, independent of storage layout.
 
 `PersistenceResult` composes `PersistenceData` with optional representatives.
 The common data owns diagram/context and exposes immutable borrows. Compatible

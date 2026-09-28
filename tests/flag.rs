@@ -36,11 +36,7 @@ fn cycle_and_isolate_have_essential_classes_only_for_complete_graph() {
             &ExecutionLimits::default(),
         )
         .unwrap();
-        let h0: Vec<_> = result
-            .diagram()
-            .intervals_in_dimension(0)
-            .unwrap()
-            .collect();
+        let h0: Vec<_> = result.diagram().dimension(0).unwrap().iter().collect();
         assert_eq!(h0.len(), 5);
         assert_eq!(
             h0.iter()
@@ -49,11 +45,7 @@ fn cycle_and_isolate_have_essential_classes_only_for_complete_graph() {
             2
         );
         if q == 1 {
-            let h1: Vec<_> = result
-                .diagram()
-                .intervals_in_dimension(1)
-                .unwrap()
-                .collect();
+            let h1: Vec<_> = result.diagram().dimension(1).unwrap().iter().collect();
             assert_eq!(h1.len(), 1);
             assert_eq!(h1[0].birth(), 1.);
             assert_eq!(h1[0].end(), IntervalEnd::Essential);
@@ -66,7 +58,7 @@ fn cycle_and_isolate_have_essential_classes_only_for_complete_graph() {
     )
     .unwrap();
     assert_eq!(result.diagram().coverage(), Coverage::Through(0.));
-    assert_eq!(result.diagram().intervals().len(), 5);
+    assert_eq!(result.diagram().len(), 5);
 }
 
 #[test]
@@ -124,12 +116,6 @@ fn sparse_h1_handles_many_isolated_vertices_with_bounded_work() {
         &ExecutionLimits::new(Some(100), None),
     )
     .unwrap();
-    assert_eq!(
-        result.diagram().intervals_in_dimension(0).unwrap().count(),
-        10000
-    );
-    assert_eq!(
-        result.diagram().intervals_in_dimension(1).unwrap().count(),
-        0
-    );
+    assert_eq!(result.diagram().dimension(0).unwrap().iter().count(), 10000);
+    assert_eq!(result.diagram().dimension(1).unwrap().iter().count(), 0);
 }

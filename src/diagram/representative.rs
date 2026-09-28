@@ -47,7 +47,10 @@ impl Representative {
     pub fn request_index(&self) -> usize {
         self.request_index
     }
-    /// Position in the owning result's diagram interval slice.
+    /// Zero-based ordinal in the owning diagram's canonical logical interval sequence.
+    ///
+    /// Resolve with [`super::PersistenceDiagram::interval`]. Duplicate intervals
+    /// retain distinct ordinals, local to this result rather than to storage addresses.
     pub fn interval_index(&self) -> usize {
         self.interval_index
     }

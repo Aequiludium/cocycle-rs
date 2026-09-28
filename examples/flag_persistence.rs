@@ -13,18 +13,12 @@ fn main() -> cocycle::Result<()> {
         .collect();
     let input = FlagFiltration::new(WeightedGraph::new(5, edges)?);
     let result = input.persistence().compute()?;
-    println!(
-        "{:?}: {:?}",
-        result.context().filtration_kind(),
-        result.diagram().intervals()
-    );
+    println!("{:?}:", result.context().filtration_kind());
+    for interval in result.diagram().intervals() {
+        println!("{interval:?}");
+    }
     assert_eq!(
-        result
-            .diagram()
-            .intervals_in_dimension(1)?
-            .next()
-            .unwrap()
-            .end(),
+        result.diagram().dimension(1)?.iter().next().unwrap().end(),
         IntervalEnd::Essential
     );
     Ok(())

@@ -24,7 +24,6 @@ fn cross_polytope(pairs: usize) -> Vec<f64> {
 fn bars(diagram: &PersistenceDiagram) -> Vec<(usize, f64, Option<f64>)> {
     let mut bars: Vec<_> = diagram
         .intervals()
-        .iter()
         .map(|i| {
             (
                 i.dimension(),
@@ -74,8 +73,9 @@ fn high_dimensional_spheres_die_when_opposite_edges_enter() {
             assert_eq!(sparse.diagram(), dense.diagram());
             let sphere: Vec<_> = dense
                 .diagram()
-                .intervals_in_dimension(pairs - 1)
+                .dimension(pairs - 1)
                 .unwrap()
+                .iter()
                 .collect();
             assert_eq!(sphere.len(), 1);
             assert_eq!(sphere[0].birth(), 1.);
@@ -98,8 +98,9 @@ fn high_dimensional_spheres_die_when_opposite_edges_enter() {
                 assert_eq!(
                     supplied
                         .diagram()
-                        .intervals_in_dimension(pairs - 1)
+                        .dimension(pairs - 1)
                         .unwrap()
+                        .iter()
                         .next()
                         .unwrap()
                         .end(),
@@ -194,7 +195,7 @@ fn arbitrary_requests_empty_inputs_and_control_failures() {
         assert!(expanded.is_dimension_complete());
         let result =
             compute_expanded_rips(&expanded, &options, &ExecutionLimits::default()).unwrap();
-        assert_eq!(result.diagram().intervals().len(), n);
+        assert_eq!(result.diagram().len(), n);
         assert_eq!(
             result.diagram(),
             compute_rips_from_distances(matrix(&[], n), &options, &ExecutionLimits::default())
@@ -386,5 +387,5 @@ fn sparse_high_dimensions_do_not_densify() {
         &ExecutionLimits::new(Some(20000), None),
     )
     .unwrap();
-    assert_eq!(result.diagram().intervals().len(), 10000);
+    assert_eq!(result.diagram().len(), 10000);
 }

@@ -24,6 +24,7 @@ pub enum IntervalEnd {
 /// Finite intervals use `[birth, death)`. A censored interval includes its
 /// `through` scale and may have `birth == through`. Zero-length finite intervals
 /// are not stored in public diagrams.
+/// This is a logical value: reading a diagram does not require a stored physical row.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PersistenceInterval {
     dimension: usize,

@@ -38,7 +38,7 @@ assert_eq!(graph.graph().vertex_count(), 4);
 assert_eq!(graph.graph().edge_count(), 4);
 assert_eq!(graph.coverage(), Coverage::Through(1.));
 let result = graph.persistence().compute()?;
-let interval = result.diagram().intervals_in_dimension(1)?.next().unwrap();
+let interval = result.diagram().dimension(1)?.iter().next().unwrap();
 assert_eq!(interval.end(), IntervalEnd::RightCensored { through: 1. });
 # Ok::<(), cocycle::Error>(())
 ```
@@ -68,7 +68,7 @@ let input = DissimilarityMatrixView::new(&values, 3, MatrixLayout::UpperTriangle
 assert_eq!(input.get(2, 0), Some(2.));
 let result = RipsBuilder::from_distance_matrix(input).persistence().compute()?;
 assert_eq!(result.context().characteristic(), 2);
-assert_eq!(result.diagram().intervals_in_dimension(1)?.count(), 0);
+assert_eq!(result.diagram().dimension(1)?.iter().count(), 0);
 # Ok::<(), cocycle::Error>(())
 ```
 
@@ -109,7 +109,7 @@ let edges = [[0,1], [1,2], [2,3], [0,3]].into_iter()
 let input = FlagFiltration::new(WeightedGraph::new(5, edges)?); // Vertex 4 is isolated.
 let result = input.persistence().compute()?;
 assert_eq!(result.diagram().coverage(), Coverage::Complete);
-assert_eq!(result.diagram().intervals_in_dimension(1)?.next().unwrap().end(), IntervalEnd::Essential);
+assert_eq!(result.diagram().dimension(1)?.iter().next().unwrap().end(), IntervalEnd::Essential);
 # Ok::<(), cocycle::Error>(())
 ```
 
@@ -138,7 +138,7 @@ let triangle = complex.find(&[0, 2, 4]).unwrap();
 assert_eq!(complex.boundary(triangle).unwrap().len(), 3);
 assert_eq!(complex.cofacets(triangle).unwrap().len(), 3);
 let result = expanded.persistence().max_homology_dimension(2).compute()?;
-let sphere = result.diagram().intervals_in_dimension(2)?.next().unwrap();
+let sphere = result.diagram().dimension(2)?.iter().next().unwrap();
 assert_eq!((sphere.birth(), sphere.end()), (1., IntervalEnd::Finite(2.)));
 # Ok::<(), cocycle::Error>(())
 ```

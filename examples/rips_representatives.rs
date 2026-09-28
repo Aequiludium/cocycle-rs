@@ -23,7 +23,10 @@ fn main() -> cocycle::Result<()> {
     assert_eq!(representatives.len(), 2);
     assert_eq!(result.context().characteristic(), 3);
     for representative in representatives {
-        let interval = result.diagram().intervals()[representative.interval_index()];
+        let interval = result
+            .diagram()
+            .interval(representative.interval_index())
+            .unwrap();
         let kind = match representative.kind() {
             RepresentativeKind::Cycle => "cycle",
             RepresentativeKind::Cocycle => "cocycle",

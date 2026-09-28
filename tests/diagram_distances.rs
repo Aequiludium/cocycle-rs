@@ -74,15 +74,15 @@ fn compatible_results_borrow_common_data_and_keep_witness_indices() -> cocycle::
     )?];
     let result = source.persistence().representatives(&requests).compute()?;
     let common: &PersistenceData = result.as_ref();
-    assert!(std::ptr::eq(common.diagram(), result.diagram()));
+    assert_eq!(common.diagram(), result.diagram());
     assert!(std::ptr::eq(common.context(), result.context()));
-    let interval_buffer = result.diagram().intervals().as_ptr();
+    let intervals: Vec<_> = result.diagram().intervals().collect();
     let witnesses = result.representatives().unwrap().to_vec();
     let (data, representatives) = result.into_parts();
-    assert_eq!(data.diagram().intervals().as_ptr(), interval_buffer);
+    assert_eq!(data.diagram().intervals().collect::<Vec<_>>(), intervals);
     assert_eq!(representatives.as_deref(), Some(witnesses.as_slice()));
     for witness in representatives.unwrap() {
-        let interval = &data.diagram().intervals()[witness.interval_index()];
+        let interval = &data.diagram().interval(witness.interval_index()).unwrap();
         assert_eq!(interval.dimension(), witness.dimension());
         assert!(interval.birth() <= witness.scale());
     }
@@ -137,7 +137,7 @@ fn diagram(points: &[[f64; 2]]) -> PersistenceDiagram {
 }
 
 fn with_essential(points: &[[f64; 2]], births: &[f64]) -> PersistenceDiagram {
-    let mut intervals = diagram(points).intervals().to_vec();
+    let mut intervals = diagram(points).intervals().collect::<Vec<_>>();
     intervals.extend(
         births
             .iter()
@@ -612,14 +612,12 @@ fn modified_sparse_edge_values_measure_diagrams_in_the_declared_parameter() {
             exact
                 .diagram()
                 .intervals()
-                .iter()
                 .any(|i| i.end() == IntervalEnd::Finite(3. * unit))
         );
         assert!(
             sparse
                 .diagram()
                 .intervals()
-                .iter()
                 .any(|i| i.end() == IntervalEnd::Finite(4. * unit))
         );
         for (raw, contextual) in DISTANCES.into_iter().zip([

@@ -15,7 +15,7 @@ pub use dimensions::ComputedDimensions;
 
 pub use crate::filtration::{Coverage, FiltrationKind};
 pub use interval::{IntervalEnd, PersistenceInterval};
-pub use persistence_diagram::PersistenceDiagram;
+pub use persistence_diagram::{DiagramDimension, PersistenceDiagram};
 
 pub use crate::filtration::{ApproximationTarget, RipsApproximation, RipsApproximationBound};
 

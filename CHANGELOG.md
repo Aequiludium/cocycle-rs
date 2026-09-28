@@ -2,6 +2,17 @@
 
 ## 0.1.0 (unreleased)
 
+- Pre-release breaking diagram access revision: `PersistenceDiagram::intervals()`
+  now yields `PersistenceInterval` values in canonical logical order, preserving
+  multiplicity. Add `len`, `is_empty`, and `interval(index)` for logical ordinals;
+  replace `intervals_in_dimension(k)` with `dimension(k)?.iter()` on the borrowed
+  `DiagramDimension` view. Computed-empty/uncomputed dimensions, coverage and
+  endpoint semantics are unchanged. Representative indices resolve with
+  `diagram.interval(rep.interval_index())`. Storage layout, row addresses and
+  input-buffer reuse are no longer public contracts; internal AoS storage and
+  matching preparation remain unchanged. Iteration does not allocate a temporary
+  interval buffer. Migrate slice operations to logical access or explicitly collect
+  values when an owned buffer is needed.
 - Separate owned boundary computation from filtered-source validation and keep
   exact flag selection in a private dispatch module. Explicit and approximate
   Rips call simplicial algorithms directly. Add a persistence-reduction contributor

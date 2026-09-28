@@ -49,7 +49,7 @@ fn delayed_triangle_uses_all_simplex_values_and_preserves_certified_ranges() -> 
             .compute()?;
         assert_eq!(result.diagram(), generic.diagram());
         assert_eq!(result.diagram(), bases.diagram());
-        let interval = result.diagram().intervals_in_dimension(1)?.next().unwrap();
+        let interval = result.diagram().dimension(1)?.iter().next().unwrap();
         assert_eq!(
             (interval.birth(), interval.end()),
             (0.25, IntervalEnd::Finite(1. / 3.))
@@ -67,16 +67,11 @@ fn delayed_triangle_uses_all_simplex_values_and_preserves_certified_ranges() -> 
     let capped = complex.persistence().max_filtration_value(0.3).compute()?;
     assert_eq!(capped.diagram().coverage(), Coverage::Through(0.3));
     assert_eq!(
-        capped
-            .diagram()
-            .intervals_in_dimension(1)?
-            .next()
-            .unwrap()
-            .end(),
+        capped.diagram().dimension(1)?.iter().next().unwrap().end(),
         IntervalEnd::RightCensored { through: 0.3 }
     );
     let early = complex.persistence().max_filtration_value(-1.).compute()?;
-    assert!(early.diagram().intervals().is_empty());
+    assert!(early.diagram().is_empty());
     assert_eq!(early.diagram().coverage(), Coverage::Through(-1.));
     // A bare supplied skeleton is its own complete complex. A Rips certificate
     // must still reject the same insufficient skeleton relative to its source.
@@ -92,7 +87,8 @@ fn delayed_triangle_uses_all_simplex_values_and_preserves_certified_ranges() -> 
             .persistence()
             .compute()?
             .diagram()
-            .intervals_in_dimension(1)?
+            .dimension(1)?
+            .iter()
             .next()
             .unwrap()
             .end(),
@@ -146,7 +142,7 @@ fn signed_vertex_births_and_interleaved_cells_agree_with_representatives() -> Re
         cocycle::descriptors::betti_curve(diagram.diagram(), 0, &[-5., -4., -3., -2., 0., 1., 2.])?,
         [0, 1, 2, 1, 1, 2, 1]
     );
-    let intervals = diagram.diagram().intervals();
+    let intervals: Vec<_> = diagram.diagram().intervals().collect();
     assert_eq!(
         (intervals[0].birth(), intervals[0].end()),
         (-4., IntervalEnd::Essential)
@@ -224,7 +220,7 @@ fn low_degree_selection_reuses_frozen_incidence_and_range() -> Result<()> {
         .persistence()
         .max_filtration_value(-2.)
         .compute_with(&Execution::default().max_work(16))?;
-    assert!(early.diagram().intervals().is_empty());
+    assert!(early.diagram().is_empty());
     let empty = SimplicialComplex::new(vec![])?;
     assert_eq!(empty.vertex_count(), 0);
     assert_eq!(empty.dimension(), None);
@@ -274,13 +270,13 @@ fn zero_born_non_flag_cofaces_agree_with_boundary_reduction() -> Result<()> {
                 .compute()?;
             assert_eq!(actual.diagram(), boundary.diagram());
             if cutoff == 3. {
-                let h1: Vec<_> = actual.diagram().intervals_in_dimension(1)?.collect();
+                let h1: Vec<_> = actual.diagram().dimension(1)?.iter().collect();
                 assert_eq!(h1.len(), 3);
                 assert!(
                     h1.iter()
                         .all(|i| i.birth() == 1. && i.end() == IntervalEnd::Finite(2.))
                 );
-                let h2: Vec<_> = actual.diagram().intervals_in_dimension(2)?.collect();
+                let h2: Vec<_> = actual.diagram().dimension(2)?.iter().collect();
                 assert_eq!(h2.len(), 1);
                 assert_eq!((h2[0].birth(), h2[0].end()), (3., IntervalEnd::Essential));
             }
@@ -322,31 +318,23 @@ fn external_cell_contract_handles_field_dependent_homology() -> Result<()> {
         .max_homology_dimension(2)
         .compute()?;
     assert_eq!(
-        mod2.diagram()
-            .intervals_in_dimension(1)?
-            .next()
-            .unwrap()
-            .end(),
+        mod2.diagram().dimension(1)?.iter().next().unwrap().end(),
         IntervalEnd::Essential
     );
     assert_eq!(
-        mod2.diagram()
-            .intervals_in_dimension(2)?
-            .next()
-            .unwrap()
-            .end(),
+        mod2.diagram().dimension(2)?.iter().next().unwrap().end(),
         IntervalEnd::Essential
     );
     let mod3 = PersistenceBuilder::from_complex(&source)
         .max_homology_dimension(2)
         .field(PrimeField::new(3)?)
         .compute()?;
-    let interval = mod3.diagram().intervals_in_dimension(1)?.next().unwrap();
+    let interval = mod3.diagram().dimension(1)?.iter().next().unwrap();
     assert_eq!(
         (interval.birth(), interval.end()),
         (-2., IntervalEnd::Finite(1.))
     );
-    assert_eq!(mod3.diagram().intervals_in_dimension(2)?.count(), 0);
+    assert_eq!(mod3.diagram().dimension(2)?.iter().count(), 0);
     let requests = [RepresentativeRequest::new(
         1,
         0.,
@@ -396,7 +384,6 @@ fn construction_rejects_invalid_topology_and_filtration() {
             .compute()
             .unwrap()
             .diagram()
-            .intervals()
             .is_empty()
     );
     let legacy: cocycle::complex::FilteredSimplicialComplex = alpha_triangle();
