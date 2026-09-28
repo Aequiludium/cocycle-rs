@@ -416,30 +416,34 @@ fn distance<const CONTROLLED: bool>(
     if essential != second.len() - second_finite {
         return Ok(f64::INFINITY);
     }
-    let finite = match kind {
-        Kind::Bottleneck => bottleneck::from_dimensions(
-            &first,
-            &second,
-            (first_finite, second_finite),
-            &mut stats.bottleneck,
-            budget,
-        )?,
-        Kind::W1 => wasserstein::from_dimensions(
-            &first,
-            &second,
-            (first_finite, second_finite),
-            wasserstein::Metric::W1,
-            &mut stats.wasserstein,
-            budget,
-        )?,
-        Kind::W2 => wasserstein::from_dimensions(
-            &first,
-            &second,
-            (first_finite, second_finite),
-            wasserstein::Metric::W2,
-            &mut stats.wasserstein,
-            budget,
-        )?,
+    let finite = if first_finite == 0 && second_finite == 0 {
+        0.0
+    } else {
+        match kind {
+            Kind::Bottleneck => bottleneck::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                &mut stats.bottleneck,
+                budget,
+            )?,
+            Kind::W1 => wasserstein::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                wasserstein::Metric::W1,
+                &mut stats.wasserstein,
+                budget,
+            )?,
+            Kind::W2 => wasserstein::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                wasserstein::Metric::W2,
+                &mut stats.wasserstein,
+                budget,
+            )?,
+        }
     };
     let mut value = finite;
     let mut compensation = 0.0;

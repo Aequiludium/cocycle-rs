@@ -204,8 +204,8 @@ and [mathematical contract](../reference/mathematics.md#16-diagram-matching-dist
 The facade passes borrowed `DiagramDimension` views and finite counts into the
 kernels. It allocates no shared point arrays; essential births are matched by
 streaming their canonical subsequences. Bottleneck owns private coordinate and
-index buffers, while Wasserstein scans the logical view for its scale and builds
-only its algorithm-specific prepared points. Repeated scans retain the shared
+index buffers, while Wasserstein determines its scale while filling its own
+point vectors and normalizes them in place. Repeated scans retain the shared
 execution budget, including visits that skip essential or finite intervals.
 
 Decide the ground metric and Wasserstein order explicitly. Preserve repeated

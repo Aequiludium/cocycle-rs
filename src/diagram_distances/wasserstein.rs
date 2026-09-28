@@ -50,9 +50,11 @@ mod numeric;
 use dense::{certified_greedy, dense_sap, tiny};
 use graph::{Edge, Graph, components, generate, groups};
 use numeric::{
-    Point, cross_power, diagonal_power, finite, from_flows, from_matching, numerical, power_scale,
-    prepare, restore_scale, saving,
+    Point, cross_power, diagonal_power, finite, from_flows, from_matching, numerical,
+    prepare_dimensions, restore_scale, saving,
 };
+#[cfg(any(test, cocycle_distance_bench))]
+use numeric::{power_scale, prepare};
 mod sparse;
 #[cfg(test)]
 mod tests;
@@ -239,25 +241,7 @@ pub(crate) fn from_dimensions<const CONTROLLED: bool>(
     stats: &mut Stats,
     budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<f64> {
-    let scale = power_scale(
-        first
-            .iter()
-            .chain(second.iter())
-            .map(|i| (i.birth(), i.end())),
-        budget,
-    )?;
-    let first = prepare(
-        first.iter().map(|i| (i.birth(), i.end())),
-        counts.0,
-        scale,
-        budget,
-    )?;
-    let second = prepare(
-        second.iter().map(|i| (i.birth(), i.end())),
-        counts.1,
-        scale,
-        budget,
-    )?;
+    let (first, second, scale) = prepare_dimensions(first, second, counts, budget)?;
     solve_prepared(
         first,
         second,

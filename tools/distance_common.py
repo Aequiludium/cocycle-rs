@@ -219,6 +219,8 @@ PHASE_HOOKS = {
     'bottleneck/flow.rs': [('fn within<const CONTROLLED: bool>(', 'bottleneck.flow_decision')],
     'wasserstein/numeric.rs': [
         ('fn prepare<const CONTROLLED: bool>(', 'wasserstein.prepare'),
+        ('fn collect_points<const CONTROLLED: bool>(', 'wasserstein.collect'),
+        ('fn normalize<const CONTROLLED: bool>(', 'wasserstein.normalize'),
         ('fn from_flows<const CONTROLLED: bool>(', 'wasserstein.reconstruct'),
     ],
     'wasserstein/graph.rs': [
