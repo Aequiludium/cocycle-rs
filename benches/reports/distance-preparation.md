@@ -7,8 +7,6 @@
 This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle-rs/issues/14).
 Implementation and independent replication discussion:
 [Draft PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
-Implementation and independent replication discussion:
-[Draft PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
 The implementation removes the facade's intermediate finite/essential vectors
 and prepares algorithm-owned storage from logical diagram views. Fewer copies
 are not a performance guarantee. A fresh committed-harness comparison did not
