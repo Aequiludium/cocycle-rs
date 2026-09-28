@@ -82,6 +82,8 @@ impl KdIndex {
     }
 
     // Keep the existing query operands separate from diagnostics and execution.
+    // Keep the per-neighbor query in its caller after budget specialization.
+    #[inline(always)]
     #[allow(clippy::too_many_arguments)]
     fn next<const CONTROLLED: bool>(
         &self,
