@@ -7,11 +7,13 @@
 This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle-rs/issues/14).
 The implementation removes the facade's intermediate finite/essential vectors
 and prepares algorithm-owned storage from logical diagram views. Fewer copies
-are not a performance guarantee. The change remains a draft pending independent
-reproduction of a finite W1 regression and discussion of the appropriate fix.
+are not a performance guarantee. A fresh committed-harness comparison did not
+reproduce the earlier stable W1 regression or the earlier timing ordering of
+allocation interventions. It did reproduce differences in buffer relocation.
+The change remains a draft pending independent replication and discussion.
 No padding allocations or experimental selectors are added to the public crate.
 
-The counterexample is a complete dimension-zero diagram with 512 finite
+The proposed counterexample is a complete dimension-zero diagram with 512 finite
 intervals against 64, evaluated with W1 and L-infinity ground distance.
 Endpoints are f64 and multiplicity is retained. This is a before/after and
 allocation-intervention experiment, not a cross-library speed ranking.
@@ -100,11 +102,102 @@ with ordinary or causal timing.
 
 ## Results and evidence status
 
-The committed reproducer is being validated for a new, revision-bound run.
-Earlier local exploration found a regression and allocation sensitivity, but
-its uncommitted diagnostic sources are not presented as measurements of this
-new harness. Measured identities and results will be recorded after the
-committed run. The implementation's performance acceptance remains open.
+Evidence class: local comparative experiment, with an inconclusive timing
+ranking. All 224 planned process samples completed, none failed or were
+excluded, all returned the expected distance, and all preparation bit checks
+passed. The report commit is distinct from the measured revision.
+
+| Identity | Recorded value |
+| --- | --- |
+| Measured candidate and harness | `ae7bbbe7792b7f71139784e3c44ddb92028b572c`; clean at measurement |
+| Measured baseline | `75330fcf7e5b9ca764641c68b987a71bbfad8498` |
+| Production source equivalence | Candidate `src/` is unchanged from `9fb122ae9eb6e53c55f49ee38b356d87327d52ce` |
+| Run | `target/benchmarks/commit-ae7bbbe7792b7/diagram-distance-preparation/run-001/` |
+| UTC start/end | 2026-09-28 15:01:28 / 15:04:34 |
+| Build | Rust 1.91.0; Cargo release library; `rustc -O` worker; no extra RUSTFLAGS |
+| Environment | Intel Core Ultra 7 155H; WSL2 Linux 6.6.87.2; glibc 2.39; Python 3.12.3; CPU 0 |
+| Sampling | 14 fresh processes per path, 3 warmups and 300 timed calls per process |
+| Source fingerprints | Original/generated per-file SHA-256 inventories in each build's `identity.json` |
+
+Replay this measured implementation with `--candidate ae7bbbe7792b7f71139784e3c44ddb92028b572c`,
+the same committed harness, and a fresh `run-002` directory. The worker,
+controller and probe hashes are recorded in `environment.json`; experimental
+libraries are generated from this commit, not ordinary production builds.
+
+| Ordinary API | Median, us | Q1-Q3, us | Min-max, us | Median process peak RSS, KiB |
+| --- | ---: | --- | --- | ---: |
+| baseline | 402.37 | 374.55-517.34 | 361.47-688.91 | 3,168 |
+| candidate | 378.66 | 358.14-446.33 | 342.80-644.82 | 3,344 |
+
+The candidate/baseline median ratio is 0.941. The broad overlapping distributions
+do not support either a stable regression claim or a stable speedup claim.
+The small RSS difference is not evidence that materialized bytes increased:
+RSS includes allocator/runtime state and input setup as well as the kernel.
+
+| Causal path | Median, us | Q1-Q3, us | Min-max, us | Median process peak RSS, KiB |
+| --- | ---: | --- | --- | ---: |
+| direct | 439.65 | 368.61-539.61 | 343.58-793.19 | 3,344 |
+| copy_keep | 451.98 | 354.79-646.99 | 346.55-897.37 | 3,344 |
+| copy_drop | 414.42 | 362.94-493.47 | 350.03-632.24 | 3,256 |
+| unused_copy_keep | 439.80 | 356.55-507.80 | 346.95-721.94 | 3,168 |
+| reserve_keep | 483.22 | 366.51-621.52 | 347.34-774.46 | 3,344 |
+| reserve_drop | 454.60 | 359.88-606.53 | 345.69-686.48 | 3,344 |
+| reserve_after_prepare | 477.07 | 372.53-589.67 | 351.86-803.50 | 3,168 |
+
+These distributions also overlap substantially. No intervention has established
+a repeatable latency benefit in this run. Inclusive graph-generation medians
+are 311.39 us for direct, 282.65 us for copy_keep and 330.03 us for reserve_keep;
+the corresponding matching/reconstruction medians are 128.16, 135.54 and
+135.10 us. Nested scopes and independent medians must not be summed or
+subtracted to manufacture an explanation.
+
+The separate growth diagnostic does establish a change in buffer behavior:
+
+| Path | Capacity growths/call | Relocations/call | Relocated live Edge bytes/call |
+| --- | ---: | ---: | ---: |
+| direct | 2,523 | 1,024.00 | 163,840.43 |
+| copy_keep | 2,523 | 1,534.29 | 229,157.12 |
+| copy_drop | 2,523 | 1,536.00 | 229,376.00 |
+| unused_copy_keep | 2,523 | 1,534.29 | 229,157.12 |
+| reserve_keep | 2,523 | 1,534.29 | 229,157.12 |
+| reserve_drop | 2,523 | 1,536.00 | 229,376.00 |
+| reserve_after_prepare | 2,523 | 1,024.00 | 163,840.43 |
+
+Entries are medians of per-process per-call averages. Equal prepared values
+and capacity-growth counts do not imply equal relocation behavior. This
+observation is narrower than proving that copying improves latency. It does
+not locate a particular libc or cache mechanism.
+
+Earlier local exploration motivated this case: ordinary calls measured
+364.96 versus 458.36 us (24 processes), and a seven-path experimental worker
+measured 466.34 us direct versus 373.99 us with copies and 369.74 us with only
+reserved capacity (14 processes). Those exploratory workers were uncommitted;
+these figures explain the hypothesis, not an accepted performance result of
+the committed harness. Their artifacts remain local under
+`target/benchmarks/commit-9fb122ae9eb6/diagram-distance-boundary/run-004-imbalance/`
+and `target/issue14/causal-allocation/run-001/`. The new results above supersede
+any claim that this ordering has been independently reproduced. Differences
+in harness code generation, allocation history, host load and frequency have
+not been isolated. Unfavorable and contradictory results are retained.
+
+Structurally, on this finite W1 input the facade's two coordinate vectors
+(9,216 bytes of logical payload) disappear. The two algorithm-owned Point
+vectors still contain 18,432 bytes of payload; duplicate grouping and graph /
+solver workspace remain separate and unchanged in design. These payload sizes
+are not measured total allocator calls, allocator metadata, simultaneous peak
+workspace or process RSS. The existing logical diagnostic worker reports
+preparation and kernel capacity counters separately. No zero-copy or general
+memory/latency improvement is claimed.
+
+Raw formal-run data is local-only and has not been publicly archived. SHA-256:
+
+- `raw.jsonl`: `dfe09accb88e76d02e6cbdee216d440bd9ffb97880fa3b46d8e7ba462e431468`.
+- `environment.json`: `a3c108dd897403d91365c12787826b2bbcd946b0dff968c227b53153e188e97d`.
+- `candidate/identity.json`: `6c0bccc8ae197ddbb2cc7225e573abce4bf5fb7f08c45aef004d72a1a72ce8b9`.
+
+Independent replication should first compare the fixed fixture and prepared
+values, then retain all time distributions and allocator controls. Until that
+discussion is complete, the issue's integrated-performance acceptance is open.
 
 The implementation at `9fb122ae9eb6e53c55f49ee38b356d87327d52ce` passed the local
 supported distance comparison suite (108/108), using Topp
