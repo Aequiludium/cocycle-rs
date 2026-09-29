@@ -59,9 +59,9 @@ The square's H₁ interval is `[1, sqrt(2))`. Scales are **edge lengths**; a cla
 surviving an incomplete cutoff is censored, not dead. See the
 [user guide](docs/guides/rips.md) for cutoffs, input layouts, and result semantics.
 The [0.1.0 release notes](CHANGELOG.md#010) describe the supported scope,
-limitations and migration from development Git revisions. This is an initial
-release; future breaking API changes will use a new minor version while the
-crate remains below 1.0.
+limitations and migration from development Git revisions. See the
+[version policy and release procedure](CONTRIBUTING.md#release-procedure) for
+compatibility and publishing.
 
 ## Explore
 
