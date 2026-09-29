@@ -2,10 +2,18 @@
 
 ## Unreleased
 
+## 0.1.1
+
+Maintenance release for documentation discovery and release tooling.
+
 - Point the package documentation URL to the generated API reference on docs.rs
   and link it from the README and documentation index alongside the usage guides.
 - Document version selection and the reviewed release procedure; package CI now
   reads the package name and version from Cargo instead of assuming `0.1.0`.
+
+No changes to public APIs, algorithms, mathematical semantics or dependencies.
+Rust 1.91 remains the minimum supported version. No migration is required from
+0.1.0; the initial release's capabilities and limitations still apply.
 
 ## 0.1.0
 
