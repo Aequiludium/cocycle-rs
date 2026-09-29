@@ -32,11 +32,11 @@ dependencies and no unsafe code.
 
 ## Quick start
 
-**Rust 1.91+ · Pre-release.** Not yet published on crates.io; use the Git dependency:
+**Rust 1.91+ · MIT.** Add Cocycle to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
-cocycle = { git = "https://github.com/Aequiludium/cocycle-rs", branch = "main" }
+cocycle = "0.1.0"
 ```
 
 ```rust
@@ -56,9 +56,12 @@ fn main() -> cocycle::Result<()> {
 ```
 
 The square's H₁ interval is `[1, sqrt(2))`. Scales are **edge lengths**; a class
-surviving an incomplete cutoff is censored, not dead. Your application's
-`Cargo.lock` pins the resolved Git commit. See the [user guide](docs/guides/rips.md)
-for cutoffs, input layouts, and result semantics.
+surviving an incomplete cutoff is censored, not dead. See the
+[user guide](docs/guides/rips.md) for cutoffs, input layouts, and result semantics.
+The [0.1.0 release notes](CHANGELOG.md#010) describe the supported scope,
+limitations and migration from development Git revisions. This is an initial
+release; future breaking API changes will use a new minor version while the
+crate remains below 1.0.
 
 ## Explore
 
@@ -74,7 +77,8 @@ without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
 
-Build the API reference with `cargo doc --no-deps --open`, or run the example with
+Build the API reference with `cargo doc --no-deps --open`. From a repository
+checkout, run the example with
 `cargo run --locked --example square`. Dimension-generic prime-field persistence and
 explicit complex queries are demonstrated by `cargo run --example rips_sphere`.
 [Prime fields and representative bases](docs/guides/rips-representatives.md) are

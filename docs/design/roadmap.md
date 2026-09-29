@@ -30,8 +30,9 @@ incidence queries, requested cycle/cocycle bases, blocker-aware sparse approxima
 owned diagrams/context, basic descriptors and exact bottleneck/Wasserstein distances.
 Cooperative work limits and cancellation are available on the richer compute
 entry points. An independent explicit boundary implementation remains a test oracle; the
-production representative path owns a separate reducer. The
-crate has not been published. See the [construction guide](../guides/rips-construction.md).
+production representative path owns a separate reducer. See the
+[construction guide](../guides/rips-construction.md) and the
+[0.1.0 release scope](../../CHANGELOG.md#010).
 
 The [filtered-complex boundary](../guides/filtered-complexes.md) is implemented:
 validated supplied simplices, a four-method cell trait, signed-scale boundary
@@ -52,26 +53,26 @@ The [API design](rips-api.md) is implemented with a compatibility stage:
 configures direct analysis. Approximation, callback ownership, source context and
 whole-operation execution controls follow the same contracts. Guides and native
 workers use the new paths. Legacy names and functions remain available; removing
-them requires a separately declared pre-release breaking revision. Algorithm
+them requires a separately declared breaking release. Algorithm
 optimizations and new filtration families remain separate review units.
 
 The [aligned kernel design](kernel.md) owns the dependency, ownership, result and
 extension decisions. Its [implementation sequence](kernel.md#implementation-sequence)
-has been completed locally in four steps:
+is included in the 0.1.0 release in four steps:
 
-1. Implemented locally: reuse frozen simplicial incidence, cache structural facts,
+1. Reuse frozen simplicial incidence, cache structural facts,
    and limit direct exact point edge retention to the effective analysis range,
    without changing public result semantics.
-2. Implemented locally: common result data and computed dimensions in the explicitly
+2. Common result data and computed dimensions in the explicitly
    [declared result-API revision](kernel.md#result-api-migration), including analysis
    consumers and equivalent source-context assembly.
-3. Implemented locally: independent owned-boundary computation, exact flag
+3. Independent owned-boundary computation, exact flag
    dispatch and direct simplicial calls for explicit/approximate Rips. Share
    compatible types and keep specialized public operations optional.
-4. Implemented locally: contributor guides and examples reflect the current
+4. Contributor guides and examples reflect the current
    boundaries; persistence reduction has a focused check exercised by CI.
 
-These four steps are implemented locally. Diagrams support explicit computed-dimension sets;
+Diagrams support explicit computed-dimension sets;
 default builders still compute every dimension through their requested maximum.
 Current representatives remain simplicial bases. Common data supports cheap
 `AsRef` borrowing. The design specifies static cell adaptation and the scope
@@ -115,10 +116,11 @@ capabilities; they are not substitutes for completing Rips. The selected target
 includes ownership, resources, reproducibility and result interpretation, not only
 an expanded constructor list. See [R1-R10](rips.md#required-capability-matrix).
 
-The first crates.io release remains a separate readiness gate: verify the name
-and publisher, confirm hosted CI for the release commit, and inspect the package
-using the [release procedure](../../CONTRIBUTING.md#release-procedure). This planning
-work does not publish a crate or commit to a release date.
+Each crates.io release requires hosted CI for the exact release commit and
+inspection of the packaged crate, following the
+[release procedure](../../CONTRIBUTING.md#release-procedure). Release notes in the
+[changelog](../../CHANGELOG.md) describe delivered capabilities; this roadmap
+does not commit to dates for future work.
 
 Performance-only changes to existing paths must preserve pivot order, F2 parity,
 multiplicity, and public coverage. New fields and generalized algorithms establish

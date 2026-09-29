@@ -3,7 +3,7 @@
 [Documentation](../README.md) / Design
 
 Status: adapter/resource corrections, the result-API revision, algorithm-boundary
-cleanup and the reduction contributor walkthrough are implemented locally.
+cleanup and the reduction contributor walkthrough are included in 0.1.0.
 This page defines the
 intended responsibilities, type boundaries and implementation sequence.
 [Current architecture](../development/architecture.md) and rustdoc describe
