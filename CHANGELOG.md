@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-No changes yet.
+- Point the package documentation URL to the generated API reference on docs.rs
+  and link it from the README and documentation index alongside the usage guides.
+- Document version selection and the reviewed release procedure; package CI now
+  reads the package name and version from Cargo instead of assuming `0.1.0`.
 
 ## 0.1.0
 
