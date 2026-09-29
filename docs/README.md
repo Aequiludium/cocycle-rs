@@ -32,8 +32,9 @@ proposed APIs and remaining acceptance gates.
   defines the metrics, supported endpoints and context requirements.
 - [Runnable square example](../examples/square.rs): run
   `cargo run --locked --example square` from the repository root.
-- [API reference source](../src/lib.rs): build rustdoc with
-  `cargo doc --locked --no-deps --open` for signatures and error contracts.
+- [Published API reference](https://docs.rs/cocycle): browse rustdoc for signatures
+  and error contracts. For the current checkout's [API source](../src/lib.rs),
+  build locally with `cargo doc --locked --no-deps --open`.
 
 ## Understand and develop the core
 

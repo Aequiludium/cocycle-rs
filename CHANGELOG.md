@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-No changes yet.
+- Point the package documentation URL to the generated API reference on docs.rs
+  and link it from the README and documentation index alongside the usage guides.
 
 ## 0.1.0
 
