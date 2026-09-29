@@ -233,11 +233,10 @@ uncomputed dimension.
 `PersistenceDiagram::new(q, ...)` keeps contiguous `0..=q` construction.
 `ComputedDimensions::new` normalizes an explicit list; `through(q)` creates the
 contiguous set without enumerating it. `PersistenceDiagram::with_dimensions`
-accepts the declared set, exposed by `computed_dimensions()`. Every interval belongs to
-the declared set. Dimension-specific descriptors and distances reject uncomputed
-dimensions. An operation over all dimensions requires matching sets or an
-explicitly selected common domain; it never silently intersects away requested
-information.
+accepts the declared set, exposed by `computed_dimensions()`. Every interval belongs
+to the declared set; the maximum alone does not establish membership. The
+[dimension-level consumer contract](../development/diagram-analysis.md#dimension-level-consumer-contract)
+owns consumer access, domain selection, empty-result semantics and required tests.
 
 #### Result construction and external integration
 
@@ -273,8 +272,8 @@ unchanged, but its semantics differ. Migrate callers as follows:
 Use `diagram.computed_dimensions().contains(k)` for availability and
 `diagram.computed_dimensions().iter()` for traversal. `DimensionNotComputed` keeps
 its `computed_max` field as an upper bound, including errors for gaps below it.
-No current public operation implicitly combines all dimensions; future ones must
-require matching domains or explicit selection.
+No current public operation implicitly combines all dimensions. Future operations
+must follow the [consumer contract](../development/diagram-analysis.md#dimension-level-consumer-contract).
 
 The three context-aware distance functions now accept independent generic types
 `L, R: AsRef<PersistenceData> + ?Sized`. Ordinary calls with two
