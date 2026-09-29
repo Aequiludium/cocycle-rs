@@ -36,7 +36,7 @@ dependencies and no unsafe code.
 
 ```toml
 [dependencies]
-cocycle = "0.1.0"
+cocycle = "0.1.1"
 ```
 
 ```rust
@@ -58,7 +58,8 @@ fn main() -> cocycle::Result<()> {
 The square's H₁ interval is `[1, sqrt(2))`. Scales are **edge lengths**; a class
 surviving an incomplete cutoff is censored, not dead. See the
 [user guide](docs/guides/rips.md) for cutoffs, input layouts, and result semantics.
-The [0.1.0 release notes](CHANGELOG.md#010) describe the supported scope,
+The [0.1.1 release notes](CHANGELOG.md#011) describe the latest maintenance fixes;
+the [initial release notes](CHANGELOG.md#010) describe the supported scope,
 limitations and migration from development Git revisions. See the
 [version policy and release procedure](CONTRIBUTING.md#release-procedure) for
 compatibility and publishing.
