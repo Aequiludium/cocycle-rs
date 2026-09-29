@@ -323,8 +323,8 @@ parameters or result semantics may have a focused entry point independently of
 default Builder dispatch. The [kernel design](kernel.md#algorithm-implementations-and-default-integration)
 owns that contribution policy and the implemented result contracts.
 Common `PersistenceData`, explicit computed-dimension sets and internal
-[source-context assembly](kernel.md#source-facts-and-result-assembly) are implemented
-locally. The [result API migration](kernel.md#result-api-migration) describes their
+[source-context assembly](kernel.md#source-facts-and-result-assembly) are included
+in 0.1.0. The [result API migration](kernel.md#result-api-migration) describes their
 pre-release semantic and signature changes; legacy Rips entry points remain available.
 The [extension boundaries](kernel.md#extension-boundaries) distinguish current
 static cell adaptation and in-crate contributions from future external result
@@ -384,7 +384,7 @@ Implemented responsibilities (no placeholder modules):
 
 Delivery proceeds in reviewable stages: shared execution contract; both exact/flag
 workflows with explicit metadata; approximation and callbacks; caller migration;
-then removal of superseded APIs in a declared pre-release breaking revision.
+then removal of superseded APIs in a declared breaking release.
 Existing function families remain temporary tested adapters. Do not deprecate a
 capability before its replacement works. No legacy public API is removed in this compatibility stage.
 
