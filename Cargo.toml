@@ -1,6 +1,6 @@
 [package]
 name = "cocycle"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.91"
 description = "Topological data analysis in pure Rust"
@@ -8,7 +8,7 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Aequiludium/cocycle-rs"
 homepage = "https://github.com/Aequiludium/cocycle-rs"
-documentation = "https://github.com/Aequiludium/cocycle-rs/tree/main/docs"
+documentation = "https://docs.rs/cocycle"
 keywords = ["tda", "topology", "homology", "persistence"]
 categories = ["mathematics", "science"]
 publish = ["crates-io"]

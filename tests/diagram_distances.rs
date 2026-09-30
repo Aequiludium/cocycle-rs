@@ -215,29 +215,32 @@ fn distances_respect_gaps_and_selected_dimensions() -> cocycle::Result<()> {
     let only_h1 = PersistenceDiagram::with_dimensions(
         ComputedDimensions::new(vec![1])?,
         Coverage::Complete,
-        vec![],
+        vec![PersistenceInterval::new(1, 0., IntervalEnd::Finite(2.))?; 2],
     )?;
     let separated = PersistenceDiagram::with_dimensions(
         ComputedDimensions::new(vec![1, 3])?,
         Coverage::Complete,
-        vec![],
+        only_h1.intervals().collect(),
     )?;
-    for distance in [
-        bottleneck_distance,
-        wasserstein_1_infinity,
-        wasserstein_2_euclidean,
-    ] {
-        // A selected common dimension does not require identical full domains.
-        assert_eq!(distance(&only_h1, &separated, 1)?, 0.);
-        for missing in [0, 2, 3] {
-            assert!(matches!(
-                distance(&only_h1, &separated, missing),
-                Err(cocycle::Error::DimensionNotComputed { .. })
-            ));
-            assert!(matches!(
-                distance(&separated, &only_h1, missing),
-                Err(cocycle::Error::DimensionNotComputed { .. })
-            ));
+    let execution = Execution::default().max_work(u64::MAX);
+    for (distance, controlled) in DISTANCES.into_iter().zip(CONTROLLED) {
+        // Empty H3 is valid even when the same diagram has nonempty H1.
+        assert_eq!(distance(&separated, &separated, 3)?, 0.);
+        assert_eq!(controlled(&separated, &separated, 3, &execution)?, 0.);
+        for (first, second) in [(&only_h1, &separated), (&separated, &only_h1)] {
+            // A selected common dimension does not require identical full domains.
+            assert_eq!(distance(first, second, 1)?, 0.);
+            assert_eq!(controlled(first, second, 1, &execution)?, 0.);
+            for missing in [0, 2, 3, 4] {
+                assert!(matches!(
+                    distance(first, second, missing),
+                    Err(Error::DimensionNotComputed { requested, .. }) if requested == missing
+                ));
+                assert!(matches!(
+                    controlled(first, second, missing, &execution),
+                    Err(Error::DimensionNotComputed { requested, .. }) if requested == missing
+                ));
+            }
         }
     }
     Ok(())

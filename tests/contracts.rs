@@ -340,6 +340,12 @@ fn a_gap_is_uncomputed_even_when_below_the_maximum() {
             .unwrap();
     assert_eq!(diagram.max_dimension(), 3);
     assert_eq!(diagram.computed_dimensions(), &dimensions);
+    let visited: Vec<_> = diagram
+        .computed_dimensions()
+        .iter()
+        .map(|dimension| (dimension, diagram.dimension(dimension).unwrap().len()))
+        .collect();
+    assert_eq!(visited, [(1, 1), (3, 0)]);
     assert_eq!(diagram.dimension(3).unwrap().iter().count(), 0);
     for missing in [0, 2, 4] {
         assert!(
