@@ -12,6 +12,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
 | [Diagram-distance preparation and allocation effects](distance-preparation.md) | Finite W1 counterexample, ordinary API comparison and isolated allocation interventions; draft pending independent reproduction |
+| [Integrated Phase-2 performance baseline](phase2-baseline.md) | Frozen Direction-B R0, prepared Rips, complete Rips workflows and Bottleneck/W1/W2 resources; local evidence and replay contract |
 
 Do not create a report per date, commit, PR or rerun. Related suites share a report
 with separate timing contracts and tables. Keep concise conclusions and selected
