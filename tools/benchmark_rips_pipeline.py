@@ -240,7 +240,7 @@ def validate_output(data, case):
             raise ValueError('interval outside cutoff')
 
 
-def worker(command, case, timeout, memory_mib, cpu=None):
+def worker(command, case, timeout, memory_mib, cpu=None, retain_stderr=False):
     import resource
 
     def limits():
@@ -260,6 +260,8 @@ def worker(command, case, timeout, memory_mib, cpu=None):
     try:
         data = json.loads(result.stdout)
         validate_output(data, case)
+        if retain_stderr:
+            data['stderr'] = result.stderr
         return data
     except (KeyError, ValueError, TypeError) as error:
         return {'status': 'protocol_error', 'error': str(error), 'stdout': result.stdout[-2000:]}
