@@ -209,18 +209,31 @@ fn descriptors_distinguish_gaps_from_computed_empty_dimensions() -> cocycle::Res
     let separated = PersistenceDiagram::with_dimensions(
         ComputedDimensions::new(vec![1, 3])?,
         Coverage::Complete,
-        vec![],
+        vec![interval(1, 0., IntervalEnd::Finite(2.)); 2],
     )?;
+    assert_eq!(betti_curve(&separated, 1, &[0., 1., 2.])?, [2, 2, 0]);
+    assert_eq!(
+        finite_lifetime_summary(&separated, 1)?.total_persistence(),
+        4.
+    );
     assert_eq!(betti_curve(&separated, 3, &[0., 1.])?, [0, 0]);
-    assert_eq!(finite_lifetime_summary(&separated, 3)?.finite_count(), 0);
-    for missing in [0, 2] {
-        assert!(matches!(
-            betti_curve(&separated, missing, &[]),
-            Err(cocycle::Error::DimensionNotComputed { .. })
-        ));
+    let empty = finite_lifetime_summary(&separated, 3)?;
+    assert_eq!(empty.finite_count(), 0);
+    assert_eq!(empty.total_persistence(), 0.);
+    assert_eq!(empty.max_persistence(), None);
+    assert_eq!(empty.entropy(), None);
+    assert_eq!(empty.excluded_essential_count(), 0);
+    assert_eq!(empty.excluded_censored_count(), 0);
+    for missing in [0, 2, 4] {
+        for grid in [&[][..], &[0., 1.][..]] {
+            assert!(matches!(
+                betti_curve(&separated, missing, grid),
+                Err(Error::DimensionNotComputed { requested, .. }) if requested == missing
+            ));
+        }
         assert!(matches!(
             finite_lifetime_summary(&separated, missing),
-            Err(cocycle::Error::DimensionNotComputed { .. })
+            Err(Error::DimensionNotComputed { requested, .. }) if requested == missing
         ));
     }
     Ok(())

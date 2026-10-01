@@ -32,11 +32,11 @@ dependencies and no unsafe code.
 
 ## Quick start
 
-**Rust 1.91+ · Pre-release.** Not yet published on crates.io; use the Git dependency:
+**Rust 1.91+ · MIT.** Add Cocycle to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
-cocycle = { git = "https://github.com/Aequiludium/cocycle-rs", branch = "main" }
+cocycle = "0.1.1"
 ```
 
 ```rust
@@ -56,13 +56,18 @@ fn main() -> cocycle::Result<()> {
 ```
 
 The square's H₁ interval is `[1, sqrt(2))`. Scales are **edge lengths**; a class
-surviving an incomplete cutoff is censored, not dead. Your application's
-`Cargo.lock` pins the resolved Git commit. See the [user guide](docs/guides/rips.md)
-for cutoffs, input layouts, and result semantics.
+surviving an incomplete cutoff is censored, not dead. See the
+[user guide](docs/guides/rips.md) for cutoffs, input layouts, and result semantics.
+The [0.1.1 release notes](CHANGELOG.md#011) describe the latest maintenance fixes;
+the [initial release notes](CHANGELOG.md#010) describe the supported scope,
+limitations and migration from development Git revisions. See the
+[version policy and release procedure](CONTRIBUTING.md#release-procedure) for
+compatibility and publishing.
 
 ## Explore
 
-[Documentation](docs/README.md) · [Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
+[API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
+[Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
 [Architecture](docs/development/architecture.md) · [Benchmarks](benches/README.md) ·
 [Rips comparison](benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)
 
@@ -74,7 +79,9 @@ without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
 
-Build the API reference with `cargo doc --no-deps --open`, or run the example with
+Read the [published API reference](https://docs.rs/cocycle), or build it locally
+with `cargo doc --no-deps --open`. From a repository
+checkout, run the example with
 `cargo run --locked --example square`. Dimension-generic prime-field persistence and
 explicit complex queries are demonstrated by `cargo run --example rips_sphere`.
 [Prime fields and representative bases](docs/guides/rips-representatives.md) are

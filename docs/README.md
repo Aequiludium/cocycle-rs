@@ -32,8 +32,9 @@ proposed APIs and remaining acceptance gates.
   defines the metrics, supported endpoints and context requirements.
 - [Runnable square example](../examples/square.rs): run
   `cargo run --locked --example square` from the repository root.
-- [API reference source](../src/lib.rs): build rustdoc with
-  `cargo doc --locked --no-deps --open` for signatures and error contracts.
+- [Published API reference](https://docs.rs/cocycle): browse rustdoc for signatures
+  and error contracts. For the current checkout's [API source](../src/lib.rs),
+  build locally with `cargo doc --locked --no-deps --open`.
 
 ## Understand and develop the core
 
@@ -49,7 +50,8 @@ proposed APIs and remaining acceptance gates.
 | Where does code belong and how do the parts interact? | [Current architecture](development/architecture.md) |
 | How should modules, APIs, errors, and source files be written? | [Code conventions](development/conventions.md) |
 | How do we check correctness independently? | [Testing and validation](development/testing.md) |
-| Which commands, review rules, and release checks apply? | [Contributing](../CONTRIBUTING.md) |
+| Which commands and review rules apply? | [Contributing](../CONTRIBUTING.md) |
+| How are versions chosen and published? | [Release procedure](../CONTRIBUTING.md#release-procedure) |
 
 For algorithm work, start with the contribution path and relevant mathematical
 section. Maintainers use the architecture and validation obligations for kernel

@@ -29,9 +29,9 @@ Keep changes focused. New dependencies need a concrete benefit and license/MSRV
 review; Python tools and C++ comparison workers are outside the Rust runtime.
 
 Public API includes documented numeric, ordering, and error semantics, not only
-Rust signatures. Before publication, describe intentional breaking changes in the
-changelog. After publication, preserve compatibility within a 0.x minor line and
-use a new minor version for incompatible changes. MSRV changes must be explicit.
+Rust signatures. Preserve compatibility within a 0.x minor line and describe
+incompatible changes and migration in the changelog. Follow the
+[release procedure](#release-procedure) for version selection and MSRV changes.
 
 ## Focused algorithm checks
 
@@ -237,26 +237,60 @@ comparability, sampling and artifact retention; use the
 
 ## Release procedure
 
-Releases are an explicit maintainer action. A successful local build is not a
-release. Before the first publication, verify registry-name availability and
-establish the publishing identity. The source repository is
-[Aequiludium/cocycle-rs](https://github.com/Aequiludium/cocycle-rs); repository
-bootstrap does not publish a crate or reserve its name.
+The crate is published as [cocycle](https://crates.io/crates/cocycle). Releases are
+explicit maintainer actions after a reviewed release PR and successful CI.
+GitHub CI verifies changes; it does not publish packages or select versions.
 
-For every release:
+### Version and notes
 
-1. Finalize the version and changelog, review public API and MSRV changes.
-2. Run the required CI jobs for the exact release commit; inspect their results.
-3. Run `cargo package --locked`, inspect the package file list, and execute its
-   `square`, `diagram_analysis`, `diagram_distances` and `complex_construction` examples. Run the
-   packaged construction example's tests with `--example complex_construction`.
-   Exclude raw experiments and temporary files from the crate.
-4. Publish only after those checks pass, then verify installation from crates.io.
-5. Record the release tag and notes for the published source.
+`Cargo.toml` is the version source. While the crate is `0.x` with `x >= 1`, use a
+patch release for compatible additions, fixes and performance improvements, and
+a new minor version for incompatible changes. Compatibility includes documented
+mathematical semantics, defaults and errors as well as Rust signatures; see
+[Cargo's compatibility guidance](https://doc.rust-lang.org/cargo/reference/semver.html).
+Treat an increased MSRV as an incompatible change for this project, update the
+manifest, CI and user documentation together, and state it in the release notes.
+Use a suffix such as `-rc.1` only when a pre-release is needed.
 
-`cargo package --allow-dirty` is acceptable for local review of uncommitted work;
-it is not the release procedure. Do not fabricate repository URLs or success
-badges before a hosted repository and CI results exist.
+[CHANGELOG.md](CHANGELOG.md) owns release notes. Contributions add user-visible
+changes to `Unreleased`; a release PR moves them into a version section and leaves
+`Unreleased` ready for the next changes. Describe behavior, limitations and any
+migration steps. GitHub Release reuses that section rather than a separate history.
+
+### Prepare, publish and verify
+
+1. Open a release PR updating `Cargo.toml`, the corresponding `Cargo.lock` entry,
+   the changelog and README version references. Running `cargo check` after the
+   version edit refreshes the lockfile. Review the version and notes, then merge
+   through the normal PR process.
+2. Use a clean checkout of that merged commit. Confirm `git status --short` is
+   empty and all required CI checks succeeded for its exact SHA, including the
+   package job. That job builds the archive, runs its `square`, `diagram_analysis`,
+   `diagram_distances` and `complex_construction` examples, and tests the packaged
+   construction example. Do not substitute checks from an earlier PR commit.
+3. Inspect `cargo package --locked --list` for unintended files and run
+   `cargo publish --locked --registry crates-io --dry-run` from that checkout.
+   Authenticate as a crates.io owner using `cargo login` if needed. Then run
+   `cargo publish --locked --registry crates-io`. Keep credentials outside Git.
+4. In a temporary project outside this checkout, depend on `cocycle` with the
+   exact published version (`=X.Y.Z`), copy the README Rust example and run it.
+   Use the registry dependency, without a path dependency or local patch. Verify
+   the version's API page at `https://docs.rs/cocycle/X.Y.Z/cocycle/` once the
+   documentation build completes.
+5. Create an annotated `vX.Y.Z` tag on the verified source commit and push that
+   tag. Create the GitHub Release from this existing tag, copying the corresponding
+   changelog section. Mark pre-releases as such in GitHub. Never move a published
+   version's tag to different source.
+
+If publication times out, check crates.io before retrying: the upload may already
+have succeeded. If it did, finish verification and the GitHub Release for that
+same source. A published version cannot be replaced; corrections need a new
+version. See [Cargo's publishing command](https://doc.rust-lang.org/cargo/commands/cargo-publish.html).
+
+`cargo package --allow-dirty` is only for local review of uncommitted work, not
+publication. API documentation is generated from rustdoc on docs.rs; guides stay
+in `docs/`. Build output and release scratch files stay in `target/` or outside
+the repository.
 
 Contributions are made under the project's [MIT License](LICENSE). Attribute
 external code and check its license before incorporating it; citing an algorithm
