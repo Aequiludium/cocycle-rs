@@ -6,6 +6,63 @@ The separate [preparation investigation](../reports/distance-preparation.md)
 provides a deterministic public-API counterexample and runtime allocation
 controls. Its warmed-call protocol differs from this suite; do not pool samples.
 
+## Persistent lifecycle study
+
+`tools/profile_distance_lifecycle.py` uses protocol
+`cocycle-distance-lifecycle-v1`. It generates private copies of immutable R0
+`b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`; ordinary R0 is separately linked.
+The production source and public API do not change. See the lifecycle report
+in the [report index](../reports/README.md) for conclusions after measurement.
+
+Diagrams are constructed before timing. Two initial operations warm generated
+code, then all candidate preparation and retained buffers are dropped. The
+whole measured sequence includes frequency counting, cache construction,
+per-operation semantic validation, finite solve, output allocation and scalar
+equivalence checks. Inner clocks are disabled for amortization curves; use
+`--detailed` only for separate diagnostic decomposition. Phase timers overlap
+with solver time and must not be summed as exclusive components.
+
+R1 prepares the fixed reused operand; R2 prepares every operand occurring more
+than once. R3 adds batch-local cleared scratch capacity, R4 retains it between
+batches, R5 also retains the batch output vector, and `bounded` drops any scratch
+slot exceeding 4096 bytes. This is a per-slot cutoff, not a total memory quota.
+Matching, dual state, candidate graphs, residual networks and heaps remain
+pair-local. Generation checks prevent newly dropped sparse scratch from being
+reused by a later augmentation in the same operation. Thus ordinary sparse
+intra-operation policy stays intact.
+
+K is the requested operation count for same-pair, one-to-many, many-to-one and
+repeated-batch workloads. Repeated batches have eight operations and distinct
+diagrams per batch. All-pairs uses the full directed matrix (including diagonal)
+of `max(2, ceil(sqrt(K)))` diagrams; inspect actual operation and operand counts.
+Single has K=1 only. Every formal cell has a separately discarded process and
+12 balanced measured processes per variant. Existing fresh-process distance
+results remain separate.
+
+```sh
+python3 tools/profile_distance_lifecycle.py --output target/lifecycle-curves-001 --cpu 0
+python3 tools/profile_distance_lifecycle.py --worker-dir target/lifecycle-curves-001/build --samples 1 --detailed --families uniform duplicates --sizes 8 32 128 512 --patterns same_pair --ks 4 --output target/lifecycle-phases-001 --cpu 0
+python3 tools/profile_distance_lifecycle.py --worker-dir target/lifecycle-curves-001/build --samples 12 --poison --huge-size 4096 --families dense --sizes 32 --patterns same_pair --ks 1 --metrics bottleneck --variants r2 r4 bounded --output target/lifecycle-poison-001 --cpu 0
+```
+
+Poison traces solve reference operations in a separate process, avoiding an
+unmeasured huge solve in the measured allocator. They record three small pairs,
+one huge pair, then eight small pairs, with RSS snapshots outside micro-clocks.
+RSS is read from `/proc` on Linux and `GetProcessMemoryInfo` on Windows while
+the worker waits at an output handshake. Retained capacities count owned Vec
+payloads, excluding allocator/header/HashMap overhead and temporary in-use
+buffers. They are not RSS. `--workers 2` and `--workers 4` release independent
+processes at a ready barrier and record throughput plus aggregate endpoint RSS
+and sum of individual peak RSS (the latter is not a simultaneous RSS peak).
+With `--cpu 0`, Linux uses consecutive CPU IDs for concurrent workers.
+
+Correctness includes ordinary-R0 equality on every operation, an independent
+exact tiny oracle for at most eight points, and worker selftests for cached
+orientation, scale, coverage, computed-empty/uncomputed dimensions, essential
+counts, contexts and valid-failed-valid recovery. Formal runs reject dirty
+harnesses, changed worker hashes and kernels differing from R0. Smoke runs may
+use `--exploratory`; their timings do not support selection.
+
 Use this suite to check bottleneck, W1 and W2 against independent references,
 then compare memory and search choices within Rust and C++. Protocol
 `cocycle-distance-v1` preserves f64 inputs and has its own timing boundary;
