@@ -72,6 +72,24 @@ fn compute(
     metric: &str,
     variant: &str,
 ) -> Result<(f64, bottleneck::Diagnostics, wasserstein::Stats)> {
+    if variant == "logical" {
+        let first = diagram(first)?;
+        let second = diagram(second)?;
+        let kind = match metric {
+            "bottleneck" => diagram_distances::Kind::Bottleneck,
+            "w1" => diagram_distances::Kind::W1,
+            "w2" => diagram_distances::Kind::W2,
+            _ => {
+                return Err(Error::InvalidInterval {
+                    reason: "unknown metric",
+                });
+            }
+        };
+        let mut stats = diagram_distances::Diagnostics::default();
+        let value =
+            diagram_distances::distance_with_diagnostics(&first, &second, 0, kind, &mut stats)?;
+        return Ok((value, stats.bottleneck, stats.wasserstein));
+    }
     if variant == "public" {
         let first = diagram(first)?;
         let second = diagram(second)?;
@@ -215,7 +233,9 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             "\"positive_edges\":{},\"dense_solves\":{},\"sparse_solves\":{},\"augmentations\":{},",
             "\"components\":{},\"tiny_components\":{},\"duplicate_groups\":{},\"greedy_certificates\":{},",
             "\"direct_cost_fallbacks\":{},\"peak_graph_storage_bytes\":{},",
-            "\"peak_residual_storage_bytes\":{},\"peak_sparse_scratch_bytes\":{}}}"
+            "\"peak_residual_storage_bytes\":{},\"peak_sparse_scratch_bytes\":{},",
+            "\"algorithm_preparation_bytes\":{},\"algorithm_preparation_buffers\":{},",
+            "\"boundary_materialization_bytes\":{},\"boundary_materialization_buffers\":{}}}"
         ),
         bs.route,
         bs.threshold_decisions,
@@ -239,7 +259,11 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         ws.direct_cost_fallbacks,
         ws.peak_graph_storage_bytes,
         ws.peak_residual_storage_bytes,
-        ws.peak_sparse_scratch_bytes
+        ws.peak_sparse_scratch_bytes,
+        bs.preparation_bytes + ws.preparation_bytes,
+        bs.preparation_buffers + ws.preparation_buffers,
+        nullable((args[3] == "logical").then_some(0)),
+        nullable((args[3] == "logical").then_some(0))
     );
     println!(
         concat!(

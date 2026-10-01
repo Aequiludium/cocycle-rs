@@ -207,6 +207,8 @@ PHASE_HOOKS = {
         ('fn new<const CONTROLLED: bool>(\n        first:', 'bottleneck.pair'),
         ('fn candidates<const CONTROLLED: bool>(', 'bottleneck.candidates'),
         ('fn solve<const CONTROLLED: bool>(', 'bottleneck.total'),
+        ('fn from_dimensions<const CONTROLLED: bool>(', 'bottleneck.logical_total'),
+        ('fn coordinates<const CONTROLLED: bool>(', 'bottleneck.coordinates'),
     ],
     'bottleneck/geometry.rs': [
         ('fn new<const CONTROLLED: bool>(\n        points:', 'bottleneck.kd_build'),
@@ -217,6 +219,8 @@ PHASE_HOOKS = {
     'bottleneck/flow.rs': [('fn within<const CONTROLLED: bool>(', 'bottleneck.flow_decision')],
     'wasserstein/numeric.rs': [
         ('fn prepare<const CONTROLLED: bool>(', 'wasserstein.prepare'),
+        ('fn collect_points<const CONTROLLED: bool>(', 'wasserstein.collect'),
+        ('fn normalize<const CONTROLLED: bool>(', 'wasserstein.normalize'),
         ('fn from_flows<const CONTROLLED: bool>(', 'wasserstein.reconstruct'),
     ],
     'wasserstein/graph.rs': [
@@ -228,7 +232,10 @@ PHASE_HOOKS = {
         ('fn dense_sap<const CONTROLLED: bool>(', 'wasserstein.dense_sap'),
         ('fn tiny<const CONTROLLED: bool>(', 'wasserstein.tiny'),
     ],
-    'wasserstein.rs': [('fn solve<const CONTROLLED: bool>(', 'wasserstein.total')],
+    'wasserstein.rs': [
+        ('fn solve<const CONTROLLED: bool>(', 'wasserstein.total'),
+        ('fn from_dimensions<const CONTROLLED: bool>(', 'wasserstein.logical_total'),
+    ],
     'wasserstein/sparse.rs': [('fn solve<const CONTROLLED: bool>(', 'wasserstein.sparse_sap')],
     'wasserstein/direct.rs': [('fn matching<const CONTROLLED: bool>(', 'wasserstein.direct_cost_sap')],
 }

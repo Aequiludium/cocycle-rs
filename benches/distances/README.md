@@ -2,6 +2,10 @@
 
 [Benchmarks](../README.md) / [Reporting rules](../reporting.md)
 
+The separate [preparation investigation](../reports/distance-preparation.md)
+provides a deterministic public-API counterexample and runtime allocation
+controls. Its warmed-call protocol differs from this suite; do not pool samples.
+
 Use this suite to check bottleneck, W1 and W2 against independent references,
 then compare memory and search choices within Rust and C++. Protocol
 `cocycle-distance-v1` preserves f64 inputs and has its own timing boundary;
@@ -81,6 +85,21 @@ binary-search ablation and experimental arena storage from ordinary library
 builds, including debug. The worker's `public` variant calls the separately
 linked ordinary crate; native ablations call the instrumented private kernels.
 Build metadata records this boundary. There is no public Cargo experiment feature.
+
+The diagnostic `logical` Rust worker variant constructs diagrams and calls the
+instrumented logical-view facade. It reports `algorithm_preparation_bytes` from
+retained Vec capacities and `algorithm_preparation_buffers` from nonempty owned
+preparation buffers. Bottleneck includes coordinates and its four index/cost
+arrays per operand; Wasserstein includes the two prepared Point vectors. These
+are not allocator-call counts. Grouping and solver scratch remain separate.
+The facade has no owned point buffers, so `boundary_materialization_bytes` and
+`boundary_materialization_buffers` are zero for this variant (null for others).
+This boundary accounting excludes the worker's raw-to-diagram conversion.
+The existing Bottleneck workspace counter overlaps preparation indexes; do not
+sum it with preparation bytes as a process-memory estimate. `logical` timing
+includes diagram construction and is diagnostic, not part of native rankings.
+For public API before/after timings, construct both diagrams outside the clock,
+use the ordinary crate, and record that distinct timing boundary and revisions.
 
 Topp uses a portable scalar build with MSVC-only AVX2 dispatch disabled. Weighted
 Topp matching uses compiler-dependent `long double`; Rust uses f64. Preserve
