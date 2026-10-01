@@ -5,15 +5,22 @@
 ## Question and status
 
 This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle-rs/issues/14).
-Implementation and independent replication discussion:
-[Draft PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
+Implementation and replication discussion:
+[PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
 The implementation removes the facade's intermediate finite/essential vectors
 and prepares algorithm-owned storage from logical diagram views. Fewer copies
 are not a performance guarantee. A fresh committed-harness comparison did not
 reproduce the earlier stable W1 regression or the earlier timing ordering of
 allocation interventions. It did reproduce differences in buffer relocation.
-The change remains a draft pending independent replication and discussion.
 No padding allocations or experimental selectors are added to the public crate.
+
+On 2026-10-01, the contributor reported that subsequent retesting with a
+collaborator found no performance anomaly and requested submission of the
+existing implementation through PR 26. This collaborator-reported outcome
+resolves the submission hold; it is not a new measurement by this harness.
+No additional timing values or environment metadata were supplied for that
+retest. The historical measurements below remain unchanged, and no universal
+speedup or allocator/cache mechanism is claimed.
 
 The proposed counterexample is a complete dimension-zero diagram with 512 finite
 intervals against 64, evaluated with W1 and L-infinity ground distance.
@@ -197,9 +204,10 @@ Raw formal-run data is local-only and has not been publicly archived. SHA-256:
 - `environment.json`: `a3c108dd897403d91365c12787826b2bbcd946b0dff968c227b53153e188e97d`.
 - `candidate/identity.json`: `6c0bccc8ae197ddbb2cc7225e573abce4bf5fb7f08c45aef004d72a1a72ce8b9`.
 
-Independent replication should first compare the fixed fixture and prepared
-values, then retain all time distributions and allocator controls. Until that
-discussion is complete, the issue's integrated-performance acceptance is open.
+Further replication should first compare the fixed fixture and prepared
+values, then retain all time distributions and allocator controls. The
+collaborator-reported retest and submission decision are recorded above;
+the historical local experiments do not establish a universal timing ranking.
 
 The implementation at `9fb122ae9eb6e53c55f49ee38b356d87327d52ce` passed the local
 supported distance comparison suite (108/108), using Topp
@@ -208,15 +216,6 @@ supported distance comparison suite (108/108), using Topp
 workers (GUDHI 3.11.0, NumPy 2.4.6, POT 0.9.6.post1). Existing numerical stress
 exclusions remain exclusions. Those checks establish agreement on their
 supported domain, not universal numerical or performance guarantees.
-
-Those retained reference runs originally recorded `3314006b2881fe3125b4ccead7c9316879328354`
-with a dirty worktree. Their source fingerprint
-`b4c599319caa88c5775fd77db6283168590ce204d42eea3022031b4cc5563b1c`
-was recomputed from the committed `9fb122ae9eb6e53c55f49ee38b356d87327d52ce`
-tree and matched. The original metadata remains unchanged; this is a source
-binding, not a fresh reference run. Local evidence is retained under
-`target/issue14/correctness-002/`, `target/issue14/smoke-002/` and
-`target/issue14/source-binding-verified.json` and is not publicly archived.
 
 Those retained reference runs originally recorded `3314006b2881fe3125b4ccead7c9316879328354`
 with a dirty worktree. Their source fingerprint
