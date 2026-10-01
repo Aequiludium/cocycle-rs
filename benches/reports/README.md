@@ -14,6 +14,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | [Diagram-distance preparation and allocation effects](distance-preparation.md) | Finite W1 counterexample, ordinary API comparison and isolated allocation interventions; draft pending independent reproduction |
 | [Integrated Phase-2 performance baseline](phase2-baseline.md) | Frozen Direction-B R0, prepared Rips, complete Rips workflows and Bottleneck/W1/W2 resources; local evidence and replay contract |
 | [Persistence diagram assembly overhead](diagram-assembly.md) | Fixed-R0 private phase and output-storage diagnostics; focused H0 follow-up and retained timing-mode discrepancy |
+| [Diagram-distance state lifetimes](distance-lifecycle.md) | Fixed-R0 persistent preparation/workspace ablations, cross-platform break-even, retention and selected worker-throughput evidence |
 
 Do not create a report per date, commit, PR or rerun. Related suites share a report
 with separate timing contracts and tables. Keep concise conclusions and selected
