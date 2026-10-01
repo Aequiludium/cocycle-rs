@@ -9,9 +9,9 @@ controls. Its warmed-call protocol differs from this suite; do not pool samples.
 ## Concurrent resource study
 
 `tools/benchmark_distance_resources.py` is the separate Linux protocol
-`cocycle-distance-resources-v1`. It generates a worker from the existing native
+`cocycle-distance-resources-v2`. It generates a worker from the existing native
 adapter plus `resources.rs`, on immutable Phase-2 R0. Production code is unchanged.
-Each worker parses inputs and completes one discarded in-process warmup before
+Each warm worker parses inputs and completes one discarded in-process warmup before
 the ready barrier. Raw validation/copying, ordinary preparation, solve and cleanup
 stay inside each native job clock. Candidate options retain existing diagnostics.
 Finite inputs, endpoint precision and the distance definitions match the native
@@ -42,6 +42,30 @@ root. DRAM bytes and LLC misses are recorded as unavailable (`null`), never zero
 invented cache proxies. Trace wall times do not select routes. Initial curves do
 not establish a saturation knee, mixed-route model, holdout router or production
 default; those require subsequent Issue #19 stages.
+
+V2 adds cold single-call traces (`--cold --jobs 1`), per-child dispatch/completion
+and CPU observations, trace node PSS, explicit staggered dispatch, and JSON
+heterogeneous process plans (`--plan`). Plans list named groups with `nodes`, each
+specifying generator `family`, `size`, `split`, `metric`, `variant` and optionally
+`jobs`; a group can specify `stagger_ms`. They use the same numerical contract.
+Completed children remain resident until group ack. Phase replay retains that
+post-completion residence and subtracts single-process initial PSS before adding
+increments to the measured group-ready PSS, limiting shared-page double counting.
+Replay remains a sampled proxy, not a hard memory-feasibility certificate.
+
+`--target-ms` chooses jobs from a four-call baseline calibration before any
+measured group. It never chooses a route; counts are clamped to 1..4096 and retained.
+Counts remain fixed across concurrency within a run. `--order-seed` controls fresh
+balanced schedules. Processes exceeding the available CPU count use explicit
+round-robin pinning; threads share the selected CPU mask. Oversubscription and
+uncontrolled frequency/host load remain part of the measured contract.
+
+`tools/analyze_distance_resources.py` fits tuning-only M0 peak, M1 static CPU/PSS,
+M2 linear load-dependent and M3 pair-interference contrasts. It rejects holdout
+records at fitting boundaries. Demand and peak budgets are separate. The current
+two-resource empirical model cannot identify DRAM or a physical bottleneck.
+Frozen model parameters, held-out errors and any no-go decision stay in artifacts.
+The earlier first tranche uses V1; its measurements are never pooled with V2.
 
 ```sh
 python3 tools/benchmark_distance_resources.py --families uniform sparse --sizes 128 --workers 1 --samples 3 --jobs 64 --trace --output target/resources-trace

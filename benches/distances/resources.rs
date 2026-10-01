@@ -42,14 +42,19 @@ fn resource_run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         println!("{value:.17e}");
         return Ok(());
     }
-    if args.len() != 8 {
-        return Err("fixture metric variant threads jobs expected tolerance".into());
+    if args.len() != 9 {
+        return Err("fixture metric variant threads jobs expected tolerance warm|cold".into());
     }
     let (points, n) = read_resource_input(&args[1])?;
     let count: usize = args[4].parse()?;
     let jobs: usize = args[5].parse()?;
     let expected: f64 = args[6].parse()?;
     let tolerance: f64 = args[7].parse()?;
+    let warm = match args[8].as_str() {
+        "warm" => true,
+        "cold" => false,
+        _ => return Err("invalid warmup mode".into()),
+    };
     if count == 0 || jobs == 0 || !expected.is_finite() || !tolerance.is_finite() || tolerance < 0.0
     {
         return Err("invalid resource parameters".into());
@@ -62,11 +67,14 @@ fn resource_run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             for _ in 0..count {
                 handles.push(scope.spawn(|| -> Result<_> {
                     let mut durations = Vec::with_capacity(jobs);
-                    let (value, _, _) = compute(&points[..n], &points[n..], &args[2], &args[3])?;
-                    assert!(
-                        (value - expected).abs() <= tolerance,
-                        "warmup scalar mismatch"
-                    );
+                    if warm {
+                        let (value, _, _) =
+                            compute(&points[..n], &points[n..], &args[2], &args[3])?;
+                        assert!(
+                            (value - expected).abs() <= tolerance,
+                            "warmup scalar mismatch"
+                        );
+                    }
                     ready.wait();
                     go.wait();
                     let mut last = (
@@ -113,12 +121,13 @@ fn resource_run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let (bs, ws) = &results[0].2;
     println!(
         concat!(
-            "{{\"type\":\"resource-result\",\"protocol\":\"cocycle-distance-resources-v1\",",
+            "{{\"type\":\"resource-result\",\"protocol\":\"cocycle-distance-resources-v2\",",
             "\"metric\":\"{}\",\"variant\":\"{}\",\"threads\":{},\"jobs_per_thread\":{},",
             "\"native_group_ns\":{},\"durations_ns\":{:?},\"checksum\":{},",
             "\"peak_rss_kib\":{},\"stats\":{{\"bottleneck_route\":\"{:?}\",",
             "\"dense_solves\":{},\"sparse_solves\":{},\"candidate_pairs\":{},\"positive_edges\":{},",
-            "\"components\":{},\"duplicate_groups\":{},\"graph_bytes\":{},\"residual_bytes\":{},\"scratch_bytes\":{}}}}}"
+            "\"components\":{},\"duplicate_groups\":{},\"graph_bytes\":{},\"residual_bytes\":{},\"scratch_bytes\":{},",
+            "\"direct_cost_fallbacks\":{},\"greedy_certificates\":{},\"tiny_components\":{},\"augmentations\":{},\"preparation_bytes\":{}}}}}"
         ),
         args[2],
         args[3],
@@ -137,7 +146,12 @@ fn resource_run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         ws.duplicate_groups,
         ws.peak_graph_storage_bytes,
         ws.peak_residual_storage_bytes,
-        ws.peak_sparse_scratch_bytes
+        ws.peak_sparse_scratch_bytes,
+        ws.direct_cost_fallbacks,
+        ws.greedy_certificates,
+        ws.tiny_components,
+        ws.augmentations,
+        ws.preparation_bytes
     );
     io::stdout().flush()?;
     let mut ack = String::new();
