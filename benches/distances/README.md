@@ -6,6 +6,52 @@ The separate [preparation investigation](../reports/distance-preparation.md)
 provides a deterministic public-API counterexample and runtime allocation
 controls. Its warmed-call protocol differs from this suite; do not pool samples.
 
+## Concurrent resource study
+
+`tools/benchmark_distance_resources.py` is the separate Linux protocol
+`cocycle-distance-resources-v1`. It generates a worker from the existing native
+adapter plus `resources.rs`, on immutable Phase-2 R0. Production code is unchanged.
+Each worker parses inputs and completes one discarded in-process warmup before
+the ready barrier. Raw validation/copying, ordinary preparation, solve and cleanup
+stay inside each native job clock. Candidate options retain existing diagnostics.
+Finite inputs, endpoint precision and the distance definitions match the native
+suite. Every job is checked against separately linked ordinary public R0; tiny
+inputs additionally use the independent exact oracle.
+
+Process groups use independently pinned workers; thread groups share one raw
+input in one process with affinity over the same allowed CPU set. Jobs keep fresh
+pair-local state. These are different concurrency contracts and stay separate.
+One parent monotonic dispatch-to-completion envelope measures group throughput,
+including go/result transport and group scheduling, excluding startup/input and
+ready warmups. Native per-job monotonic clocks exclude result transport. Keep
+both; this protocol does not pool samples with single-shot or lifecycle studies.
+Each cell has a discarded fresh group and 12 measured balanced groups per route.
+Per-group p95 is nearest-rank over its native jobs; summaries use group medians.
+
+`--trace` enables a separate 2-ms requested sampling cadence. `/proc` CPU time is
+scheduled core-seconds (including stalls while scheduled), not retired-instruction
+work or a direct stall measurement. Sampled PSS sums proportionally account shared
+pages and are a proxy, not cgroup aggregate memory; RSS sums remain separate.
+Sequential procfs reads and observer scheduling limit temporal resolution. Trace
+integrals use trapezoids over actual monotonic sample times, including the final
+observer boundary. Warm/input/allocator residence is included. Individual process
+VmHWM includes premeasurement work and is not a simultaneous group peak.
+
+The current WSL environment has no usable perf/IMC counters and no writable cgroup
+root. DRAM bytes and LLC misses are recorded as unavailable (`null`), never zero or
+invented cache proxies. Trace wall times do not select routes. Initial curves do
+not establish a saturation knee, mixed-route model, holdout router or production
+default; those require subsequent Issue #19 stages.
+
+```sh
+python3 tools/benchmark_distance_resources.py --families uniform sparse --sizes 128 --workers 1 --samples 3 --jobs 64 --trace --output target/resources-trace
+python3 tools/benchmark_distance_resources.py --worker-dir target/resources-trace/build --families uniform sparse --sizes 128 --workers 1 2 4 --samples 12 --jobs 64 --output target/resources-process
+python3 tools/benchmark_distance_resources.py --worker-dir target/resources-trace/build --families uniform --sizes 128 --workers 2 --modes threads --samples 12 --jobs 64 --output target/resources-threads
+```
+
+Formal runs require a committed clean harness, exact source/binary fingerprints
+and the unchanged R0 kernel. Preserve failures in distinct output directories.
+
 ## Persistent lifecycle study
 
 `tools/profile_distance_lifecycle.py` uses protocol
