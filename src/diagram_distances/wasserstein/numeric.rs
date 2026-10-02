@@ -28,7 +28,7 @@ pub(super) fn restore_scale(value: f64, scale: f64) -> Result<f64> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Point {
+pub(in crate::diagram_distances) struct Point {
     pub(super) coordinates: [f64; 2],
     pub(super) midpoint: f64,
     pub(super) half: f64,

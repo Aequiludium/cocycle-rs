@@ -5,11 +5,11 @@ use cocycle::algebra::PrimeField;
 use cocycle::complex::WeightedGraph;
 use cocycle::diagram::{Coverage, IntervalEnd, PersistenceDiagram, PersistenceInterval};
 use cocycle::diagram_distances::{
-    bottleneck_distance, bottleneck_distance_results, bottleneck_distance_results_with,
-    bottleneck_distance_with, wasserstein_1_infinity, wasserstein_1_infinity_results,
-    wasserstein_1_infinity_results_with, wasserstein_1_infinity_with, wasserstein_2_euclidean,
-    wasserstein_2_euclidean_results, wasserstein_2_euclidean_results_with,
-    wasserstein_2_euclidean_with,
+    PreparedDiagram, bottleneck_distance, bottleneck_distance_results,
+    bottleneck_distance_results_with, bottleneck_distance_with, wasserstein_1_infinity,
+    wasserstein_1_infinity_results, wasserstein_1_infinity_results_with,
+    wasserstein_1_infinity_with, wasserstein_2_euclidean, wasserstein_2_euclidean_results,
+    wasserstein_2_euclidean_results_with, wasserstein_2_euclidean_with,
 };
 use cocycle::execution::Execution;
 use cocycle::filtration::FlagFiltration;
@@ -24,6 +24,240 @@ const CONTROLLED: [ControlledDistance; 3] = [
     wasserstein_1_infinity_with,
     wasserstein_2_euclidean_with,
 ];
+
+type Prepare = for<'a> fn(
+    &'a PersistenceDiagram,
+    usize,
+    &Execution<'_>,
+) -> cocycle::Result<PreparedDiagram<'a>>;
+const PREPARE: [Prepare; 3] = [
+    |d, i, e| PreparedDiagram::bottleneck_with(d, i, e),
+    |d, i, e| PreparedDiagram::wasserstein_1_infinity_with(d, i, e),
+    |d, i, e| PreparedDiagram::wasserstein_2_euclidean_with(d, i, e),
+];
+
+#[test]
+fn prepared_queries_preserve_numeric_essential_and_ordering_contracts() {
+    let cases = [
+        diagram(&[]),
+        diagram(&[[-2., 0.]]),
+        diagram(&[[3., 4.], [0., 2.], [0., 2.]]),
+        with_essential(&[[0., 1.]], &[3., -2.]),
+        with_essential(&[], &[1.]),
+        diagram(&[[0., f64::from_bits(1)]]),
+        diagram(&[[1., f64::from_bits(1.0_f64.to_bits() + 1)]]),
+        diagram(&[[-1e308, 1e308]]),
+        diagram(&[[0., 2e-300]]),
+        with_essential(&[], &[-f64::MAX]),
+        with_essential(&[], &[f64::MAX]),
+    ];
+    let originals = cases.clone();
+    for (prepare, ordinary) in PREPARE.into_iter().zip(DISTANCES) {
+        let operands: Vec<_> = cases
+            .iter()
+            .map(|d| prepare(d, 0, &Execution::default()).unwrap())
+            .collect();
+        for (a, left) in operands.iter().enumerate() {
+            assert!(std::ptr::eq(left.diagram(), &cases[a]));
+            assert_eq!(left.dimension(), 0);
+            for (b, right) in operands.iter().enumerate() {
+                let expected = ordinary(&cases[a], &cases[b], 0);
+                assert_eq!(left.distance_with(right, &Execution::default()), expected);
+                assert_eq!(
+                    left.distance_with(right, &Execution::default().max_work(u64::MAX)),
+                    expected
+                );
+            }
+        }
+    }
+    assert_eq!(cases, originals);
+}
+
+#[test]
+fn prepared_dimensions_coverage_and_metric_are_bound() {
+    use cocycle::diagram::ComputedDimensions;
+    let gaps = PersistenceDiagram::with_dimensions(
+        ComputedDimensions::new(vec![0, 2]).unwrap(),
+        Coverage::Complete,
+        vec![],
+    )
+    .unwrap();
+    let partial = PersistenceDiagram::new(2, Coverage::Through(3.), vec![]).unwrap();
+    for prepare in PREPARE {
+        assert!(matches!(
+            prepare(&gaps, 1, &Execution::default()).err(),
+            Some(Error::DimensionNotComputed { .. })
+        ));
+        assert_eq!(
+            prepare(&partial, 0, &Execution::default()).err(),
+            Some(Error::IncompleteDiagram { through: 3. })
+        );
+        let a = prepare(&gaps, 0, &Execution::default()).unwrap();
+        let b = prepare(&gaps, 2, &Execution::default()).unwrap();
+        assert_eq!(a.distance_with(&a, &Execution::default()), Ok(0.));
+        assert!(matches!(
+            a.distance_with(&b, &Execution::default()),
+            Err(Error::IncompatibleDiagramContext { .. })
+        ));
+    }
+    let a = PreparedDiagram::bottleneck_with(&gaps, 0, &Execution::default()).unwrap();
+    let b = PreparedDiagram::wasserstein_1_infinity_with(&gaps, 0, &Execution::default()).unwrap();
+    let c = PreparedDiagram::wasserstein_2_euclidean_with(&gaps, 0, &Execution::default()).unwrap();
+    for (left, right) in [(&a, &b), (&b, &c), (&c, &a)] {
+        assert!(matches!(
+            left.distance_with(right, &Execution::default()),
+            Err(Error::IncompatibleDiagramContext { .. })
+        ));
+    }
+}
+
+#[test]
+fn prepared_failures_and_cancellation_do_not_poison_later_queries() {
+    let a = diagram(&[[0., 2.], [1., 4.]]);
+    let b = diagram(&[[0.5, 2.5]]);
+    let poison = diagram(&[[0., f64::from_bits(1)]]);
+    let empty = diagram(&[]);
+    for (prepare, ordinary) in PREPARE.into_iter().zip(DISTANCES) {
+        let flag = AtomicBool::new(true);
+        let cancelled = Execution::new(Some(0), Some(&flag));
+        assert_eq!(prepare(&a, 8, &cancelled).err(), Some(Error::Cancelled));
+        assert_eq!(
+            prepare(&empty, 0, &Execution::default().max_work(0)).err(),
+            Some(Error::WorkLimitExceeded { limit: 0 })
+        );
+        let left = prepare(&a, 0, &Execution::default()).unwrap();
+        let right = prepare(&b, 0, &Execution::default()).unwrap();
+        let bad = prepare(&poison, 0, &Execution::default()).unwrap();
+        let zero = prepare(&empty, 0, &Execution::default()).unwrap();
+        let expected = ordinary(&a, &b, 0).unwrap();
+        assert_eq!(
+            left.distance_with(&right, &Execution::default()),
+            Ok(expected)
+        );
+        assert!(matches!(
+            left.distance_with(&bad, &Execution::default()),
+            Err(Error::NumericalFailure { .. })
+        ));
+        assert_eq!(
+            left.distance_with(&right, &cancelled),
+            Err(Error::Cancelled)
+        );
+        assert!(flag.load(Ordering::Relaxed));
+        flag.store(false, Ordering::Relaxed);
+        assert_eq!(
+            zero.distance_with(&zero, &cancelled),
+            Err(Error::WorkLimitExceeded { limit: 0 })
+        );
+        let mut passed = false;
+        for limit in 0..20_000 {
+            let execution = Execution::default().max_work(limit);
+            match left.distance_with(&right, &execution) {
+                Ok(value) => {
+                    assert_eq!(value, expected);
+                    assert_eq!(left.distance_with(&right, &execution), Ok(expected));
+                    passed = true;
+                    break;
+                }
+                Err(error) => assert_eq!(error, Error::WorkLimitExceeded { limit }),
+            }
+            assert_eq!(
+                left.distance_with(&right, &Execution::default()),
+                Ok(expected)
+            );
+        }
+        assert!(passed);
+        assert_eq!(
+            left.distance_with(&right, &Execution::default().cancellation(&flag)),
+            Ok(expected)
+        );
+    }
+}
+
+#[test]
+fn prepared_results_bind_context_without_downgrading_to_raw() -> cocycle::Result<()> {
+    use cocycle::complex::{Simplex, SimplicialComplex};
+    use cocycle::diagram::PersistenceData;
+    use cocycle::persistence::PersistenceExt;
+    let source = FlagFiltration::new(WeightedGraph::new(1, vec![])?);
+    let a = source
+        .persistence()
+        .max_homology_dimension(0)
+        .compute()?
+        .into_data();
+    let b = source
+        .persistence()
+        .max_homology_dimension(0)
+        .field(PrimeField::new(3)?)
+        .compute()?
+        .into_data();
+    let bare = SimplicialComplex::new(vec![Simplex::new(vec![0], -2.)?])?;
+    let unspecified = bare
+        .persistence()
+        .max_homology_dimension(0)
+        .compute()?
+        .into_data();
+    type ResultPrepare = for<'a> fn(
+        &'a PersistenceData,
+        usize,
+        &Execution<'_>,
+    ) -> cocycle::Result<PreparedDiagram<'a>>;
+    let constructors: [ResultPrepare; 3] = [
+        |d, i, e| PreparedDiagram::bottleneck_results_with(d, i, e),
+        |d, i, e| PreparedDiagram::wasserstein_1_infinity_results_with(d, i, e),
+        |d, i, e| PreparedDiagram::wasserstein_2_euclidean_results_with(d, i, e),
+    ];
+    for (contextual, raw) in constructors.into_iter().zip(PREPARE) {
+        let left = contextual(&a, 0, &Execution::default())?;
+        let compatible = contextual(&a, 0, &Execution::default())?;
+        let other_field = contextual(&b, 0, &Execution::default())?;
+        let other_scale = contextual(&unspecified, 0, &Execution::default())?;
+        let raw = raw(a.diagram(), 0, &Execution::default())?;
+        assert!(std::ptr::eq(left.diagram(), a.diagram()));
+        assert_eq!(
+            left.distance_with(&compatible, &Execution::default()),
+            Ok(0.)
+        );
+        for (first, second) in [
+            (&left, &other_field),
+            (&left, &other_scale),
+            (&other_scale, &other_scale),
+            (&left, &raw),
+            (&raw, &left),
+        ] {
+            assert!(matches!(
+                first.distance_with(second, &Execution::default()),
+                Err(Error::IncompatibleDiagramContext { .. })
+            ));
+        }
+        assert_eq!(
+            left.distance_with(&compatible, &Execution::default()),
+            Ok(0.)
+        );
+    }
+    let erased: &dyn AsRef<PersistenceData> = &a;
+    let prepared = PreparedDiagram::bottleneck_results_with(erased, 0, &Execution::default())?;
+    assert_eq!(
+        prepared.distance_with(&prepared, &Execution::default()),
+        Ok(0.)
+    );
+    struct MustNotConvert;
+    impl AsRef<PersistenceData> for MustNotConvert {
+        fn as_ref(&self) -> &PersistenceData {
+            panic!("conversion after pre-cancellation")
+        }
+    }
+    let flag = AtomicBool::new(true);
+    assert_eq!(
+        PreparedDiagram::bottleneck_results_with(
+            &MustNotConvert,
+            0,
+            &Execution::default().cancellation(&flag)
+        )
+        .err(),
+        Some(Error::Cancelled)
+    );
+    Ok(())
+}
 
 #[test]
 fn default_controls_preserve_values_and_errors() {
@@ -669,6 +903,14 @@ fn seeded_small_diagrams_match_independent_exhaustive_oracle() {
                 close(actual, expected);
             }
             close(distance(&db, &da, 0).unwrap(), expected);
+            let left = PREPARE[metric](&da, 0, &Execution::default()).unwrap();
+            let right = PREPARE[metric](&db, 0, &Execution::default()).unwrap();
+            for (first, second) in [(&left, &right), (&right, &left), (&left, &right)] {
+                close(
+                    first.distance_with(second, &Execution::default()).unwrap(),
+                    expected,
+                );
+            }
         }
     }
 }
