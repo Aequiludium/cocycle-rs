@@ -19,6 +19,10 @@
 //! approximations describe the two supplied diagrams, not the unknown original
 //! diagrams and not an approximation error certificate.
 //!
+//! For repeated comparisons of the same operands, [`PreparedDiagram`] explicitly
+//! retains immutable preparation for a caller-chosen scope. Ordinary scalar
+//! functions remain the default for single, low-reuse or solve-heavy comparisons.
+//!
 //! # Execution controls
 //!
 //! Each raw and context-aware function has a `_with` variant accepting
@@ -280,11 +284,322 @@ where
     distance_results_with(first, second, dimension, Kind::W2, execution)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Bottleneck,
     W1,
     W2,
+}
+
+/// Immutable preparation of one diagram, dimension and matching metric.
+///
+/// Use this opt-in path when the same operands are compared many times within a
+/// finite scope. Building and retaining preparation has a cost; it need not help
+/// small diagrams, solve-heavy work or batches of operands used only once. The
+/// ordinary scalar functions never create or retain these objects implicitly.
+///
+/// The source is borrowed for the object's lifetime; coordinate copies and
+/// metric-specific arrays are owned and released on drop. Multiplicity and
+/// essential births are preserved. Construction requires an explicitly computed
+/// dimension and complete coverage, including for an empty dimension.
+/// Results constructors also bind the source's original context. Queries require
+/// the same metric, dimension and context mode, and repeat field/scale checks.
+/// Raw construction establishes no context compatibility or common units.
+///
+/// Matching, graphs, residuals and scratch are local to each query. Wasserstein
+/// recomputes the pair's scale and creates normalized copies when needed. There
+/// is no matching warm start, retained output, global cache or automatic routing.
+///
+/// Every constructor and query accepts fresh [`Execution`] controls. Construction
+/// charges validation and preparation; queries charge compatibility and new pair
+/// work, with the module's cooperative cancellation limits. Cached work is not
+/// charged again. A zero query budget rejects even two empty operands. Failed or
+/// cancelled queries do not change preparation and may be retried with new controls.
+/// Operand-only numerical failures are deferred until a query: essential-count
+/// mismatch still returns infinity, and Wasserstein scaling may make work
+/// representable. No partial scalar is returned on error.
+///
+/// ```
+/// use cocycle::diagram::{Coverage, PersistenceDiagram};
+/// use cocycle::diagram_distances::PreparedDiagram;
+/// use cocycle::execution::Execution;
+/// let diagram = PersistenceDiagram::new(0, Coverage::Complete, vec![])?;
+/// let execution = Execution::default();
+/// {
+///     let prepared = PreparedDiagram::bottleneck_with(&diagram, 0, &execution)?;
+///     for _ in 0..64 {
+///         assert_eq!(prepared.distance_with(&prepared, &execution)?, 0.0);
+///     }
+/// } // All preparation capacity is released here.
+/// # Ok::<(), cocycle::Error>(())
+/// ```
+pub struct PreparedDiagram<'a> {
+    diagram: &'a PersistenceDiagram,
+    context: Option<&'a PersistenceData>,
+    dimension: usize,
+    kind: Kind,
+    essential: Vec<f64>,
+    finite: PreparedFinite,
+}
+
+enum PreparedFinite {
+    Bottleneck(Result<bottleneck::Prepared<'static>>),
+    Wasserstein {
+        points: Vec<[f64; 2]>,
+        unit_scale: Option<Vec<wasserstein::PreparedPoint>>,
+    },
+}
+
+impl<'a> PreparedDiagram<'a> {
+    /// Prepare bottleneck distance with L-infinity costs for one raw operand.
+    ///
+    /// # Errors
+    /// Returns an error for an uncomputed dimension, incomplete coverage,
+    /// allocation failure, exhausted work budget or cancellation.
+    pub fn bottleneck_with(
+        diagram: &'a PersistenceDiagram,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_with(diagram, dimension, Kind::Bottleneck, execution)
+    }
+
+    /// Prepare order-one Wasserstein distance with L-infinity costs.
+    ///
+    /// # Errors
+    /// Has the same construction errors as [`Self::bottleneck_with`].
+    pub fn wasserstein_1_infinity_with(
+        diagram: &'a PersistenceDiagram,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_with(diagram, dimension, Kind::W1, execution)
+    }
+
+    /// Prepare order-two Wasserstein distance with Euclidean costs.
+    ///
+    /// # Errors
+    /// Has the same construction errors as [`Self::bottleneck_with`].
+    pub fn wasserstein_2_euclidean_with(
+        diagram: &'a PersistenceDiagram,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_with(diagram, dimension, Kind::W2, execution)
+    }
+
+    /// Prepare bottleneck distance while borrowing the result's original context.
+    ///
+    /// Accepts stored common data and result wrappers via `AsRef<PersistenceData>`.
+    /// Queries repeat the ordinary results API's field and declared edge-length
+    /// scale checks; an unspecified scale is not a compatible unit.
+    ///
+    /// # Errors
+    /// Has the same construction errors as [`Self::bottleneck_with`].
+    pub fn bottleneck_results_with<T: AsRef<PersistenceData> + ?Sized>(
+        result: &'a T,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_results_with(result, dimension, Kind::Bottleneck, execution)
+    }
+
+    /// Prepare context-aware order-one Wasserstein distance with L-infinity costs.
+    ///
+    /// Context rules and construction errors match [`Self::bottleneck_results_with`].
+    pub fn wasserstein_1_infinity_results_with<T: AsRef<PersistenceData> + ?Sized>(
+        result: &'a T,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_results_with(result, dimension, Kind::W1, execution)
+    }
+
+    /// Prepare context-aware order-two Wasserstein distance with Euclidean costs.
+    ///
+    /// Context rules and construction errors match [`Self::bottleneck_results_with`].
+    pub fn wasserstein_2_euclidean_results_with<T: AsRef<PersistenceData> + ?Sized>(
+        result: &'a T,
+        dimension: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::prepare_results_with(result, dimension, Kind::W2, execution)
+    }
+
+    /// The immutable diagram bound at construction.
+    pub fn diagram(&self) -> &'a PersistenceDiagram {
+        self.diagram
+    }
+
+    /// The explicitly computed dimension bound at construction.
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    /// Compare two prepared operands under fresh execution controls.
+    ///
+    /// Metric conventions and numerical/essential semantics match the scalar APIs.
+    /// Essential-count mismatch returns infinity. All pair work and scratch start
+    /// fresh, including after an earlier failure or cancellation.
+    ///
+    /// # Errors
+    /// Returns `IncompatibleDiagramContext` for different metrics, dimensions,
+    /// raw/results modes or incompatible result contexts. May also return an
+    /// allocation, numerical, work-limit or cancellation error.
+    pub fn distance_with(
+        &self,
+        other: &PreparedDiagram<'_>,
+        execution: &Execution<'_>,
+    ) -> Result<f64> {
+        if execution.is_unlimited() {
+            self.query(other, &mut WorkBudget::unlimited())
+        } else {
+            self.query(other, &mut WorkBudget::new(execution)?)
+        }
+    }
+
+    fn prepare_with(
+        diagram: &'a PersistenceDiagram,
+        dimension: usize,
+        kind: Kind,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        if execution.is_unlimited() {
+            Self::prepare(diagram, None, dimension, kind, &mut WorkBudget::unlimited())
+        } else {
+            Self::prepare(
+                diagram,
+                None,
+                dimension,
+                kind,
+                &mut WorkBudget::new(execution)?,
+            )
+        }
+    }
+
+    fn prepare_results_with<T: AsRef<PersistenceData> + ?Sized>(
+        result: &'a T,
+        dimension: usize,
+        kind: Kind,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        if execution.is_unlimited() {
+            let data = result.as_ref();
+            Self::prepare(
+                data.diagram(),
+                Some(data),
+                dimension,
+                kind,
+                &mut WorkBudget::unlimited(),
+            )
+        } else {
+            // Poll before invoking caller-provided conversion code.
+            let mut budget = WorkBudget::new(execution)?;
+            let data = result.as_ref();
+            Self::prepare(data.diagram(), Some(data), dimension, kind, &mut budget)
+        }
+    }
+
+    fn prepare<const CONTROLLED: bool>(
+        diagram: &'a PersistenceDiagram,
+        context: Option<&'a PersistenceData>,
+        dimension: usize,
+        kind: Kind,
+        budget: &mut WorkBudget<'_, CONTROLLED>,
+    ) -> Result<Self> {
+        let Points { finite, essential } = points(diagram, dimension, budget)?;
+        let finite = match kind {
+            Kind::Bottleneck => {
+                let prepared = match bottleneck::prepare_owned(finite, budget) {
+                    Ok(prepared) => Ok(prepared),
+                    Err(error @ Error::NumericalFailure { .. }) => Err(error),
+                    Err(error) => return Err(error),
+                };
+                PreparedFinite::Bottleneck(prepared)
+            }
+            Kind::W1 | Kind::W2 => {
+                let unit_scale = wasserstein::prepare_operand(&finite, budget)?;
+                PreparedFinite::Wasserstein {
+                    points: finite,
+                    unit_scale,
+                }
+            }
+        };
+        budget.check()?;
+        Ok(Self {
+            diagram,
+            context,
+            dimension,
+            kind,
+            essential,
+            finite,
+        })
+    }
+
+    fn query<const CONTROLLED: bool>(
+        &self,
+        other: &PreparedDiagram<'_>,
+        budget: &mut WorkBudget<'_, CONTROLLED>,
+    ) -> Result<f64> {
+        budget.step()?;
+        if self.kind != other.kind || self.dimension != other.dimension {
+            return Err(Error::IncompatibleDiagramContext {
+                reason: "prepared metrics or dimensions differ",
+            });
+        }
+        match (self.context, other.context) {
+            (Some(first), Some(second)) => {
+                budget.step()?;
+                check_context(first, second)?;
+            }
+            (None, None) => {}
+            _ => {
+                return Err(Error::IncompatibleDiagramContext {
+                    reason: "prepared raw/results modes differ",
+                });
+            }
+        }
+        finish_distance(
+            &self.essential,
+            &other.essential,
+            self.kind,
+            budget,
+            |budget| match (&self.finite, &other.finite) {
+                (PreparedFinite::Bottleneck(first), PreparedFinite::Bottleneck(second)) => {
+                    bottleneck::distance_prepared(
+                        first.as_ref().map_err(Clone::clone)?,
+                        second.as_ref().map_err(Clone::clone)?,
+                        budget,
+                    )
+                }
+                (
+                    PreparedFinite::Wasserstein {
+                        points: first,
+                        unit_scale: left,
+                    },
+                    PreparedFinite::Wasserstein {
+                        points: second,
+                        unit_scale: right,
+                    },
+                ) => {
+                    let metric = if self.kind == Kind::W1 {
+                        wasserstein::Metric::W1
+                    } else {
+                        wasserstein::Metric::W2
+                    };
+                    wasserstein::distance_prepared(
+                        (first, left.as_deref()),
+                        (second, right.as_deref()),
+                        metric,
+                        budget,
+                    )
+                }
+                _ => Err(Error::IncompatibleDiagramContext {
+                    reason: "prepared metrics differ",
+                }),
+            },
+        )
+    }
 }
 
 fn distance_with(
@@ -392,32 +707,43 @@ fn distance<const CONTROLLED: bool>(
 ) -> Result<f64> {
     let first = points(first, dimension, budget)?;
     let second = points(second, dimension, budget)?;
+    finish_distance(
+        &first.essential,
+        &second.essential,
+        kind,
+        budget,
+        |budget| match kind {
+            Kind::Bottleneck => bottleneck::distance(&first.finite, &second.finite, budget),
+            Kind::W1 => wasserstein::distance(
+                &first.finite,
+                &second.finite,
+                wasserstein::Metric::W1,
+                budget,
+            ),
+            Kind::W2 => wasserstein::distance(
+                &first.finite,
+                &second.finite,
+                wasserstein::Metric::W2,
+                budget,
+            ),
+        },
+    )
+}
+
+fn finish_distance<const CONTROLLED: bool>(
+    first: &[f64],
+    second: &[f64],
+    kind: Kind,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+    finite: impl FnOnce(&mut WorkBudget<'_, CONTROLLED>) -> Result<f64>,
+) -> Result<f64> {
     budget.check()?;
-    if first.essential.len() != second.essential.len() {
+    if first.len() != second.len() {
         return Ok(f64::INFINITY);
     }
-    let finite = match kind {
-        Kind::Bottleneck => bottleneck::distance(&first.finite, &second.finite, budget)?,
-        Kind::W1 => wasserstein::distance(
-            &first.finite,
-            &second.finite,
-            wasserstein::Metric::W1,
-            budget,
-        )?,
-        Kind::W2 => wasserstein::distance(
-            &first.finite,
-            &second.finite,
-            wasserstein::Metric::W2,
-            budget,
-        )?,
-    };
-    let mut value = finite;
+    let mut value = finite(budget)?;
     let mut compensation = 0.0;
-    for (left, right) in first
-        .essential
-        .chunks(256)
-        .zip(second.essential.chunks(256))
-    {
+    for (left, right) in first.chunks(256).zip(second.chunks(256)) {
         budget.step_by(left.len())?;
         for (&left, &right) in left.iter().zip(right) {
             let cost = (left - right).abs();
@@ -523,6 +849,44 @@ mod tests {
                 run(&mut WorkBudget::new(&Execution::default()).unwrap()).unwrap(),
                 expected
             );
+        }
+    }
+
+    #[test]
+    fn prepared_construction_and_queries_poll_after_real_work_and_recover() {
+        let make = |offset, scale| {
+            PersistenceDiagram::new(
+                0,
+                Coverage::Complete,
+                (0..64)
+                    .map(|i| {
+                        let birth = ((i % 8) as f64 + offset) * scale;
+                        crate::diagram::PersistenceInterval::new(
+                            0,
+                            birth,
+                            IntervalEnd::Finite(birth + 3.0 * scale),
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+            )
+            .unwrap()
+        };
+        for scale in [1.0, 1e200] {
+            let a = make(0.0, scale);
+            let b = make(0.25, scale);
+            for kind in [Kind::Bottleneck, Kind::W1, Kind::W2] {
+                check_control(|budget| {
+                    PreparedDiagram::prepare(&a, None, 0, kind, budget).map(|_| ())
+                });
+                let left =
+                    PreparedDiagram::prepare(&a, None, 0, kind, &mut WorkBudget::unlimited())
+                        .unwrap();
+                let right =
+                    PreparedDiagram::prepare(&b, None, 0, kind, &mut WorkBudget::unlimited())
+                        .unwrap();
+                check_control(|budget| left.query(&right, budget));
+            }
         }
     }
 

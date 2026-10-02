@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add opt-in `diagram_distances::PreparedDiagram` for scoped reuse of immutable
+  operand preparation in repeated bottleneck, W1 and W2 comparisons. Each value
+  binds a source, dimension, metric and optional result context, with fresh
+  execution controls per construction/query. Matching scratch and Wasserstein
+  pair normalization remain local to each query. Ordinary scalar APIs are
+  unchanged and remain the default for single or low-reuse comparisons.
+
 ## 0.1.1
 
 Maintenance release for documentation discovery and release tooling.

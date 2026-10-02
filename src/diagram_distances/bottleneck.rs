@@ -120,8 +120,8 @@ fn diagonal(point: [f64; 2]) -> Result<f64> {
     Ok(result)
 }
 
-struct Prepared<'a> {
-    points: &'a [[f64; 2]],
+pub(super) struct Prepared<'a> {
+    points: std::borrow::Cow<'a, [[f64; 2]]>,
     diagonals: Vec<f64>,
     order: Vec<usize>,
     representatives: Vec<usize>,
@@ -178,7 +178,7 @@ impl<'a> Prepared<'a> {
             }
         }
         Ok(Self {
-            points,
+            points: std::borrow::Cow::Borrowed(points),
             diagonals,
             order,
             representatives,
@@ -207,6 +207,42 @@ impl<'a> Prepared<'a> {
             .saturating_add(bytes(&self.representatives))
             .saturating_add(bytes(&self.multiplicities))
     }
+}
+
+pub(super) fn prepare_owned<const CONTROLLED: bool>(
+    points: Vec<[f64; 2]>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<Prepared<'static>> {
+    let Prepared {
+        points: _,
+        diagonals,
+        order,
+        representatives,
+        multiplicities,
+        max_diagonal,
+    } = Prepared::new(&points, budget)?;
+    Ok(Prepared {
+        points: std::borrow::Cow::Owned(points),
+        diagonals,
+        order,
+        representatives,
+        multiplicities,
+        max_diagonal,
+    })
+}
+
+pub(super) fn distance_prepared<const CONTROLLED: bool>(
+    first: &Prepared<'_>,
+    second: &Prepared<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
+    solve_prepared(
+        first,
+        second,
+        Options::default(),
+        &mut Diagnostics::default(),
+        budget,
+    )
 }
 
 struct Pair<'a, 'p> {
@@ -244,9 +280,9 @@ impl<'a, 'p> Pair<'a, 'p> {
                 .checked_mul(second.points.len())
                 .ok_or_else(size_overflow)?;
             reserve(&mut result.dense, count)?;
-            for &a in first.points {
+            for &a in first.points.iter() {
                 budget.step_by(second.points.len())?;
-                for &b in second.points {
+                for &b in second.points.iter() {
                     result.dense.push(cross(a, b));
                 }
             }
@@ -390,6 +426,16 @@ fn solve<const CONTROLLED: bool>(
     record! { *_stats = Diagnostics::default(); }
     let first = Prepared::new(first, budget)?;
     let second = Prepared::new(second, budget)?;
+    solve_prepared(&first, &second, _options, _stats, budget)
+}
+
+fn solve_prepared<const CONTROLLED: bool>(
+    first: &Prepared<'_>,
+    second: &Prepared<'_>,
+    _options: Options,
+    _stats: &mut Diagnostics,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
     let total = first
         .points
         .len()
@@ -400,15 +446,15 @@ fn solve<const CONTROLLED: bool>(
         return Ok(first.max_diagonal.max(second.max_diagonal));
     }
     budget.step_by(total)?;
-    let duplicates = prefer_multiplicity(&first, &second, total);
-    if duplicates && identical(&first, &second) {
+    let duplicates = prefer_multiplicity(first, second, total);
+    if duplicates && identical(first, second) {
         record! { _stats.route = Route::Identity; }
         return Ok(0.0);
     }
     let (first, second) = if total >= 128 && first.points.len() > second.points.len() {
-        (&second, &first)
+        (second, first)
     } else {
-        (&first, &second)
+        (first, second)
     };
     let upper = first.max_diagonal.max(second.max_diagonal);
     let mut route = Route::Quickselect;
