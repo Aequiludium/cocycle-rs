@@ -26,7 +26,7 @@ disposition supported by this study.
 
 | Item | Recorded identity |
 | --- | --- |
-| Associated PR | None associated with this branch when inspected; local `codex/phase2-resource-study`; no new PR or remote update |
+| Associated PR | [Direction B summary #32](https://github.com/Aequiludium/cocycle-rs/pull/32); report-only closeout, not a measured PR head |
 | Production baseline/candidate source | `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`; all `src/` and Cargo files unchanged |
 | V2 worker/controller/model | `e1ceba853347f84d0f40396b09255939cedb9a40` |
 | V2 protocol | `cocycle-distance-resources-v2` |

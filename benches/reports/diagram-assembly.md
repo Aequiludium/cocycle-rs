@@ -23,7 +23,7 @@ speedup or RSS saving.
 
 | Item | Recorded value |
 | --- | --- |
-| Associated PR | None for this study |
+| Associated PR | [Direction B summary #32](https://github.com/Aequiludium/cocycle-rs/pull/32); report-only closeout, not a measured PR head |
 | Kernel | Phase-2 R0 `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`; identity and mathematical acceptance in [the baseline report](phase2-baseline.md) |
 | Harness | Local commit `8c23aacd78a0637437471c4bf2e39d29e75a0324` |
 | Source fingerprint | `94d44e0f6773fb4bcad2d93b34f05a2d228e89dc815843b69beecb7917947db9`; original kernel, pipeline worker/controller/helpers and assembly controller |

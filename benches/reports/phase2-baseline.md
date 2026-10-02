@@ -92,7 +92,7 @@ ordinary tools in the submission tree match its main base. Frozen R0 includes
 the still separately reviewed A3 / #14 logical preparation; this campaign does
 not decide or deliver [PR #26](https://github.com/Aequiludium/cocycle-rs/pull/26).
 
-The summary PR links #11 and #16-#19 using closing keywords, for closure on merge
+The [summary PR #32](https://github.com/Aequiludium/cocycle-rs/pull/32) links #11 and #16-#19 using closing keywords, for closure on merge
 through the normal PR process. B5 is independently tracked as Todo in Project #2
 and is excluded from those closing keywords. No merge or release is performed
 by preparing this report.
@@ -108,7 +108,7 @@ are in the individual reports. No publicly retrievable raw archive is claimed.
 
 | Item | Recorded value |
 | --- | --- |
-| Associated PR | None for this study |
+| Associated PR | [Direction B summary #32](https://github.com/Aequiludium/cocycle-rs/pull/32); report-only closeout, not a measured PR head |
 | Kernel and harness | Both [`b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`](https://github.com/Aequiludium/cocycle-rs/commit/b2c3bd5eebf0c1193f30ea651012b8ae61b274c1); clean integrated merge snapshot |
 | Integrated main parent | `9e6715f4c2e0118ab738486bd747ec3e361397de` |
 | Local Issue #14 parent | `5c4f7b87995141d1a95e876bc894cd89f616f0ac` |

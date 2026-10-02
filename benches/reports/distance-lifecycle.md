@@ -25,7 +25,7 @@ WSL/Windows host limit application and hardware generalization.
 
 | Item | Recorded value |
 | --- | --- |
-| Associated PR | None for this study; local branch `codex/phase2-resource-study` |
+| Associated PR | [Direction B summary #32](https://github.com/Aequiludium/cocycle-rs/pull/32); report-only closeout, not a measured PR head |
 | Production kernel | `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`, immutable integrated R0 |
 | Candidate generator and harness | `ec27c66b5db2a67d37c7a9ed5d1317051fa9cdc6`; all formal starts clean and non-exploratory |
 | Identity | Both builds' 111 original-source hashes, generated files, worker/pool/generator and binary SHA-256 retained and checked; source/kernel snapshots archived |
