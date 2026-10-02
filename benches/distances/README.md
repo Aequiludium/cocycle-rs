@@ -39,9 +39,11 @@ VmHWM includes premeasurement work and is not a simultaneous group peak.
 
 The current WSL environment has no usable perf/IMC counters and no writable cgroup
 root. DRAM bytes and LLC misses are recorded as unavailable (`null`), never zero or
-invented cache proxies. Trace wall times do not select routes. Initial curves do
-not establish a saturation knee, mixed-route model, holdout router or production
-default; those require subsequent Issue #19 stages.
+invented cache proxies. Trace wall times do not select routes. The
+[completed available-host study](../reports/distance-resources.md) records finite
+N95 grids, mixed interference, phase replay, held-out model errors and independent
+repeats. Its adoption gate retains R0; the sampled two-resource model does not
+identify physical saturation or justify a production resource-admission rule.
 
 V2 adds cold single-call traces (`--cold --jobs 1`), per-child dispatch/completion
 and CPU observations, trace node PSS, explicit staggered dispatch, and JSON

@@ -2,296 +2,282 @@
 
 [Reports](README.md) / [Protocol](../distances/README.md#concurrent-resource-study)
 
-## Question and conclusion
+## Decision and scope
 
-This first tranche of [Issue #19](https://github.com/Aequiludium/cocycle-rs/issues/19)
-asks how the current adaptive route and existing forced sparse layouts behave
-under homogeneous concurrency. Separate comparative performance groups and
-resource snapshots cover finite W1/W2 pairs of size 128 on one Linux/WSL host.
-All planned groups passed; production Rust and Cargo files remain identical to
-the [integrated R0](phase2-baseline.md).
+The available-host study for [Issue #19](https://github.com/Aequiludium/cocycle-rs/issues/19)
+is complete: finite concurrency curves, independent repeats, heterogeneous pairs,
+cold phase replay, CPU/PSS model contrasts and a deployable-policy decision have
+been measured and audited. **Retain integrated R0. No tested deployable policy
+passes the preregistered joint resource/performance gate on both holdout and the
+independent repeat.** The private arena candidate remains research code; no
+production router, public Prepared/Workspace/Batch API or host-load API is added.
 
-On the held-out sparse input, adaptive component decomposition avoids a full
-sparse solve and is more than thirty times faster than either forced route.
-The arena contrast has a smaller observed benefit over nested vectors, with
-overlapping sample ranges and no independent formal repeat. It cannot select a
-production default. Four workers still increase throughput; these three points
-do not locate a saturation knee or identify the limiting physical resource.
+This completes the feasible experiment and its negative adoption decision, not
+the unavailable full CPU/RAM/DRAM model. DRAM traffic and LLC events remain
+`null`; PSS is a sampled proportional-page proxy, not enforced cgroup RAM.
+No physical bottleneck, RAM saturation or universal machine-capacity claim is
+supported. The [Issue #18 lifecycle decision](distance-lifecycle.md) remains:
+investigate scoped preparation for repeated comparisons; reject the tested
+scratch/output retention. Retaining measured code is the final optimization
+disposition supported by this study.
 
-This is an initial concurrency study, not completion of Issue #19. No model,
-router or production optimization is delivered by this tranche. The
-[lifecycle conclusion](distance-lifecycle.md) remains a separate lifetime axis:
-prepared-state opportunities are scoped, and the tested scratch/output retention
-does not pass its joint incremental gate.
+## Immutable identities and execution
 
-## Measured identities and environment
-
-| Identity | Recorded value |
+| Item | Recorded identity |
 | --- | --- |
-| PR | No associated experiment PR as last inspected; local branch `codex/phase2-resource-study` |
-| Production baseline and private candidate source | `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1` |
-| Frozen worker/controller commit | `0156860b614fed9f13d60e254e53435858e97d3f` |
-| Protocol | `cocycle-distance-resources-v1` |
-| Source fingerprint | `5127c769399a67e3758852e197faceb3617572302b5e4d2d0679f67fa4def679` |
-| Generated worker SHA-256 | `1ff3ec10002c8dde13fce6d118dc503db8725fa2380ac2a4f59c3d173b3adc92` |
-| Worker binary SHA-256 | `f004033d51442c23d5f1120924722eabb7552237e8b9cf0333cf88f17d0c5354` |
-| Compiler/build | Rust 1.91.0, release library, `rustc -O --edition=2024 --cfg cocycle_distance_bench` |
-| Host | Intel Core Ultra 7 155H; WSL2 Linux 6.6.87.2; 22 allowed logical CPUs |
-| Placement | Processes pinned to CPUs 0, 1, 2, 3 as needed; thread process affinity spans CPUs 0 and 1 |
-| Limits and controls | 120-second result wait; no explicit resource-study address-space cap; frequency and external host load uncontrolled |
+| Associated PR | None associated with this branch when inspected; local `codex/phase2-resource-study`; no new PR or remote update |
+| Production baseline/candidate source | `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`; all `src/` and Cargo files unchanged |
+| V2 worker/controller/model | `e1ceba853347f84d0f40396b09255939cedb9a40` |
+| V2 protocol | `cocycle-distance-resources-v2` |
+| Source fingerprint SHA-256 | `a756098085007886c639f4ce6026d8b373d79a9207e44d5912ea695148a9b6d1` |
+| Generated worker SHA-256 | `c9164e21c8d422d81c13b62ecb306ea7dcdfa81a60e717e9189e8b1d42d8b6d0` |
+| Worker binary SHA-256 | `da75ee00a89e58406de5512e7e51ebcdbcd65e6cc2a8da111f755c212bb49337` |
+| Build | Rust 1.91.0 `f8297e351`; locked offline release library; generated worker `rustc --edition=2024 -O --cfg cocycle_distance_bench` |
+| Host | Intel Core Ultra 7 155H; Ubuntu 24.04/WSL2 Linux 6.6.87.2; 22 allowed logical CPU IDs |
+| Placement | Processes pinned round-robin to IDs 0..21; threads share the selected CPU mask; N > 22 explicitly oversubscribes |
+| Controls | Serial measurement stages; no overlapping builds/tests/compression/analysis; frequency and external host load uncontrolled |
+| Limits | 120-second result wait; no resource-study address-space cap or writable cgroup |
 
-The source fingerprint hashes canonical sorted JSON containing build metadata
-`originals` and `owners` maps. The audit checks every original against R0, every
-owner against the frozen harness commit, and generated source/binary hashes.
-The report revision is distinct from both measured commits. WSL logical CPU
-numbers do not establish physical-core isolation, NUMA placement or cache topology.
-No compilation, tests, compression or other formal run overlapped these groups.
+The source fingerprint hashes canonical sorted JSON containing the build's
+`originals` and `owners` maps. Original sources were checked against R0; all
+instrumentation/model owners against the frozen harness; generated source and
+binary against build metadata. The report revision is not a measured revision.
+The 22 guest CPU IDs do not establish physical-core or cache isolation.
 
-Run IDs are `linux-trace-uniform`, `linux-process-uniform`, `linux-trace-sparse`,
-`linux-process-sparse`, and `linux-thread-uniform`, executed in that order under
-one orchestration script. Manifests retain UTC creation metadata; completion UTC
-is not recorded. Elapsed clocks are monotonic and do not depend on realtime UTC.
+V2 began on 2026-10-01 UTC and resumed on 2026-10-02 UTC. The original execution
+session stopped during W2 concurrency without a controller failure marker. Its
+14 complete cells and incomplete fifteenth cell are preserved separately in
+`interrupted-attempts/`; the entire unfinished stage was repeated with its frozen
+command. Completed earlier stages were preserved. No selective favorable retry
+or outlier removal was used. All resumed stages completed. Monotonic clocks own
+timings; UTC metadata does not replace them.
 
-## Workload and coverage
+The original V1 tranche remains separate: harness
+`0156860b614fed9f13d60e254e53435858e97d3f`, 36 cells, 1,080 measured groups,
+2,232 measured child processes and 2,223,360 calls. Its forced vector/arena
+controls explain the large benefit of adaptive decomposition on sparse inputs,
+but cannot select the V2 default. No V1 observations enter V2 fits or rankings.
 
-Each family has one 128-by-128 finite f64 diagram pair per split, four distinct
-pairs in total, using the maintained generator and seed 20260922 for tuning and
-20260923 for holdout. W1 and W2 both use the internal
-L-infinity cost convention. Raw parsing and an in-process warmup precede readiness;
-every measured call includes validation/copying, preparation, solve and cleanup.
-Calls retain no prepared representation or explicit solver workspace across jobs.
-The allocator, input and code caches can remain warm within a group.
+## Workloads, coverage and timing
 
-| Suite | Cells | Measured groups | Discarded groups | Jobs per worker/group |
-| --- | ---: | ---: | ---: | ---: |
-| Single-process traces, both families | 8 | 72 | 24 | uniform 64; sparse 2048 |
-| Process performance, N = 1/2/4 | 24 | 864 | 72 | uniform 64; sparse 2048 |
-| Uniform native thread performance, N = 2 | 4 | 144 | 12 | 64 |
+All nine maintained families are represented: uniform, clustered, near-diagonal,
+duplicates, imbalanced, separated, threshold-shell, dense and sparse. Generator
+seeds are 20260922 tuning and 20260923 holdout, with exact f64 endpoint binaries.
+W1 uses L-infinity cost. W2 uses Euclidean squared cost and the final square root;
+the earlier V1 report's statement that both use L-infinity was incorrect.
+Bottleneck controls use the maintained finite-pair convention. There is one
+fixture per family/size/split, so these are independent seeded fixtures, not a
+population-distribution confidence claim.
 
-The independent audit finds 36 complete cells, 1080 measured groups, 108 discarded
-groups, 2232 measured child processes, 204 discarded-group child processes, and
-2223360 measured calls. No formal group failed or was excluded. The 1080 groups
-include the 72 trace snapshots, which never enter performance rankings.
-Source identity, execution schedule, input hashes, job counts, throughput,
-native quantiles, diagnostic consistency and trace integrals passed rechecking.
-
-Every call is asserted against separately linked public R0. Two earlier 16-cell
-tiny-input smokes exercise the independent exact oracle, handshake, processes,
-threads and traces. The four-cell exploratory pilot sets observation duration
-only. Neither smokes nor pilot enter these tables. No new external Topp/GUDHI
-comparison is claimed; this tranche changes instrumentation and private options,
-with the unchanged kernel's external comparisons owned by the R0 report.
-
-| Fixture | SHA-256 |
+| Stage | Scope |
 | --- | --- |
-| sparse-holdout | `f3cb4eea268e2675431860e024fc4cd74c2f34e0a618f532d8e89c128a89c155` |
-| sparse-tuning | `3ecb8b53d33c935956f229fd0190b6e9dfa1a50b01bb35d6072f6ec3c085c9ba` |
-| uniform-holdout | `f722e6b7d741e634b61840364f594fa1cd12db82ec250716b789eeb1260a8a1c` |
-| uniform-tuning | `9a6427be2e36f858c481b00edc7f08ca8a120e6d63fffae5c26f3435a1e20439` |
+| Primary process curves | Uniform/dense/sparse/duplicates, size 128, W1; N = 1/2/4/8/12/16/20/22/32/44 plus tuning-selected extensions and N95 neighborhoods on both splits |
+| Threads | Primary W1, size 128, N = 1/8/22/44; separate shared-input process contract |
+| Broad serial | Nine families, sizes 32/128/512, W1/W2, both splits, N1 |
+| W2 parallel | Nine families, size 128, N8/22/44, both splits |
+| Bottleneck control | Uniform/duplicates, size 128, N1/8/22/44, baseline only |
+| Warm resources | Primary W1, size 128, N1/8/22/44, three measured groups per route |
+| Cold singles | Uniform/dense size 512 and sparse/duplicates size 4096, W1/W2, jobs1, three measured groups |
+| Heterogeneous pairs | Five actual strategy types; all 15 unordered pairs including diagonals, N8/22, both splits; separate N8 traces |
+| Phase replay | Primary cold W1, N2/8; synchronous and half-single-call-duration staggered dispatch, both splits |
+| Independent repeat | All broad serial cells and primary N1/coarse-extended tuning N95/maximum N; exact input/jobs, fresh order seed 20261005 |
 
-## Timing and resource boundaries
+The independent audit checked **788 complete cells, 12,522 measured groups, 149,520 measured child processes and 178,591,662 calls**. It also checked 1,162 discarded groups, 13,684 discarded-group children and 170 separate baseline calibration groups. Full per-stage counts are in `audit/audit.json`.
 
-Each cell/route has one fresh discarded group and twelve measured groups, except
-the three-group trace snapshots. A seeded shuffled cyclic schedule balances
-route positions. Tables use medians across groups and retain every sample.
-Native p95 is nearest-rank within each group, followed by its median across
-groups; it is not a pooled-call p95 or confidence bound. The selected tables below
-show all held-out family/metric/route combinations. Tuning and complete resource
-columns remain in `analysis/matrix.json` with the raw records.
+Comparative cells use 12 fresh measured groups per route plus one discarded group;
+resource cells use three measured groups plus one discarded group. Four baseline
+calls calibrate observation duration to 100 ms, clamped to 1..4096 jobs. Counts
+stay fixed across route/concurrency; repeats copy them exactly. Equivalent
+fixture/job blocks balance policy positions, with seeded shuffled block order.
+All samples, unfavorable outcomes and interrupted records are retained.
 
-Parent monotonic dispatch-to-result time includes go/result transport and group
-scheduling; it excludes process creation, parsing and readiness warmups. Native
-per-job clocks exclude result transport. The native group clock includes its
-barrier release and thread joins. Parent time divided by the slowest child's
-native group time has cell medians 1.0002-1.0142 in the process performance runs.
-These boundaries are close for these job counts, not interchangeable.
+Every numerical job is checked against separately linked public R0. Prior V2
+tiny smokes additionally enumerate independent exact matchings, including cold,
+warm, process/thread, mixed, staggered and oversubscribed cases. These validate
+the instrumentation contract, not external performance rankings. Unchanged
+kernel Topp/GUDHI evidence belongs to the [R0 report](phase2-baseline.md); no new
+external comparison or hosted CI result is claimed here.
 
-CPU demand is scheduled core-seconds from procfs ticks, including stalls while
-scheduled. The observed endpoint includes result production/transport before ack;
-CPU time is neither retired work nor a stall counter. Tick quantization limits
-small-demand precision. PSS apportions shared pages across processes and is a
-proxy for aggregate memory, not cgroup accounting. RSS is separately retained.
-Endpoint memory is after result transport and may include serialization buffers,
-parser/input buffers, runtime and allocator retention. It is not live solver memory.
+Parent throughput includes dispatch, scheduling and result transport after ready,
+but excludes process creation, parsing and readiness warmup. Native per-job
+latency includes validation/copying, preparation, solve and cleanup, excluding
+result transport. Pair-local state is fresh; inputs, code and allocator can be
+warm. Resource tracing changes observation overhead and never ranks routes.
+Scheduled CPU includes stalls while scheduled and procfs tick quantization.
+Endpoint PSS includes parser/runtime/allocator and result-serialization residence;
+it is not peak RSS or live solver memory. Trace integrals use their actual final
+observation window, which can outlast the throughput envelope. Cold jobs1
+measurements validate traces and are excluded from route selection.
 
-Trace sampling requests 2 ms. Actual intervals across measured samples have
-minimum 0.174 ms, median 2.224 ms and maximum 11.652 ms, including final boundary
-intervals. Sequential procfs reads and observer scheduling limit resolution.
-The final observation follows sampler shutdown, so its window can exceed the
-dispatch-to-result window. Integrals and peak rectangles use that same observed
-window. They must not substitute the throughput clock.
+Actual measured trace intervals: minimum 0.236 ms, median 1.044 ms, p95 7.637 ms, maximum 234.812 ms. Sequential procfs reads and observer scheduling limit resolution.
 
-DRAM bytes and LLC misses are unavailable (`null`) on this host; cgroup root is
-not writable. No DRAM capacity, bandwidth or three-resource fit is inferred.
+Using the same observed window, sampled peak times window overestimates the integrated PSS demand by a median factor of 1.056 for warm groups and 1.248 for cold singles. Every ratio is retained in `final-analysis/peak-vs-integral.json`; neither window is silently replaced by native time.
 
-## Initial process curves
+## Finite concurrency curves
 
-Throughput is jobs/s, displayed as median [minimum, maximum] over twelve groups.
-Each worker runs the same pair serially; concurrency is between callers, not
-parallel execution within one numerical solve.
+N95 is the earliest measured caller count attaining 95% of the maximum on that
+finite grid. Tuning alone selected extensions and the union of both routes'
+N95 +/- 2 neighborhoods. Holdout never selected a grid point. Dense, sparse and
+duplicates were extended to N88; uniform ended at N44. These are closed finite
+groups, not open-loop server-arrival or sustained queue experiments.
 
-| Held-out family / metric | Route | N1 | N2 | N4 | N4/N1 |
-| --- | --- | ---: | ---: | ---: | ---: |
-| uniform / W1 | baseline | 273.8 [257.3, 298.1] | 493.1 [460.1, 522.1] | 795.2 [612.9, 890.2] | 2.904 |
-| uniform / W1 | vectors | 273.1 [251.1, 286.5] | 490.5 [458.7, 517.4] | 781.8 [661.0, 828.2] | 2.863 |
-| uniform / W1 | arena | 284.5 [259.6, 292.6] | 513.4 [440.5, 529.2] | 813.6 [747.1, 902.4] | 2.860 |
-| uniform / W2 | baseline | 280.0 [273.9, 291.8] | 508.9 [477.9, 525.1] | 801.0 [746.3, 839.6] | 2.860 |
-| uniform / W2 | vectors | 266.1 [256.0, 277.1] | 463.6 [438.9, 493.9] | 744.6 [706.9, 791.9] | 2.799 |
-| uniform / W2 | arena | 275.6 [261.5, 293.1] | 488.2 [462.4, 509.7] | 756.7 [660.3, 812.8] | 2.745 |
-| sparse / W1 | baseline | 26656.0 [23452.6, 29282.3] | 49137.2 [33773.9, 52669.1] | 80426.8 [73326.4, 84212.6] | 3.017 |
-| sparse / W1 | vectors | 763.2 [732.3, 802.9] | 1413.8 [1316.0, 1483.1] | 2341.9 [2228.2, 2466.6] | 3.069 |
-| sparse / W1 | arena | 818.3 [787.5, 845.4] | 1535.3 [1432.6, 1570.2] | 2522.4 [2169.9, 2584.0] | 3.082 |
-| sparse / W2 | baseline | 25244.8 [22702.5, 27902.5] | 47439.3 [45225.0, 51790.7] | 78218.7 [75545.1, 80552.5] | 3.098 |
-| sparse / W2 | vectors | 728.6 [697.5, 743.0] | 1404.1 [1297.2, 1456.7] | 2255.6 [2171.3, 2384.1] | 3.096 |
-| sparse / W2 | arena | 768.2 [749.3, 798.5] | 1496.0 [1418.5, 1534.2] | 2430.0 [2263.7, 2511.4] | 3.163 |
+| Family | Route | Tuning N95 | Holdout N95 | Holdout peak N | Peak jobs/s | Last/peak | Peak/N1 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| dense | adaptive_arena | 16 | 20 | 20 | 3248.6 | 0.883 | 6.470 |
+| dense | baseline | 18 | 20 | 20 | 3229.2 | 0.875 | 6.447 |
+| duplicates | adaptive_arena | 18 | 18 | 44 | 424475.6 | 0.999 | 6.282 |
+| duplicates | baseline | 18 | 44 | 44 | 389908.6 | 0.897 | 6.442 |
+| sparse | adaptive_arena | 18 | 16 | 20 | 165800.6 | 0.931 | 6.092 |
+| sparse | baseline | 19 | 19 | 20 | 169641.2 | 0.919 | 6.056 |
+| uniform | adaptive_arena | 18 | 18 | 20 | 2123.8 | 0.895 | 7.148 |
+| uniform | baseline | 18 | 18 | 19 | 2052.3 | 0.894 | 7.193 |
 
-Held-out N4/N1 gains range from 2.745 to 3.163, below ideal fourfold scaling.
-Tuning gains range from 2.864 to 3.326. These observations motivate a wider,
-densified sweep; they do not prove a bandwidth, cache or CPU saturation mechanism.
+At the held-out independent-repeat points, repeated/original throughput spans 0.619..1.002, with median 0.880. Repeat N95 points were frozen from the coarse/extended tuning grid before neighborhood densification; they are not relabeled as newly selected final knees. The complete contrasts are in `final-analysis/repeat-knee-comparison.json`.
 
-The next table shows native median/p95 at N4 in microseconds, scheduled CPU
-microseconds per completed call at N1/N4, and N4 endpoint PSS. CPU demand divides
-each group's core-seconds by its fixed completed-call count before taking medians.
 
-| Held-out family / metric | Route | N4 job median / p95 (us) | CPU us/call N1 / N4 | N4 PSS (MiB) |
-| --- | --- | ---: | ---: | ---: |
-| uniform / W1 | baseline | 4656.2 / 6243.5 | 3593.8 / 4746.1 | 2.403 |
-| uniform / W1 | vectors | 4766.6 / 6383.5 | 3671.9 / 4863.3 | 2.414 |
-| uniform / W1 | arena | 4611.2 / 5913.9 | 3437.5 / 4648.4 | 2.400 |
-| uniform / W2 | baseline | 4655.1 / 6184.6 | 3593.8 / 4785.2 | 2.407 |
-| uniform / W2 | vectors | 5057.0 / 6679.4 | 3750.0 / 5195.3 | 2.406 |
-| uniform / W2 | arena | 4961.6 / 6425.1 | 3671.9 / 5058.6 | 2.405 |
-| sparse / W1 | baseline | 46.0 / 58.3 | 34.2 / 44.6 | 2.329 |
-| sparse / W1 | vectors | 1662.6 / 2259.5 | 1296.4 / 1689.5 | 2.720 |
-| sparse / W1 | arena | 1537.8 / 1990.0 | 1210.9 / 1560.7 | 2.496 |
-| sparse / W2 | baseline | 47.4 / 59.1 | 36.6 / 47.0 | 2.321 |
-| sparse / W2 | vectors | 1716.6 / 2286.6 | 1374.5 / 1741.3 | 2.728 |
-| sparse / W2 | arena | 1599.6 / 2116.4 | 1306.2 / 1622.9 | 2.490 |
+Plateaus/regressions and knee differences are observable on these grids; their
+physical cause is not identified. Per-group ranges, thread contrasts, W2 and
+Bottleneck controls and the exact independent repeat are retained in
+`audit/matrix.json`; caller counts are not transferable hardware constants.
+The independent repeat shows substantial run-to-run throughput shifts. Stages
+occurred at different serial times across two days, so fitted load and pair
+coefficients can also absorb temporal host/frequency effects. Within-stage
+balanced comparisons help, but do not identify allocator/cache/DRAM causes.
 
-Scheduled demand rises with concurrency on these cells. CPU placement,
-frequency, scheduling and contention can all contribute; this is evidence
-against silently assuming constant observed demand, not an attribution of cause.
+## Tuning-only CPU/PSS models
 
-## Same-process thread contrast
+M0 uses serial wall service as a CPU proxy and time times sampled peak as memory
+demand. M1 substitutes scheduled CPU/job and PSS integral/job. M2 fits separate
+linear load inflations, with the preregistered positive-demand floor. M3 adds
+directed pair coefficients from tuning mixed groups; it leaves homogeneous M2
+unchanged. Each model uses finite N/service and empirical CPU/PSS fluid caps.
+Only primary size-128 W1 is fitted. Cold sizes and V1 never enter these fits.
+Fitting rejects holdout. The 128-MiB proxy budget is a model contrast, not an OS
+limit; separate sampled-peak feasibility contrasts use 2/4/8/16/32/128 MiB.
 
-The thread process shares raw input and allocator state, with native worker
-threads under a two-CPU process affinity. Processes have separate inputs and
-allocators with individual pinning. Separate calls still use fresh pair-local
-solver state. These contracts must not be pooled.
+| Model | Homogeneous median / p95 error | Mixed median / p95 error | Overall max error | N95 median / max error | Crossover disagreement |
+| --- | --- | --- | ---: | --- | ---: |
+| M0 | 182.1% / 247.2% | 257.9% / 439.5% | 451.2% | 1.5 / 26 callers | 45.5% |
+| M1 | 184.1% / 283.1% | 267.7% / 507.1% | 525.9% | 0.5 / 24 callers | 57.6% |
+| M2 | 10.3% / 18.5% | 46.7% / 63.1% | 65.9% | 12.0 / 16 callers | 27.3% |
+| M3 | 10.3% / 18.5% | 28.3% / 61.8% | 62.9% | 12.0 / 16 callers | 27.3% |
 
-| Held-out uniform metric | Route | Two processes jobs/s | Two threads jobs/s [min, max] | Thread median / p95 (us) | Process / thread endpoint PSS (MiB) |
-| --- | --- | ---: | ---: | ---: | ---: |
-| W1 | baseline | 493.1 | 517.8 [496.7, 542.2] | 3780.3 / 4448.5 | 1.585 / 1.274 |
-| W1 | vectors | 490.5 | 507.7 [485.3, 529.8] | 3809.8 / 4749.0 | 1.592 / 1.272 |
-| W1 | arena | 513.4 | 522.7 [499.7, 539.6] | 3710.8 / 4461.1 | 1.583 / 1.282 |
-| W2 | baseline | 508.9 | 517.1 [474.0, 537.3] | 3794.5 / 4586.5 | 1.589 / 1.261 |
-| W2 | vectors | 463.6 | 486.0 [406.0, 493.8] | 3980.7 / 4857.4 | 1.589 / 1.297 |
-| W2 | arena | 488.2 | 495.3 [473.1, 514.5] | 3899.6 / 4735.1 | 1.586 / 1.265 |
+The fitted CPU proxy capacity is 18.009 scheduled cores. The retained complexity is **M3**, under the requirement that an upgrade improves median error by at least 10% on applicable subsets and worsens their p95 by at most 10%. M1/M2 compare both homogeneous and mixed subsets; M3 adds only mixed corrections and must improve mixed prediction while its homogeneous control stays exactly M2. This is a relative complexity decision, not certification that the retained model predicts well.
 
-Threads have lower observed endpoint PSS here, while performance ranges overlap
-several process counterparts. This single N2 family contrast cannot select a
-general execution model or quantify high-concurrency allocator interference.
+Improved throughput error does not imply improved knee or resource predictions: M2/M3 have 12-caller median N95 error versus 1.5 for M0, and 27.3% crossover disagreement. M2/M3 peak proxy median error is 67.1%. These contradictions prevent using the models as a production capacity or memory-admission rule.
 
-## Separate trace snapshots
+| Model | CPU median / p95 error | PSS demand median / p95 error | Peak proxy median / p95 error | Budget-label disagreement |
+| --- | --- | --- | --- | ---: |
+| M0 | 65.7% / 81.0% | 48.7% / 79.6% | 109.7% / 239.7% | 18.8% |
+| M1 | 68.4% / 82.5% | 24.0% / 64.2% | 230.3% / 500.3% | 27.1% |
+| M2 | 42.7% / 66.1% | 15.3% / 33.0% | 67.1% / 136.2% | 16.7% |
+| M3 | 42.7% / 66.1% | 15.3% / 33.0% | 67.1% / 136.2% | 16.7% |
 
-The three measured groups per cell estimate repeated-call group trajectories,
-not resolved single-operation phases. Warm input/code/allocator residence is
-included. Peak is sampled simultaneous PSS at N1, not individual-process VmHWM.
-For each group, I/R = trapezoid PSS integral / (sampled peak PSS times observed
-window). Columns below are medians across three groups.
+All coefficients, predictions, residuals, N95 errors and sampled budget labels are
+archived. Linear demand, pairwise corrections, finite grids, one fixture per
+split and PSS sharing limit extrapolation. No third-order interaction study or
+production resource-admission guarantee is inferred.
 
-| Held-out family / metric | Route | CPU core-seconds/group | Sampled peak PSS (MiB) | Integral (MiB s) | I/R |
-| --- | --- | ---: | ---: | ---: | ---: |
-| uniform / W1 | baseline | 0.250 | 1.408 | 0.3523 | 0.9784 |
-| uniform / W1 | vectors | 0.280 | 1.376 | 0.3768 | 0.9870 |
-| uniform / W1 | arena | 0.250 | 1.240 | 0.3234 | 0.9911 |
-| uniform / W2 | baseline | 0.270 | 1.338 | 0.3566 | 0.9797 |
-| uniform / W2 | vectors | 0.290 | 1.333 | 0.3837 | 0.9734 |
-| uniform / W2 | arena | 0.280 | 1.213 | 0.3380 | 0.9932 |
-| sparse / W1 | baseline | 0.080 | 1.114 | 0.0925 | 0.9774 |
-| sparse / W1 | vectors | 2.860 | 1.196 | 3.1719 | 0.9775 |
-| sparse / W1 | arena | 2.500 | 1.165 | 2.9414 | 0.9785 |
-| sparse / W2 | baseline | 0.080 | 1.100 | 0.0889 | 0.9534 |
-| sparse / W2 | vectors | 2.730 | 1.172 | 3.0766 | 0.9549 |
-| sparse / W2 | arena | 2.600 | 1.143 | 2.7971 | 0.9550 |
+## Interference, phase replay and lifetime
 
-Across tuning and holdout cell medians, I/R is 0.9534-0.9932. The peak rectangle
-therefore exceeds the observed integral modestly in these repeated-call groups.
-This does not validate the static peak model on single-operation phases, large
-inputs or staggered concurrent peaks. Sub-cadence allocation peaks remain unseen.
+Five actual strategy types are dense-baseline, uniform-baseline,
+uniform-adaptive_arena, sparse-baseline and duplicates-baseline. They preserve
+the existing adaptive decomposition and solver dispatch; no fictitious
+dense/on-demand production option is introduced. Directed inflation compares
+each type's native latency and scheduled CPU/job with its own homogeneous
+diagonal at the same N/split. Traced N8 groups separately compare per-node PSS.
+Different families can use different calibrated jobs; total mixed throughput
+therefore does not equal either type's individual latency.
+Per-node PSS integrals include waiting until the group's final ack; a larger
+integral does not by itself show a larger live solver footprint.
 
-## Actual routes and capacity diagnostics
+Held-out mixed-performance, N22: directed native-latency ratios span 0.890..1.167; scheduled-CPU ratios span 0.909..1.143. Full directions and diagonal demands remain in `final-analysis/interference.json`.
+Held-out mixed-resource, N8: directed native-latency ratios span 0.827..1.274; scheduled-CPU ratios span 0.818..1.333. Full directions and diagonal demands remain in `final-analysis/interference.json`.
 
-Representative last-job counters on held-out N1 process groups are consistent
-across checked groups/children. Each worker reports its first thread's final job;
-this is not a separately sampled counter trace for every job. All reported dense
-solver counts are zero. Neither family exercises a forced dense comparison.
+Replay uses actual dispatch offsets, each observed single-call trace and its
+initial PSS, then adds incremental demands above measured group-ready PSS.
+Completed children remain resident until ack; replay keeps endpoint residence.
+Three source traces are retained rather than selecting a favorable one. A naive
+sum of individual peaks and a residence-adjusted peak rectangle are separate
+comparators. Replay is evaluated on both splits, with an additional tuning-source
+to holdout contrast; no source is time-stretched to fit the measured group.
 
-| Held-out family / metric | Route | Candidate pairs / positive edges | Components | Sparse solves | Residual capacity (bytes) | Search scratch capacity (bytes) |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| uniform / W1 | baseline | 1933 / 1344 | 2 | 1 | 143304 | 14024 |
-| uniform / W1 | vectors | 1933 / 1344 | 0 | 1 | 143608 | 14072 |
-| uniform / W1 | arena | 1933 / 1344 | 0 | 1 | 103536 | 37240 |
-| uniform / W2 | baseline | 1860 / 1268 | 2 | 1 | 140088 | 14264 |
-| uniform / W2 | vectors | 1860 / 1268 | 0 | 1 | 140392 | 14312 |
-| uniform / W2 | arena | 1860 / 1268 | 0 | 1 | 99392 | 38760 |
-| sparse / W1 | baseline | 128 / 128 | 128 | 0 | 0 | 0 |
-| sparse / W1 | vectors | 128 / 128 | 0 | 1 | 47152 | 8240 |
-| sparse / W1 | arena | 128 / 128 | 0 | 1 | 26648 | 18480 |
-| sparse / W2 | baseline | 128 / 128 | 128 | 0 | 0 | 0 |
-| sparse / W2 | vectors | 128 / 128 | 0 | 1 | 47152 | 8240 |
-| sparse / W2 | arena | 128 / 128 | 0 | 1 | 26648 | 18480 |
+| Validation | Incremental replay peak median / p95 error | Integral median / p95 error | Naive peak median error | Adjusted rectangle integral median error |
+| --- | --- | --- | ---: | ---: |
+| tuning | 10.2% / 64.0% | 8.2% / 28.0% | 57.0% | 77.6% |
+| holdout | 9.2% / 107.5% | 8.8% / 29.2% | 51.0% | 72.8% |
 
-Adaptive sparse input has 128 components, each resolved without a full sparse
-network. Forced routes disable reductions and construct one full sparse solve.
-Their comparison against baseline changes policy and reductions as well as layout.
-The controlled storage comparison is vectors versus arena, including arena's
-existing scratch/heap reuse. Arena reduces residual capacity while increasing
-reported scratch capacity; category maxima are not summed into a simultaneous
-memory peak. Endpoint PSS need not track these capacities proportionally.
+3/96 cold single-call children have fewer than two interior samples, so their phase shape is unresolved. Tuning-source to holdout replay has 8.3% median peak error and 7.7% median integral error. Sampled peaks can miss transient demand; allocator, sharing and scheduling changes prevent treating either replay or peak sums as a hard budget certificate.
 
-## Evidence, reproduction and remaining work
+Issue #18 measured retained preparation capacity for 64 operands: 1 MiB for
+weighted points and 1.5 MiB for Bottleneck, before per-worker multiplication.
+The sensitivity is `M_R * H / K` MiB-seconds/job for residence H =
+0.01/0.1/1/10/100 seconds and reuse K = 1/8/16/64/256/1024. For weighted points
+it spans 0.000009765625..100; Bottleneck scales each by 1.5. At H1/K64 it is
+0.015625 and 0.0234375 respectively. These are hypothetical residence/reuse
+contrasts using measured capacity, not newly measured prepared-route timings.
+They preserve #18's early-reuse survivors and scratch/output no-go.
 
-Local-only raw evidence is
-`target/benchmarks/commit-b2c3bd5eebf0/phase2-resources/`. It contains manifests,
-fixtures, all warmups/samples, child stderr, run logs, host metadata, preregistration
-and audited `analysis/matrix.json` / `analysis/audit.json`. No durable external
-artifact URL is configured. This report does not provide public raw-data access.
+## Deployable policy and independent repeat
 
-The initial-tranche archive is
-`target/deliverables/phase2-resources-initial-b2c3bd5eebf0/phase2-resources-initial-evidence.zip`:
-16746202 bytes, SHA-256
-`c41354e30b78187029ddd1c7f1a89a3d34e0c2d2944017e2712c8269e492a27a`.
-All 4603 inventoried members passed length/SHA-256 verification. The package
-contains formal raw records, preregistration, orchestration, original smokes and
-pilot, generated source/binary/build metadata, plots, analyses and Git snapshots
-of R0 and the frozen harness. Cargo caches are excluded.
+The tuning search considers size thresholds 32/128/512/infinity in both
+orientations, preserving baseline on ties. Family labels and diagnostic counters
+are prohibited router inputs. The empirical oracle is the faster measured route
+per cell, a hindsight lower bound rather than deployable code. Regret follows the
+Issue definition `1 - throughput_policy / throughput_oracle`; family regret is
+the arithmetic mean over its equally weighted size/metric cells. Tuning minimizes
+the preregistered geometric multiplicative time regret, also retained in artifacts.
+Observations weight each family/size/metric equally. Endpoint PSS is specifically
+a proxy, not peak RSS. The oracle does not prove hard-budget feasibility.
 
-The frozen protocol can rebuild its worker in a fresh trace output directory.
-The following shell commands reproduce the planned matrix with fresh directories;
-run them serially on the unchanged kernel and frozen worker/controller sources:
+Tuning selected **arena on low side of size threshold 512**. Adoption requires geometric joint `sqrt(timeRatio * endpointPSSratio) <= 0.95`, each applicable family time/PSS ratio <= 1.10, and the same result in the independent repeat. Neither observed winners nor holdout retune the rule.
 
-```sh
-for family in uniform sparse; do
-    jobs=64
-    if [ "$family" = sparse ]; then jobs=2048; fi
-    python3 tools/benchmark_distance_resources.py --families "$family" --sizes 128 --workers 1 --jobs "$jobs" --samples 3 --trace --output "target/resources-repeat-trace-$family"
-    python3 tools/benchmark_distance_resources.py --worker-dir "target/resources-repeat-trace-$family/build" --families "$family" --sizes 128 --workers 1 2 4 --jobs "$jobs" --samples 12 --output "target/resources-repeat-process-$family"
-done
-python3 tools/benchmark_distance_resources.py --worker-dir target/resources-repeat-trace-uniform/build --families uniform --sizes 128 --workers 2 --modes threads --jobs 64 --samples 12 --output target/resources-repeat-thread-uniform
-```
+| Policy / evaluation | Time ratio | PSS ratio | Joint ratio | Regret median / p95 | Worst-family regret | Gate |
+| --- | ---: | ---: | ---: | --- | ---: | --- |
+| baseline / holdout | 1.000 | 1.000 | 1.000 | 1.0% / 15.1% | 10.6% | reference |
+| baseline / repeat | 1.000 | 1.000 | 1.000 | 2.6% / 17.3% | 10.1% | reference |
+| fixed arena / holdout | 0.982 | 1.009 | 0.995 | 0.0% / 3.3% | 1.5% | fail |
+| fixed arena / repeat | 0.964 | 1.008 | 0.986 | 0.0% / 5.8% | 2.1% | fail |
+| tuning size rule / holdout | 0.982 | 1.009 | 0.995 | 0.0% / 3.3% | 1.5% | fail |
+| tuning size rule / repeat | 0.964 | 1.008 | 0.986 | 0.0% / 5.8% | 2.1% | fail |
+| empirical oracle / holdout | 0.976 | 1.012 | 0.994 | 0.0% / 0.0% | 0.0% | not deployable |
+| empirical oracle / repeat | 0.956 | 1.013 | 0.984 | 0.0% / 0.0% | 0.0% | not deployable |
 
-These commands are a repeat recipe, not a claim of an independent formal repeat.
-The original worker was reused from the second smoke build after verifying all
-source and binary fingerprints. Earlier validation passed 96 Linux tool tests,
-two Windows focused tests, both tiny smokes, standalone formatting and project
-source/documentation checks. Hosted CI for this harness is not claimed.
+The raw policy matrix retains worst-cell time/PSS ratios, every family aggregate,
+crossover disagreements and tuning candidate objectives. An ordinary production
+API optimization was not adopted because no deployable candidate passed the
+gate. The instrumented private worker cannot establish ordinary-API speedups.
+Production tests/rustdoc/examples/changelog require no semantic update: R0 is
+unchanged. Future public lifecycle or routing work requires separate supporting
+evidence rather than relaxing this experiment's thresholds after seeing results.
 
-Issue #19 still requires resolved single-operation/phase traces, broader inputs
-and thread curves, a wider sweep densified around an observed knee, mixed-route
-interference, phase replay and held-out M0 peak / M1 static integral / M2
-load-dependent / M3 interference comparisons. DRAM evidence requires a suitable
-measurement host or an explicitly limited model. Final routing must incorporate
-Issue #18 lifetime costs and pass an independent repeat and regret comparison.
-Only stable, predictive gains can justify a cheap offline production change;
-negative or inconclusive results retain the current simpler routing.
+## Evidence, validation and reproduction
+
+All evidence is local-only and excluded from Git: V1/V2 raw samples and fixtures,
+interrupted attempt, smokes/pilot, generated sources/binaries, build metadata,
+preregistration, original/resume orchestration, audit, model predictions, policy
+matrix, interference, replay and lifetime sensitivity. R0, V1 and V2 frozen Git
+snapshots are included; Cargo caches are excluded. Fixture hashes and exact stage
+commands are in manifests and `audit/audit.json`.
+
+Archive: `target/deliverables/phase2-resources-complete-b2c3bd5eebf0/phase2-resources-complete-evidence.zip`; SHA-256 **`8cf98365415ed3f3b2932a9c00d308dd4a2d0c74a23fb0195ccca3e25ae508bc`**. All 195,944 inventoried members were read back and hash-verified. The external member inventory and `SHA256SUMS.txt` accompany it. The final maintained report carries the archive checksum; the frozen Git snapshots inside the archive carry measured code.
+
+Before freezing V2, 98 Linux tool tests and four focused Windows tests passed;
+warm/cold process/thread and mixed/staggered/oversubscribed tiny-oracle smokes
+passed. Standalone formatting, source, documentation, local collaboration and
+staged-artifact checks passed. After analysis, the independent complete-sample
+audit and final source/documentation/collaboration/staged-artifact checks passed.
+The 98 Linux tool tests were rerun after measurement and also passed.
+No hosted CI, new Topp/GUDHI suite or physical counter validation is represented
+as newly run. All ordinary numerical code remains exactly at R0.
+
+To reproduce, restore the frozen V2 snapshot alongside unchanged R0 and use the
+archived preregistration and serial orchestration with fresh output paths. V2
+uses Linux procfs/taskset. The model command takes only process tuning/extension/
+densification directories as `--train`, warm resources as `--resource`, mixed
+performance as `--mixed`, and corresponding held-out process directories as
+`--holdout`, with a fresh `--output`. Archived postprocessing scripts reproduce
+the audit, policy and replay. The maintained report tables use those JSON outputs;
+the final report and its generator are also supplied beside the evidence archive.
+Do not pool V1, retune from holdout, rank
+trace snapshots, or relabel this report revision as the measured harness.
