@@ -5,15 +5,6 @@ fn unlimited() -> WorkBudget<'static> {
     WorkBudget::new(&Execution::default()).unwrap()
 }
 
-fn prepare(input: &[[f64; 2]], scale: f64, budget: &mut WorkBudget<'_>) -> Result<Vec<Point>> {
-    numeric::prepare(
-        input.iter().map(|p| (p[0], IntervalEnd::Finite(p[1]))),
-        input.len(),
-        scale,
-        budget,
-    )
-}
-
 #[test]
 fn execution_controls_cover_dense_sparse_components_duplicates_and_fallback() {
     use crate::diagram_distances::tests::check_control;

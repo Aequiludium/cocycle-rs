@@ -1,6 +1,6 @@
 # Diagram-distance concurrent resources
 
-[Reports](README.md) / [Protocol](../distances/README.md#concurrent-resource-study)
+[Reports](README.md) / [Frozen protocol](https://github.com/Aequiludium/cocycle-rs/blob/e1ceba853347f84d0f40396b09255939cedb9a40/benches/distances/README.md#concurrent-resource-study)
 
 ## Decision and scope
 
@@ -17,7 +17,8 @@ the unavailable full CPU/RAM/DRAM model. DRAM traffic and LLC events remain
 `null`; PSS is a sampled proportional-page proxy, not enforced cgroup RAM.
 No physical bottleneck, RAM saturation or universal machine-capacity claim is
 supported. The [Issue #18 lifecycle decision](distance-lifecycle.md) remains:
-investigate scoped preparation for repeated comparisons; reject the tested
+investigate scoped preparation for repeated comparisons in
+[B5 / #31](https://github.com/Aequiludium/cocycle-rs/issues/31); reject the tested
 scratch/output retention. Retaining measured code is the final optimization
 disposition supported by this study.
 
@@ -250,6 +251,80 @@ gate. The instrumented private worker cannot establish ordinary-API speedups.
 Production tests/rustdoc/examples/changelog require no semantic update: R0 is
 unchanged. Future public lifecycle or routing work requires separate supporting
 evidence rather than relaxing this experiment's thresholds after seeing results.
+
+## Final performance figures
+
+```mermaid
+xychart-beta
+    title "B4 holdout: joint resource benefit"
+    x-axis ["R0", "Fixed arena", "Size <=512", "Oracle"]
+    y-axis "100 x (1 - joint ratio), percent" 0 --> 6
+    bar [0.000, 0.498, 0.498, 0.623]
+    line [5, 5, 5, 5]
+```
+
+```mermaid
+xychart-beta
+    title "B4 repeat: joint resource benefit"
+    x-axis ["R0", "Fixed arena", "Size <=512", "Oracle"]
+    y-axis "100 x (1 - joint ratio), percent" 0 --> 6
+    bar [0.000, 1.400, 1.400, 1.617]
+    line [5, 5, 5, 5]
+```
+
+Bars show `100 * (1 - sqrt(timeRatio * endpointPSSratio))`; higher is
+better. The horizontal line is the preregistered **5% joint benefit** requirement
+(ratio <=0.95), needed on both evaluations with per-family guards. Equal
+family/size/metric weights; endpoint PSS is a proxy. The size rule was selected
+on tuning only. It selects arena for every evaluated size (32/128/512), so its
+aggregate equals fixed arena here. Oracle means hindsight per-cell selection,
+not a deployable policy. These are a presentation of frozen results, not a new
+measurement or a population confidence interval.
+
+```mermaid
+xychart-beta
+    title "W1 N128 holdout: uniform"
+    x-axis "Caller N (sample categories)" ["1", "2", "4", "8", "12", "16", "18", "19", "20", "21", "22", "32", "44"]
+    y-axis "Jobs/s" 0 --> 2379
+    bar [285.344, 524.704, 845.256, 1298.838, 1638.440, 1875.997, 1989.212, 2052.337, 2000.803, 1963.440, 1886.172, 1697.221, 1834.772]
+    line [297.135, 535.637, 879.254, 1340.820, 1700.275, 1968.899, 2100.742, 2118.726, 2123.827, 2009.780, 1978.171, 1822.747, 1900.819]
+```
+
+```mermaid
+xychart-beta
+    title "W1 N128 holdout: dense"
+    x-axis "Caller N (sample categories)" ["1", "2", "4", "8", "12", "14", "15", "16", "17", "18", "19", "20", "21", "22", "32", "44", "66", "88"]
+    y-axis "Jobs/s" 0 --> 3638
+    bar [500.893, 931.267, 1499.531, 2189.728, 2697.516, 2897.072, 2852.355, 3020.210, 2962.548, 3021.648, 3041.031, 3229.160, 3042.716, 3161.313, 2772.107, 2868.717, 2905.944, 2824.216]
+    line [502.084, 903.717, 1510.981, 2187.877, 2710.445, 2870.171, 2926.337, 3081.329, 2993.929, 3015.591, 3063.411, 3248.577, 2914.339, 3198.337, 2864.133, 2828.168, 2880.063, 2868.732]
+```
+
+```mermaid
+xychart-beta
+    title "W1 N128 holdout: sparse"
+    x-axis "Caller N (sample categories)" ["1", "2", "4", "8", "12", "14", "15", "16", "17", "18", "19", "20", "21", "22", "32", "44", "66", "88"]
+    y-axis "Thousand jobs/s" 0 --> 190
+    bar [28.013, 50.713, 85.653, 112.709, 137.959, 146.589, 155.669, 158.192, 155.176, 160.281, 167.313, 169.641, 156.614, 156.931, 151.012, 162.016, 159.689, 155.892]
+    line [27.216, 51.343, 87.021, 113.963, 135.055, 144.715, 148.825, 161.375, 161.308, 164.188, 162.032, 165.801, 157.480, 163.948, 149.917, 163.143, 162.818, 154.315]
+```
+
+```mermaid
+xychart-beta
+    title "W1 N128 holdout: duplicates"
+    x-axis "Caller N (sample categories)" ["1", "2", "4", "8", "12", "16", "18", "19", "20", "21", "22", "23", "24", "32", "44", "66", "88"]
+    y-axis "Thousand jobs/s" 0 --> 475
+    bar [60.526, 115.049, 188.592, 265.734, 317.038, 343.420, 369.022, 365.194, 368.524, 368.413, 358.018, 315.536, 294.726, 336.320, 389.909, 352.904, 349.575]
+    line [67.570, 126.106, 210.914, 299.134, 359.238, 390.631, 404.860, 395.960, 410.368, 390.463, 395.927, 350.132, 343.352, 374.794, 424.476, 402.613, 424.133]
+```
+
+Bars = R0 baseline; line = private adaptive arena. Each point is a
+holdout median; all completed primary/extension/densification caller points are
+shown. Caller values are **equally spaced sample categories**, not a continuous
+linear N axis. The frozen PNG/SVG figures in the local evidence also show full
+group min/max and independent-repeat markers; those raw figures are not Git
+artifacts. Independent repeats are reported in the policy table and original
+report: repeat/original throughput spans 0.619..1.002, median 0.880. These curves
+do not identify a physical bottleneck or select a production admission limit.
 
 ## Evidence, validation and reproduction
 

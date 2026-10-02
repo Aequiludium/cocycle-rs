@@ -11,11 +11,11 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | Report | Scope |
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
-| [Diagram-distance preparation and allocation effects](distance-preparation.md) | Finite W1 counterexample, ordinary API comparison and isolated allocation interventions; draft pending independent reproduction |
-| [Integrated Phase-2 performance baseline](phase2-baseline.md) | Frozen Direction-B R0, prepared Rips, complete Rips workflows and Bottleneck/W1/W2 resources; local evidence and replay contract |
-| [Persistence diagram assembly overhead](diagram-assembly.md) | Fixed-R0 private phase and output-storage diagnostics; focused H0 follow-up and retained timing-mode discrepancy |
-| [Diagram-distance state lifetimes](distance-lifecycle.md) | Fixed-R0 persistent preparation/workspace ablations, cross-platform break-even, retention and selected worker-throughput evidence |
-| [Diagram-distance concurrent resources](distance-resources.md) | Fixed-R0 finite process/thread curves, mixed interference, CPU/PSS models, phase replay and independent repeats; no-go for production adoption, DRAM unavailable |
+
+| [Integrated Phase-2 baseline and Direction B disposition](phase2-baseline.md) | Frozen B1 baseline, B1-B4 no-adoption summary and final joint-gate figures |
+| [Persistence diagram assembly overhead](diagram-assembly.md) | B2 diagnostic signal, no measured production optimization; retained timing-mode discrepancy |
+| [Diagram-distance state lifetimes](distance-lifecycle.md) | B3 cross-platform break-even and retention, scratch/output no-go; independent B5 scoped-preparation follow-up |
+| [Diagram-distance concurrent resources](distance-resources.md) | B4 finite curves, model/policy contrasts and independent repeats; final comparison figures and no-go, DRAM unavailable |
 
 Do not create a report per date, commit, PR or rerun. Related suites share a report
 with separate timing contracts and tables. Keep concise conclusions and selected

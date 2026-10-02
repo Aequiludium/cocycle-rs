@@ -29,7 +29,7 @@ WSL/Windows host limit application and hardware generalization.
 | Production kernel | `b2c3bd5eebf0c1193f30ea651012b8ae61b274c1`, immutable integrated R0 |
 | Candidate generator and harness | `ec27c66b5db2a67d37c7a9ed5d1317051fa9cdc6`; all formal starts clean and non-exploratory |
 | Identity | Both builds' 111 original-source hashes, generated files, worker/pool/generator and binary SHA-256 retained and checked; source/kernel snapshots archived |
-| Protocol | `cocycle-distance-lifecycle-v1`; [execution contract](../distances/README.md#persistent-lifecycle-study), separate from fresh-process `cocycle-distance-v1` |
+| Protocol | `cocycle-distance-lifecycle-v1`; [frozen execution contract](https://github.com/Aequiludium/cocycle-rs/blob/ec27c66b5db2a67d37c7a9ed5d1317051fa9cdc6/benches/distances/README.md#persistent-lifecycle-study), separate from fresh-process `cocycle-distance-v1` |
 | Execution date | 2026-10-01 UTC; individual starts and commands retained in manifests and samples |
 | Machine | Intel Core Ultra 7 155H, 22 logical processors, same physical host; guest reports 11 cores/22 threads, host physical topology differs |
 | Linux | Ubuntu 24.04 / WSL2, kernel 6.6.87.2, Python 3.12.3; rustc 1.91.0 `f8297e351` |
@@ -174,6 +174,35 @@ especially for weighted matching. The joint incremental gate does not justify
 promoting this capacity-only pool. This is a scoped no-go for the tested pool,
 not proof that every possible internal scratch implementation must fail.
 
+### Conditional prepared-reuse comparison
+
+These are selected **N512 duplicates, holdout K64** whole-sequence R2/public
+latency savings; all four metric/pattern combinations have early joint K* in
+the full matrix. The 5% line visualizes only the savings part of the gate.
+The full gate also requires generated-R0 savings, paired wins, both splits,
+both platforms and stable later K. A favorable plotted slice alone is not an
+adoption proof. Timers include preparation/bookkeeping but exclude final
+retained-state destruction. Original medians and min/max remain in the table
+above. Absolute Linux/Windows timings cannot be compared as a hardware ranking.
+
+```mermaid
+xychart-beta
+    title "B3 Linux: conditional preparation savings"
+    x-axis ["Bottleneck same-pair", "W1 same-pair", "Bottleneck all-pairs", "W2 all-pairs"]
+    y-axis "100 x (1 - R2/public latency), percent" 0 --> 70
+    bar [60.3, 25.5, 56.9, 17.8]
+    line [5, 5, 5, 5]
+```
+
+```mermaid
+xychart-beta
+    title "B3 Windows: conditional preparation savings"
+    x-axis ["Bottleneck same-pair", "W1 same-pair", "Bottleneck all-pairs", "W2 all-pairs"]
+    y-axis "100 x (1 - R2/public latency), percent" 0 --> 70
+    bar [44.8, 25.2, 42.2, 53.1]
+    line [5, 5, 5, 5]
+```
+
 ## High-water retention
 
 Poison traces run three small pairs, one large pair, then eight small pairs.
@@ -275,10 +304,11 @@ checks are recorded separately from measured harness identity.
 Decision: investigate a separate immutable prepared representation with explicit
 dimension/context/coverage ownership, starting from the surviving duplicate-heavy
 workloads. Do not expose the tested scratch pool or output retention. Batch
-ergonomics/scheduling would require their own evidence. No follow-up remote Issue,
-new PR, merge or release is performed by this local study. Production optimization
-and resource-aware routing remain subsequent work, governed by the measured
-scope and #19's machine-level validation.
+ergonomics/scheduling would require their own evidence. The separate
+[B5 / #31](https://github.com/Aequiludium/cocycle-rs/issues/31) now tracks this
+scoped preparation question; it is not a public API adoption. The B1-B4 campaign
+closes through its summary PR with no production adoption, including #19's
+negative routing result. Preserve the original measured scope and gates.
 
 ## Evidence and reproduction
 

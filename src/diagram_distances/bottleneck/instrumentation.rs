@@ -32,9 +32,6 @@ impl Default for Options {
 
 #[derive(Debug, Default)]
 pub(crate) struct Diagnostics {
-    /// Retained algorithm preparation capacity; excludes facade and solver buffers.
-    pub(crate) preparation_bytes: usize,
-    pub(crate) preparation_buffers: usize,
     pub(crate) route: Route,
     pub(crate) threshold_decisions: usize,
     pub(crate) candidate_count: usize,

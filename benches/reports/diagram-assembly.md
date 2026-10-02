@@ -28,7 +28,7 @@ speedup or RSS saving.
 | Harness | Local commit `8c23aacd78a0637437471c4bf2e39d29e75a0324` |
 | Source fingerprint | `94d44e0f6773fb4bcad2d93b34f05a2d228e89dc815843b69beecb7917947db9`; original kernel, pipeline worker/controller/helpers and assembly controller |
 | Source state | All formal starts/ends clean; source fingerprints unchanged; generated Rust and worker hashes retained separately |
-| Protocol | `cocycle-rips-assembly-v1`, separate from pipeline/native baseline timing pools; [diagnostic contract](../pipeline/README.md#private-assembly-diagnostics) |
+| Protocol | `cocycle-rips-assembly-v1`, separate from pipeline/native baseline timing pools; [frozen diagnostic contract](https://github.com/Aequiludium/cocycle-rs/blob/8c23aacd78a0637437471c4bf2e39d29e75a0324/benches/pipeline/README.md#private-assembly-diagnostics) |
 | Runs | `stage-a-001`, `stage-a-002`, conditional `stage-b-001`, adaptive temporal control `stage-a-003` |
 | UTC window | 2026-09-30 14:27:57 to 14:36:08, including builds and gaps between runs |
 | Machine | Intel Core Ultra 7 155H host; Ubuntu 24.04.4 on WSL2, x86_64, kernel 6.6.87.2, glibc 2.39; guest reports 11 cores / 22 threads |
@@ -255,6 +255,11 @@ compact through `ComputedDimensions::through`, without an expanded dimension lis
 Producer ordering differs; specialized H1 output cannot be assumed canonical.
 
 ## Decision and scoped follow-up
+
+Campaign disposition: the B1-B4 summary adopts no production change. The
+focused H0 recommendation below is a diagnostic lead, not a measured optimization
+candidate or an implementation delivered by this closeout. The original
+dense-H0 uncertainty remains unresolved.
 
 **Outcome B: recommend investigating H0 materialization and construction memory.**
 The repeatable large graph controls cross the Issue's output-heavy gate under

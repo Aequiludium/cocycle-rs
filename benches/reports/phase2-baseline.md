@@ -23,6 +23,87 @@ candidates against this R0; they must not overwrite or relabel its evidence.
 Existing historical Rips and preparation reports retain their original identities.
 No new production algorithm, policy or default was selected by this study.
 
+## Direction B campaign disposition
+
+The B1-B4 campaign concludes with **no production adoption**. Retain its
+integrated research R0; no tested optimization, public lifecycle API, resource
+budget or router is proposed for main. This is a disposition of the tested
+campaign, not proof that every future optimization is unprofitable.
+
+| Workstream | Completed evidence | Disposition |
+| --- | --- | --- |
+| [B1 / #16](https://github.com/Aequiludium/cocycle-rs/issues/16) | 549 performance rows, 6,588 measured processes; three distinct timing contracts | Frozen integrated R0, no optimization selection |
+| [B2 / #17](https://github.com/Aequiludium/cocycle-rs/issues/17) | 71 cells, 1,704 measured processes; H0 output-heavy controls, ordinary H1 and generic paths | Diagnostic signal only; no production candidate was measured; broad assembly changes are not adopted |
+| [B3 / #18](https://github.com/Aequiludium/cocycle-rs/issues/18) | 1,543 cells, 92,604 measured processes; Linux/Windows lifecycle and retention comparisons | Reject tested scratch/output retention and public Workspace/Batch; conditional scoped preparation is isolated in [B5 / #31](https://github.com/Aequiludium/cocycle-rs/issues/31) |
+| [B4 / #19](https://github.com/Aequiludium/cocycle-rs/issues/19) | 28 V2 stages, 788 cells, 12,522 measured groups, 149,520 children and 178,591,662 calls | No deployable policy passes the joint gate on both holdout and independent repeat |
+
+The [assembly](diagram-assembly.md), [lifecycle](distance-lifecycle.md) and
+[concurrent-resource](distance-resources.md) reports retain all scoped findings
+and limitations. B2's untested focused H0 recommendation is not implemented by
+this closeout. B3's surviving prepared comparisons remain positive, conditional
+evidence; B5 starts a separate investigation and does not reopen this campaign.
+
+### Final adoption comparison
+
+| Policy / split | Time / R0 | Endpoint PSS / R0 | Joint ratio | Adoption |
+| --- | ---: | ---: | ---: | --- |
+| R0 / both | 1.000 | 1.000 | 1.000 | Retain reference |
+| Fixed arena / holdout | 0.982 | 1.009 | 0.995 | Fail |
+| Fixed arena / repeat | 0.964 | 1.008 | 0.986 | Fail |
+| Tuning size rule / holdout | 0.982 | 1.009 | 0.995 | Fail |
+| Tuning size rule / repeat | 0.964 | 1.008 | 0.986 | Fail |
+| Hindsight oracle / holdout | 0.976 | 1.012 | 0.994 | Not deployable |
+| Hindsight oracle / repeat | 0.956 | 1.013 | 0.984 | Not deployable |
+
+```mermaid
+xychart-beta
+    title "B4 holdout: joint resource benefit"
+    x-axis ["R0", "Fixed arena", "Size <=512", "Oracle"]
+    y-axis "100 x (1 - joint ratio), percent" 0 --> 6
+    bar [0.000, 0.498, 0.498, 0.623]
+    line [5, 5, 5, 5]
+```
+
+```mermaid
+xychart-beta
+    title "B4 repeat: joint resource benefit"
+    x-axis ["R0", "Fixed arena", "Size <=512", "Oracle"]
+    y-axis "100 x (1 - joint ratio), percent" 0 --> 6
+    bar [0.000, 1.400, 1.400, 1.617]
+    line [5, 5, 5, 5]
+```
+
+Bars show `100 * (1 - sqrt(timeRatio * endpointPSSratio))`; higher is
+better. The horizontal line is the preregistered **5% joint benefit** requirement
+(ratio <=0.95), needed on both evaluations with per-family guards. Equal
+family/size/metric weights; endpoint PSS is a proxy. The size rule was selected
+on tuning only. It selects arena for every evaluated size (32/128/512), so its
+aggregate equals fixed arena here. Oracle means hindsight per-cell selection,
+not a deployable policy. These are a presentation of frozen results, not a new
+measurement or a population confidence interval.
+
+### Delivery and non-adoption boundary
+
+The closeout PR contains reports only. Measured R0 and harness revisions remain
+immutable historical Git commits, including the private candidate generators
+and execution protocols; reproduce in an isolated checkout of those revisions,
+not from the report-only PR head. Production files, manifests, workflows and
+ordinary tools in the submission tree match its main base. Frozen R0 includes
+the still separately reviewed A3 / #14 logical preparation; this campaign does
+not decide or deliver [PR #26](https://github.com/Aequiludium/cocycle-rs/pull/26).
+
+The summary PR links #11 and #16-#19 using closing keywords, for closure on merge
+through the normal PR process. B5 is independently tracked as Todo in Project #2
+and is excluded from those closing keywords. No merge or release is performed
+by preparing this report.
+
+CPU/PSS are proxies; unavailable DRAM/LLC stay null. M2 homogeneous throughput
+error is 10.3% median / 18.5% p95, M3 mixed 28.3% / 61.8%; N95 median error is
+12 callers and peak-proxy median error 67.1%. No production capacity, physical
+saturation or hard-memory guarantee follows. Host frequency/load was uncontrolled.
+Full samples/fixtures/archives remain local-only; checksums and frozen identities
+are in the individual reports. No publicly retrievable raw archive is claimed.
+
 ## Measured revision and environment
 
 | Item | Recorded value |

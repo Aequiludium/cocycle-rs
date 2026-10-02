@@ -2,12 +2,6 @@
 
 ## Unreleased
 
-- Prepare diagram distances directly from borrowed logical dimension views.
-  Remove the facade's finite/essential point arrays; Wasserstein builds its
-  scaled points directly and Bottleneck owns its coordinate preparation.
-  Essential matching streams in birth order. Public signatures, numeric rules
-  and context checks are unchanged; repeated scans count toward execution work.
-
 ## 0.1.1
 
 Maintenance release for documentation discovery and release tooling.
