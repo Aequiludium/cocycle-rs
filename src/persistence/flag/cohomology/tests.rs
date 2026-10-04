@@ -4,6 +4,496 @@ use crate::persistence::reference::FilteredBoundary;
 use crate::persistence::rips::resolve_rips_range;
 use crate::persistence::{RipsOptions, assemble_diagram, reference};
 
+// H2 expectations use explicit vertex subsets and a forward F2 boundary
+// matrix. No production clique visitor, tuple ordering or parity heap is used.
+fn explicit_h2(
+    n: usize,
+    edge: impl Fn(usize, usize) -> Option<f64>,
+    cutoff: f64,
+    coverage: Coverage,
+) -> crate::diagram::PersistenceDiagram {
+    use std::collections::{BTreeSet, HashMap};
+    let mut cells = Vec::new();
+    for mask in 1_usize..1 << n {
+        if mask.count_ones() > 4 {
+            continue;
+        }
+        let mut value = 0_f64;
+        let mut present = true;
+        for b in 0..n {
+            for a in 0..b {
+                if mask & (1 << a) != 0 && mask & (1 << b) != 0 {
+                    if let Some(w) = edge(a, b) {
+                        value = value.max(w);
+                    } else {
+                        present = false;
+                    }
+                }
+            }
+        }
+        if present && value <= cutoff {
+            cells.push((mask, value));
+        }
+    }
+    cells.sort_by(|a, b| {
+        a.1.total_cmp(&b.1)
+            .then(a.0.count_ones().cmp(&b.0.count_ones()))
+            .then(b.0.cmp(&a.0))
+    });
+    let positions: HashMap<_, _> = cells.iter().enumerate().map(|(i, c)| (c.0, i)).collect();
+    let mut reduced: Vec<BTreeSet<usize>> = Vec::new();
+    let mut owners = HashMap::new();
+    let mut births = BTreeSet::new();
+    let mut raw = Vec::new();
+    for (j, &(mask, value)) in cells.iter().enumerate() {
+        let mut column = BTreeSet::new();
+        if mask.count_ones() > 1 {
+            for v in 0..n {
+                if mask & (1 << v) != 0 {
+                    column.insert(positions[&(mask ^ (1 << v))]);
+                }
+            }
+        }
+        while let Some(&pivot) = column.last() {
+            if let Some(&owner) = owners.get(&pivot) {
+                column = column
+                    .symmetric_difference(&reduced[owner])
+                    .copied()
+                    .collect();
+            } else {
+                owners.insert(pivot, j);
+                births.remove(&pivot);
+                raw.push((
+                    cells[pivot].0.count_ones() as usize - 1,
+                    cells[pivot].1,
+                    Some(value),
+                ));
+                break;
+            }
+        }
+        if column.is_empty() {
+            births.insert(j);
+        }
+        reduced.push(column);
+    }
+    raw.extend(
+        births
+            .into_iter()
+            .map(|i| (cells[i].0.count_ones() as usize - 1, cells[i].1, None)),
+    );
+    assemble_diagram(2, coverage, raw).unwrap()
+}
+
+fn independent_tetrahedra(
+    access: &crate::filtration::flag::CliqueAccess<'_>,
+    triangle: crate::filtration::flag::TupleEntry<3>,
+) -> Vec<crate::filtration::flag::TupleEntry<4>> {
+    use crate::filtration::flag::{CliqueAccess, TupleEntry};
+    let (n, cutoff) = match access {
+        CliqueAccess::Dense(m, c) => (m.len(), *c),
+        CliqueAccess::Sparse(g, c) => (g.vertex_count(), *c),
+    };
+    let mut result = Vec::new();
+    for v in 0..n {
+        if triangle.vertices.contains(&v) {
+            continue;
+        }
+        let mut vertices = Vec::from(triangle.vertices);
+        vertices.push(v);
+        vertices.sort_unstable();
+        let mut value = 0_f64;
+        let mut present = true;
+        for b in 1..4 {
+            for a in 0..b {
+                let edge = match access {
+                    CliqueAccess::Dense(m, _) => m.get(vertices[a], vertices[b]),
+                    CliqueAccess::Sparse(g, _) => g.edge_value(vertices[a], vertices[b]),
+                };
+                if let Some(w) = edge {
+                    value = value.max(w);
+                } else {
+                    present = false;
+                }
+            }
+        }
+        if present && value <= cutoff {
+            result.push(TupleEntry {
+                vertices: vertices.try_into().unwrap(),
+                value,
+            });
+        }
+    }
+    result
+}
+
+pub(super) fn check_h2_transform(
+    access: &crate::filtration::flag::CliqueAccess<'_>,
+    level: &[crate::filtration::flag::TupleEntry<3>],
+    j: usize,
+    column: &[usize],
+    working: &BinaryHeap<Reverse<crate::filtration::flag::TupleEntry<4>>>,
+    pivot: crate::filtration::flag::TupleEntry<4>,
+) {
+    use std::collections::BTreeSet;
+    assert_eq!(column.iter().filter(|&&k| k == j).count(), 1);
+    assert!(column.iter().all(|&k| k >= j));
+    assert!(column.windows(2).all(|w| w[0] > w[1]));
+    let mut expected = BTreeSet::new();
+    for &k in column {
+        for row in independent_tetrahedra(access, level[k]) {
+            if !expected.insert(row) {
+                expected.remove(&row);
+            }
+        }
+    }
+    let mut actual = BTreeSet::new();
+    for row in working.iter().map(|r| r.0).chain([pivot]) {
+        if !actual.insert(row) {
+            actual.remove(&row);
+        }
+    }
+    assert_eq!(
+        actual, expected,
+        "R = C V from independent all-edge enumeration"
+    );
+    assert_eq!(expected.first(), Some(&pivot));
+}
+
+fn check_h2_graph(
+    graph: &crate::complex::WeightedGraph,
+    cutoff: f64,
+    coverage: Coverage,
+) -> H2Stats {
+    use crate::filtration::flag::{CliqueAccess, SparseFlag};
+    let access = CliqueAccess::Sparse(graph, cutoff);
+    let mut stats = H2Stats {
+        verify_transforms: true,
+        ..H2Stats::default()
+    };
+    let execution = crate::execution::Execution::default();
+    let raw = run_h2(
+        &SparseFlag::new(graph, cutoff).unwrap(),
+        &access,
+        &mut WorkBudget::new(&execution).unwrap(),
+        &mut stats,
+    )
+    .unwrap();
+    let diagram = assemble_diagram(2, coverage, raw).unwrap();
+    assert_eq!(
+        diagram,
+        explicit_h2(
+            graph.vertex_count(),
+            |a, b| graph.edge_value(a, b),
+            cutoff,
+            coverage
+        )
+    );
+    let generic = crate::persistence::simplicial::cohomology::compute(
+        &access,
+        2,
+        crate::algebra::PrimeField::new(2).unwrap(),
+        &mut WorkBudget::new(&execution).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(diagram, assemble_diagram(2, coverage, generic).unwrap());
+    stats
+}
+
+#[test]
+fn h2_fixed_tuple_order_and_all_cofacets_match_explicit_vertices() {
+    use crate::filtration::flag::{CliqueAccess, TupleEntry};
+    let n = 9;
+    let values: Vec<_> = (0..36).map(|i| (i % 5) as f64).collect();
+    let input = DissimilarityView::new(&values, n).unwrap();
+    let graph = crate::complex::WeightedGraph::new(
+        n,
+        (0..n)
+            .flat_map(|b| (0..b).map(move |a| (a, b)))
+            .filter(|&(a, b)| (a + b) % 3 != 0)
+            .map(|(a, b)| crate::complex::WeightedEdge {
+                vertices: [a, b],
+                value: input.get(a, b).unwrap(),
+            })
+            .collect(),
+    )
+    .unwrap();
+    for cutoff in [0., 2., 4.] {
+        for access in [
+            CliqueAccess::Dense(input.into(), cutoff),
+            CliqueAccess::Sparse(&graph, cutoff),
+        ] {
+            for c in 2..n {
+                for b in 1..c {
+                    for a in 0..b {
+                        let value = match &access {
+                            CliqueAccess::Dense(m, _) => Some(
+                                m.get(a, b)
+                                    .unwrap()
+                                    .max(m.get(a, c).unwrap())
+                                    .max(m.get(b, c).unwrap()),
+                            ),
+                            CliqueAccess::Sparse(g, _) => g
+                                .edge_value(a, b)
+                                .zip(g.edge_value(a, c))
+                                .zip(g.edge_value(b, c))
+                                .map(|((x, y), z)| x.max(y).max(z)),
+                        };
+                        let Some(value) = value.filter(|&v| v <= cutoff) else {
+                            continue;
+                        };
+                        let triangle = TupleEntry {
+                            vertices: [a, b, c],
+                            value,
+                        };
+                        let mut actual = Vec::new();
+                        access
+                            .visit_tetrahedra(triangle, &mut || Ok(()), |row| {
+                                actual.push(row);
+                                Ok(())
+                            })
+                            .unwrap();
+                        actual.sort_unstable();
+                        let mut expected = independent_tetrahedra(&access, triangle);
+                        expected.sort_unstable();
+                        assert_eq!(actual, expected);
+                        for row in &actual {
+                            for other in &actual {
+                                assert_eq!(
+                                    row.cmp(other),
+                                    crate::complex::Simplex::new(row.vertices.to_vec(), row.value)
+                                        .unwrap()
+                                        .cmp(
+                                            &crate::complex::Simplex::new(
+                                                other.vertices.to_vec(),
+                                                other.value
+                                            )
+                                            .unwrap()
+                                        )
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn h2_prototype_matches_explicit_and_generic_dense_sparse_ties_cutoffs() {
+    use crate::filtration::flag::CliqueAccess;
+    let mut seed = 20261004_u64;
+    let mut additions = 0;
+    let mut transforms = 0;
+    for n in 0_usize..=10 {
+        for sample in 0..20 {
+            let values: Vec<_> = (0..n * n.saturating_sub(1) / 2)
+                .map(|_| {
+                    seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    if sample % 2 == 0 {
+                        ((seed >> 32) % 5) as f64
+                    } else {
+                        (seed >> 11) as f64 / (1_u64 << 50) as f64
+                    }
+                })
+                .collect();
+            let input = DissimilarityView::new(&values, n).unwrap();
+            for cutoff in [0., 1., 2., 4.] {
+                let coverage = Coverage::Through(cutoff);
+                let execution = crate::execution::Execution::default();
+                let access = CliqueAccess::Dense(input.into(), cutoff);
+                let mut stats = H2Stats {
+                    verify_transforms: true,
+                    ..H2Stats::default()
+                };
+                let raw = run_h2(
+                    &DenseFlag::new(input.into(), cutoff).unwrap(),
+                    &access,
+                    &mut WorkBudget::new(&execution).unwrap(),
+                    &mut stats,
+                )
+                .unwrap();
+                let diagram = assemble_diagram(2, coverage, raw).unwrap();
+                assert_eq!(
+                    diagram,
+                    explicit_h2(n, |a, b| input.get(a, b), cutoff, coverage)
+                );
+                let generic = crate::persistence::simplicial::cohomology::compute(
+                    &access,
+                    2,
+                    crate::algebra::PrimeField::new(2).unwrap(),
+                    &mut WorkBudget::new(&execution).unwrap(),
+                )
+                .unwrap();
+                assert_eq!(diagram, assemble_diagram(2, coverage, generic).unwrap());
+                additions += stats.additions;
+                transforms += stats.checked_transforms;
+                let graph = crate::complex::WeightedGraph::new(
+                    n,
+                    (0..n)
+                        .flat_map(|b| (0..b).map(move |a| (a, b)))
+                        .filter(|&(a, b)| sample % 3 == 0 || (a + b + sample) % 4 != 0)
+                        .map(|(a, b)| crate::complex::WeightedEdge {
+                            vertices: [a, b],
+                            value: input.get(a, b).unwrap(),
+                        })
+                        .collect(),
+                )
+                .unwrap();
+                let sparse = check_h2_graph(&graph, cutoff, coverage);
+                additions += sparse.additions;
+                transforms += sparse.checked_transforms;
+            }
+        }
+    }
+    assert!(additions > 0 && transforms > 0);
+}
+
+#[test]
+fn h2_octahedra_preserve_finite_essential_censored_and_repeated_intervals() {
+    use crate::complex::{WeightedEdge, WeightedGraph};
+    use crate::filtration::flag::CliqueAccess;
+    let n = 12;
+    let values: Vec<_> = (0..n)
+        .flat_map(|b| {
+            (0..b).map(move |a| {
+                if a / 6 != b / 6 {
+                    3.
+                } else if a / 2 == b / 2 {
+                    2.
+                } else {
+                    1.
+                }
+            })
+        })
+        .collect();
+    let input = DissimilarityView::new(&values, n).unwrap();
+    for cutoff in [1., 1.5, 2., 3.] {
+        let coverage = if cutoff == 3. {
+            Coverage::Complete
+        } else {
+            Coverage::Through(cutoff)
+        };
+        let raw = compute_h2(
+            &DenseFlag::new(input.into(), cutoff).unwrap(),
+            &CliqueAccess::Dense(input.into(), cutoff),
+            &mut WorkBudget::new(&crate::execution::Execution::default()).unwrap(),
+        )
+        .unwrap();
+        let diagram = assemble_diagram(2, coverage, raw).unwrap();
+        assert_eq!(
+            diagram,
+            explicit_h2(n, |a, b| input.get(a, b), cutoff, coverage)
+        );
+        let bars: Vec<_> = diagram.dimension(2).unwrap().iter().collect();
+        assert_eq!(bars.len(), 2);
+        let end = if cutoff < 2. {
+            IntervalEnd::RightCensored { through: cutoff }
+        } else {
+            IntervalEnd::Finite(2.)
+        };
+        assert!(bars.iter().all(|bar| bar.birth() == 1. && bar.end() == end));
+    }
+    let graph = WeightedGraph::new(
+        n,
+        (0..n)
+            .flat_map(|b| (0..b).map(move |a| (a, b)))
+            .filter(|&(a, b)| a / 6 == b / 6 && a / 2 != b / 2)
+            .map(|(a, b)| WeightedEdge {
+                vertices: [a, b],
+                value: 1.,
+            })
+            .collect(),
+    )
+    .unwrap();
+    check_h2_graph(&graph, f64::INFINITY, Coverage::Complete);
+    let expected = explicit_h2(
+        n,
+        |a, b| graph.edge_value(a, b),
+        f64::INFINITY,
+        Coverage::Complete,
+    );
+    assert_eq!(expected.dimension(2).unwrap().len(), 2);
+    assert!(
+        expected
+            .dimension(2)
+            .unwrap()
+            .iter()
+            .all(|b| b.end() == IntervalEnd::Essential)
+    );
+}
+
+#[test]
+fn h2_parity_heap_cancels_multiplicity_and_shared_budget_interrupts_every_boundary() {
+    let execution = crate::execution::Execution::default().max_work(u64::MAX);
+    let mut budget = WorkBudget::new(&execution).unwrap();
+    let mut heap = BinaryHeap::from([3, 3, 3, 2, 2, 1, 1, 1, 1, 0]);
+    assert_eq!(pop_parity(&mut heap, &mut budget).unwrap(), Some(3));
+    assert_eq!(pop_parity(&mut heap, &mut budget).unwrap(), Some(0));
+    assert_eq!(pop_parity(&mut heap, &mut budget).unwrap(), None);
+    let values = [1.; 15];
+    let input = DissimilarityView::new(&values, 6).unwrap();
+    let rips = DenseFlag::new(input.into(), 1.).unwrap();
+    let access = crate::filtration::flag::CliqueAccess::Dense(input.into(), 1.);
+    compute_h2(&rips, &access, &mut budget).unwrap();
+    let total = budget.used();
+    for limit in 0..total - 10 {
+        // includes handoff, level construction and reduction
+        let flag = std::sync::atomic::AtomicBool::new(false);
+        let limits = execution.max_work(limit);
+        assert!(matches!(
+            compute_h2(&rips, &access, &mut WorkBudget::new(&limits).unwrap()),
+            Err(Error::WorkLimitExceeded { .. })
+        ));
+        let limits = execution.cancellation(&flag);
+        let mut budget = WorkBudget::new(&limits).unwrap();
+        budget.cancel_at_work(limit);
+        assert_eq!(
+            compute_h2(&rips, &access, &mut budget),
+            Err(Error::Cancelled)
+        );
+    }
+    assert!(compute_h2(&rips, &access, &mut WorkBudget::new(&execution).unwrap()).is_ok());
+}
+
+#[test]
+fn h2_extreme_and_adjacent_f64_endpoints_remain_exact() {
+    use crate::filtration::flag::CliqueAccess;
+    for birth in [f64::from_bits(1), 1., 1.0e300] {
+        let death = f64::from_bits(birth.to_bits() + 1);
+        let values: Vec<_> = (0..6)
+            .flat_map(|b| (0..b).map(move |a| if a / 2 == b / 2 { death } else { birth }))
+            .collect();
+        let input = DissimilarityView::new(&values, 6).unwrap();
+        for cutoff in [birth, death] {
+            let coverage = Coverage::Through(cutoff);
+            let raw = compute_h2(
+                &DenseFlag::new(input.into(), cutoff).unwrap(),
+                &CliqueAccess::Dense(input.into(), cutoff),
+                &mut WorkBudget::new(&crate::execution::Execution::default()).unwrap(),
+            )
+            .unwrap();
+            let diagram = assemble_diagram(2, coverage, raw).unwrap();
+            assert_eq!(
+                diagram,
+                explicit_h2(6, |a, b| input.get(a, b), cutoff, coverage)
+            );
+            let end = if cutoff == birth {
+                IntervalEnd::RightCensored { through: birth }
+            } else {
+                IntervalEnd::Finite(death)
+            };
+            assert!(
+                diagram
+                    .dimension(2)
+                    .unwrap()
+                    .iter()
+                    .any(|bar| bar.birth() == birth && bar.end() == end)
+            );
+        }
+    }
+}
+
 fn compare_all(values: &[f64], n: usize, cutoff: Option<f64>) {
     let input = DissimilarityView::new(values, n).unwrap();
     let options = RipsOptions::new(1, cutoff).unwrap();

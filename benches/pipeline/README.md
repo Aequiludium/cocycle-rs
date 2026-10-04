@@ -132,7 +132,7 @@ After freezing the private H2 prototype, M1 uses the same pipeline v2 worker and
 fixture convention with a separate controller:
 
 ```sh
-python3 tools/benchmark_workspace.py --native-environment target/rips-pipeline/environment.json --samples 12 --cpu 0 --output target/workspace-run-001
+python3 tools/benchmark_workspace.py --native-environment target/rips-pipeline/environment.json --samples 15 --cpu 0 --output target/workspace-run-001
 ```
 
 The native environment identifies hash-checked, pinned GUDHI/Ripser workers from
@@ -159,3 +159,45 @@ Trace timings and RSS include the diagnostic work and must not be pooled with
 ordinary worker latency or interpreted as process-memory equations. Boundary
 failure tests simulate recoverable allocation errors and cancellation; they do
 not claim universal recovery from real allocator exhaustion.
+
+## Private H2 baseline
+
+For the T3 fixed-tuple experiment, build the same worker/controller with
+`RUSTFLAGS="--cfg cocycle_h2_bench"`. This private configuration changes only
+exact F2 diagram-only maximum-dimension-2 dispatch. Normal builds retain generic
+H2 continuation; H1-only, H3+, odd primes, representatives and approximation
+blockers keep their established paths. The configuration is not a Cargo feature
+or public engine selector. No H2 shortcut is enabled in this baseline.
+
+Commit the clean implementation before running `--phase3` at both sizes; retain
+the actual RUSTFLAGS, worker hashes and source/harness identity. Counters and
+ownership landmarks use a separate release test executable:
+
+```sh
+COCYCLE_H2_FIXTURE=path/to/fixture.txt cargo test --release --lib \
+  persistence::flag::cohomology::profiling::profile_h2_prototype \
+  -- --ignored --exact --nocapture
+```
+
+Run one fixture per fresh counter process. Validate emitted raw intervals against
+the frozen pipeline result before interpreting counts. These test builds contain
+instrumentation and do not supply ordinary latency. H1 extraction is interleaved
+with pairing and finishes before the H1-return event; capacity/event snapshots
+do not measure total live allocations or establish RSS release. The mathematical
+[baseline contract](../../docs/reference/mathematics.md#experimental-fixed-tuple-h2-baseline)
+and [H2 report](../reports/h2-foundation.md) distinguish validation from admission.
+
+The existing profiling controller can also compare two frozen, validated
+`--phase3` pipeline runs without compiling during measurement:
+
+```sh
+python3 tools/profile_rips.py --h2-baseline path/to/t2-run \
+  --h2-candidate path/to/t3-run --samples 96 --cpu 0 --quick \
+  --output target/benchmarks/commit-<sha12>/localfs-paired/run-001
+```
+
+Omit `--quick` for the n32 runs. It verifies fixture/executable hashes, copies
+byte-identical workers to Linux `/tmp`, retains every sample, checks diagrams
+and resamples matched rounds for a ratio-of-medians 95% interval (2000 replicates).
+The controller commit/hash and both original build environments are recorded.
+Keep regressions visible; a passing screen alone does not admit default dispatch.

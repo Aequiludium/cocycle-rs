@@ -15,6 +15,8 @@ use crate::complex::WeightedGraph;
 pub(crate) use access::FlagAccess;
 pub(crate) use dense::DenseFlag;
 pub(crate) use order::SimplexEntry;
+#[cfg(any(test, cocycle_h2_bench))]
+pub(crate) use order::TupleEntry;
 pub(crate) use sparse::SparseFlag;
 
 /// The complete clique filtration of a supplied weighted graph.
