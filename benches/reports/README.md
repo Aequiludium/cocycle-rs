@@ -12,6 +12,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
 | [Exact F2 H2 foundation](h2-foundation.md) | Phase-3 baseline, counter schema and H1-to-H2 continuation evidence |
+| [H1-to-H2 lifetime and scratch evidence](h2-workspace.md) | M1 ownership contract, lifetime-only and same-type scratch ablations, retained regressions and experimental decision |
 
 Do not create a report per date, commit, PR or rerun. Related suites share a report
 with separate timing contracts and tables. Keep concise conclusions and selected

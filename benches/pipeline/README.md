@@ -160,6 +160,15 @@ ordinary worker latency or interpreted as process-memory equations. Boundary
 failure tests simulate recoverable allocation errors and cancellation; they do
 not claim universal recovery from real allocator exhaustion.
 
+The [M1 report](../reports/h2-workspace.md) records the completed ownership audit,
+two independent runs, capacity retention and failed control screens. The ablations
+remain generated experiments; ordinary library dispatch is unchanged. Executables
+are retained in each run's `binaries/` directory before measurement; repeat with
+`--reuse-build` pointing to the first build-bearing run, using a new output and
+order seed. Temporary execution paths are not the retained evidence store.
+Capacity bytes describe test-build objects, including H1's empty test-only
+reduced-column Vec headers; they do not measure ordinary-worker live allocation.
+
 ## Private H2 baseline
 
 For the T3 fixed-tuple experiment, build the same worker/controller with
