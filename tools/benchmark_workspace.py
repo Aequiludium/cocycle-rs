@@ -197,7 +197,7 @@ def run(args):
             if fingerprint(args.reuse_build / name) != item['source_sha256']:
                 raise ValueError('generated source changed before repeat')
             for kind, key in (('binary', 'binary_sha256'), ('trace', 'trace_sha256')):
-                original = Path(item[kind])
+                original = args.reuse_build / 'binaries' / Path(item[kind]).name
                 if sha256(original) != item[key]:
                     raise ValueError('frozen executable changed before repeat')
                 destination = local / (name if kind == 'binary' else name + '-trace')
@@ -208,6 +208,16 @@ def run(args):
         with (output / 'build.log').open('w') as log:
             for name in ('joint', 'lifetime', 'scratch'):
                 variants[name] = build_variant(name, output, local, log)
+    # /tmp is execution storage, not retained evidence. Preserve every executable
+    # before measurement so a later process/session can repeat by the same hashes.
+    archive = output / 'binaries'
+    archive.mkdir()
+    for item in variants.values():
+        for kind, key in (('binary', 'binary_sha256'), ('trace', 'trace_sha256')):
+            destination = archive / Path(item[kind]).name
+            shutil.copy2(item[kind], destination)
+            if sha256(destination) != item[key]:
+                raise ValueError('retained executable differs from measured identity')
     # Finish all builds before any measured process; no compilation during runs.
     environment = {**identity, 'source_sha256': initial, 'variants': variants,
                    'native_environment_sha256': sha256(args.native_environment), 'pins': PINS,
