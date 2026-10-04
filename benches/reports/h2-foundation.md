@@ -9,7 +9,7 @@ T0 freezes measured R0 at
 `9e6715f4c2e0118ab738486bd747ec3e361397de`. Counter additions compile only under
 `cfg(test)`; ordinary release measurements retain the generic algorithm. The harness
 revision and fingerprints are recorded separately by each controller. Associated
-PR: the Phase-3 foundation PR, supplied at submission; no earlier PR is replaced.
+PR: [Phase-3 foundation #50](https://github.com/Aequiludium/cocycle-rs/pull/50).
 
 `benchmark_rips_pipeline.py --phase3` uses the existing
 [pipeline v2](../pipeline/README.md). Exact F2, H0/H1/H2, owned diagrams, inclusive
