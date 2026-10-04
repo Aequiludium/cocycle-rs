@@ -18,7 +18,7 @@ they are not fresh T3 measurements.
 
 | Item | T3 evidence |
 | --- | --- |
-| Associated change | [T3 #37](https://github.com/Aequiludium/cocycle-rs/issues/37), stacked on foundation PR #50; PR link follows submission |
+| Associated change | [T3 PR #51](https://github.com/Aequiludium/cocycle-rs/pull/51), [issue #37](https://github.com/Aequiludium/cocycle-rs/issues/37), stacked on foundation PR #50 |
 | Measured candidate/kernel and harness | `d6042f1895257d99258c61996eb0999f5be0792a`, clean before/after all formal measurements |
 | Matched T2 kernel baseline | `f22d6207cf63a7d6552b0989a48444e3ce8cd05f`; stacked base `1bfd739dcf056ecc8f06254e0bbfc878df550bba` differs only in reporting |
 | Candidate pipeline fingerprint | `a385958df0315d6c20c7b09965796cd6978b899803c5e2109f6e70992132c5c0` |
