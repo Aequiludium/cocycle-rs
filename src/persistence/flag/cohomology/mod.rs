@@ -84,6 +84,9 @@ struct Stats {
     peak_transform_heap: usize,
 }
 
+// Keep this H1-only entry available to the caller despite the extra continuation
+// specialization; it carries no death-key collection or allocation.
+#[inline]
 pub(super) fn compute(rips: &impl FlagAccess, budget: &mut WorkBudget<'_>) -> Result<RawIntervals> {
     let mut stats = Stats::default();
     run_access::<true, true, PRODUCTION_SHORTCUTS, false>(rips, &mut stats, budget, &mut Vec::new())
