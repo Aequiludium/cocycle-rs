@@ -44,7 +44,7 @@ def paired_summary(baseline, candidate, seed):
 def paired_h2(args):
     from benchmark_rips_pipeline import PROTOCOL, phase3_cases, schedule, worker, compare_samples, provenance
     from build_native import sha256
-    identity = provenance(None)
+    identity = provenance("HEAD")
     if identity["dirty"]:
         raise ValueError("commit the harness and implementation before measurement")
     directories = {"baseline": args.h2_baseline.resolve(), "candidate": args.h2_candidate.resolve()}
@@ -119,7 +119,7 @@ def paired_h2(args):
                "cases": len(records), "processes": sum(len(r["samples"]) for r in records),
                "finished_utc": datetime.now(timezone.utc).isoformat(),
                "regressions": [r["case"] for r in records if not r["passed"]]}
-    final_identity = provenance(None)
+    final_identity = provenance("HEAD")
     if final_identity != identity or sha256(Path(__file__)) != metadata["controller_sha256"]:
         summary.update(status="failed", error="source identity changed during measurement")
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
