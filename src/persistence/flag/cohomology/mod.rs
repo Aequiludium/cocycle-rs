@@ -639,6 +639,235 @@ fn append_coboundary(
     Ok(())
 }
 
+/// The matched T3 baseline. Shortcuts and capacity-reuse experiments are absent.
+/// Normal library builds do not contain this prototype or its selector.
+#[cfg(any(test, cocycle_h2_bench))]
+pub(super) fn compute_h2(
+    rips: &impl FlagAccess,
+    access: &crate::filtration::flag::CliqueAccess<'_>,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    run_h2(rips, access, budget, &mut H2Stats::default())
+}
+
+#[cfg(any(test, cocycle_h2_bench))]
+#[derive(Default, Debug)]
+struct H2Stats {
+    #[cfg(test)]
+    triangles: usize,
+    #[cfg(test)]
+    cleared: usize,
+    #[cfg(test)]
+    pivot_lookups: usize,
+    #[cfg(test)]
+    additions: usize,
+    #[cfg(test)]
+    stored_columns: usize,
+    #[cfg(test)]
+    stored_entries: usize,
+    #[cfg(test)]
+    largest_transform: usize,
+    #[cfg(test)]
+    peak_heap: usize,
+    #[cfg(test)]
+    peak_transform_heap: usize,
+    #[cfg(test)]
+    verify_transforms: bool,
+    #[cfg(test)]
+    checked_transforms: usize,
+    // Offsets from entry in microseconds, plus live vector capacities/lengths.
+    // These are ownership landmarks, not allocator/RSS measurements.
+    #[cfg(test)]
+    events: Vec<(&'static str, u128, usize, usize)>,
+}
+
+#[cfg(any(test, cocycle_h2_bench))]
+fn run_h2(
+    rips: &impl FlagAccess,
+    access: &crate::filtration::flag::CliqueAccess<'_>,
+    budget: &mut WorkBudget<'_>,
+    _stats: &mut H2Stats,
+) -> Result<RawIntervals> {
+    use crate::filtration::flag::TupleEntry;
+    use std::collections::HashSet;
+    #[cfg(test)]
+    let start = std::time::Instant::now();
+    let (mut raw, deaths) = compute_with_clearing(rips, budget)?;
+    #[cfg(test)]
+    _stats.events.push((
+        "h1-return/handoff-owned",
+        start.elapsed().as_micros(),
+        deaths.len(),
+        deaths.capacity(),
+    ));
+    // Deaths are original tuples, independent of the now-dropped H1 level.
+    let mut cleared = HashSet::new();
+    cleared
+        .try_reserve(deaths.len())
+        .map_err(|_| allocation("H2 clearing"))?;
+    for key in deaths {
+        budget.step()?;
+        cleared.insert(key);
+    }
+    #[cfg(test)]
+    _stats.events.push((
+        "handoff-extracted",
+        start.elapsed().as_micros(),
+        cleared.len(),
+        cleared.capacity(),
+    ));
+    let edges = rips.edges(&mut || budget.step())?;
+    let mut triangles: Vec<TupleEntry<3>> = Vec::new();
+    for &edge in &edges {
+        let vertices = rips.edge_vertices(edge.id);
+        rips.visit_cofacets(edge, &mut || budget.step(), |row| {
+            let vertices3 = rips.triangle_vertices(row.id);
+            // Unique increasing extension of the edge, without discarding
+            // cleared topology or inferring which triangles are cycle births.
+            if vertices3[..2] == vertices {
+                triangles
+                    .try_reserve(1)
+                    .map_err(|_| allocation("H2 triangle level"))?;
+                triangles.push(TupleEntry {
+                    vertices: vertices3,
+                    value: row.value,
+                });
+            }
+            Ok(true)
+        })?;
+    }
+    drop(edges);
+    budget.check()?;
+    triangles.sort_unstable();
+    budget.check()?;
+    #[cfg(test)]
+    {
+        _stats.triangles = triangles.len();
+        _stats.events.push((
+            "triangle-level-built/edges-dropped",
+            start.elapsed().as_micros(),
+            triangles.len(),
+            triangles.capacity(),
+        ));
+    }
+    let mut owners: HashMap<[usize; 4], usize> = HashMap::new();
+    // Each V is a parity-normalized list of triangle positions, including its
+    // diagonal. R is regenerated as C V, with no stored reduced coboundaries.
+    let mut columns: Vec<Vec<usize>> = Vec::new();
+    #[cfg(test)]
+    _stats.events.push((
+        "h2-reduction-start",
+        start.elapsed().as_micros(),
+        columns.len(),
+        columns.capacity(),
+    ));
+    for j in (0..triangles.len()).rev() {
+        budget.step()?;
+        let triangle = triangles[j];
+        if cleared.contains(&triangle.vertices) {
+            #[cfg(test)]
+            {
+                _stats.cleared += 1;
+            }
+            continue;
+        }
+        // Fresh scratch per column is deliberate: M1 measures reuse separately.
+        let mut working: BinaryHeap<Reverse<TupleEntry<4>>> = BinaryHeap::new();
+        let mut transform = BinaryHeap::new();
+        append_h2(access, triangle, &mut working, budget, _stats)?;
+        push_heap(&mut transform, j)?;
+        #[cfg(test)]
+        let mut previous_pivot = None;
+        loop {
+            budget.step()?;
+            let Some(Reverse(pivot)) = pop_parity(&mut working, budget)? else {
+                raw.try_reserve(1).map_err(|_| allocation("H2 intervals"))?;
+                raw.push((2, triangle.value, None));
+                break;
+            };
+            #[cfg(test)]
+            {
+                if let Some(previous) = previous_pivot {
+                    assert!(
+                        previous < pivot,
+                        "elimination must advance the forward pivot"
+                    );
+                }
+                previous_pivot = Some(pivot);
+                _stats.pivot_lookups += 1;
+            }
+            if let Some(&owner) = owners.get(&pivot.vertices) {
+                push_heap(&mut working, Reverse(pivot))?;
+                #[cfg(test)]
+                {
+                    _stats.additions += 1;
+                }
+                for &k in &columns[owner] {
+                    budget.step()?;
+                    append_h2(access, triangles[k], &mut working, budget, _stats)?;
+                    push_heap(&mut transform, k)?;
+                }
+                #[cfg(test)]
+                {
+                    _stats.peak_transform_heap = _stats.peak_transform_heap.max(transform.len());
+                }
+            } else {
+                let mut column = Vec::new();
+                while let Some(k) = pop_parity(&mut transform, budget)? {
+                    column
+                        .try_reserve(1)
+                        .map_err(|_| allocation("H2 transformation"))?;
+                    column.push(k);
+                }
+                #[cfg(test)]
+                {
+                    if _stats.verify_transforms {
+                        tests::check_h2_transform(access, &triangles, j, &column, &working, pivot);
+                        _stats.checked_transforms += 1;
+                    }
+                    _stats.stored_columns += 1;
+                    _stats.stored_entries += column.len();
+                    _stats.largest_transform = _stats.largest_transform.max(column.len());
+                }
+                owners
+                    .try_reserve(1)
+                    .map_err(|_| allocation("H2 pivot owners"))?;
+                columns
+                    .try_reserve(1)
+                    .map_err(|_| allocation("H2 transformation columns"))?;
+                owners.insert(pivot.vertices, columns.len());
+                columns.push(column);
+                // Zero bars still have owners and transforms for future work.
+                if triangle.value != pivot.value {
+                    raw.try_reserve(1).map_err(|_| allocation("H2 intervals"))?;
+                    raw.push((2, triangle.value, Some(pivot.value)));
+                }
+                break;
+            }
+        }
+    }
+    budget.check()?;
+    Ok(raw)
+}
+
+#[cfg(any(test, cocycle_h2_bench))]
+fn append_h2(
+    access: &crate::filtration::flag::CliqueAccess<'_>,
+    triangle: crate::filtration::flag::TupleEntry<3>,
+    heap: &mut BinaryHeap<Reverse<crate::filtration::flag::TupleEntry<4>>>,
+    budget: &mut WorkBudget<'_>,
+    _stats: &mut H2Stats,
+) -> Result<()> {
+    access.visit_tetrahedra(triangle, &mut || budget.step(), |row| {
+        push_heap(heap, Reverse(row))?;
+        #[cfg(test)]
+        {
+            _stats.peak_heap = _stats.peak_heap.max(heap.len());
+        }
+        Ok(())
+    })
+}
+
 #[cfg(test)]
 mod tests;
 

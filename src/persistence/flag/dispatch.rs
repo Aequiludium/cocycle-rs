@@ -48,6 +48,10 @@ pub(in crate::persistence) fn compute_dense(
             Err(error) => return Err(error),
         };
         budget.check()?;
+        #[cfg(cocycle_h2_bench)]
+        if dimension == 2 {
+            return cohomology::compute_h2(&access, &CliqueAccess::Dense(input, stop), budget);
+        }
         if dimension == 1 {
             cohomology::compute(&access, budget)
         } else {
@@ -103,6 +107,10 @@ pub(in crate::persistence) fn compute_graph(
             Err(error) => return Err(error),
         };
         budget.check()?;
+        #[cfg(cocycle_h2_bench)]
+        if dimension == 2 {
+            return cohomology::compute_h2(&access, &CliqueAccess::Sparse(graph, cutoff), budget);
+        }
         if dimension == 1 {
             cohomology::compute(&access, budget)
         } else {
@@ -159,13 +167,19 @@ mod tests {
             .unwrap();
             let counts = simplicial::cohomology::take_counts();
             if characteristic == 2 {
-                assert_eq!(counts[0], [0; 3]);
-                assert_eq!(counts[1], [0; 3]);
+                #[cfg(not(cocycle_h2_bench))]
+                {
+                    assert_eq!(counts[0], [0; 3]);
+                    assert_eq!(counts[1], [0; 3]);
+                    assert_eq!(counts[2], [1, 0, 1]);
+                }
+                #[cfg(cocycle_h2_bench)]
+                assert!(counts.is_empty());
             } else {
                 assert_eq!(counts[0][1], 3);
                 assert_eq!(counts[1], [3, 1, 2]);
+                assert_eq!(counts[2], [1, 0, 1]);
             }
-            assert_eq!(counts[2], [1, 0, 1]);
             let reference = simplicial::cohomology::compute(
                 &CliqueAccess::Sparse(&graph, 1.),
                 2,
@@ -197,9 +211,14 @@ mod tests {
         )
         .unwrap();
         let counts = simplicial::cohomology::take_counts();
-        assert_eq!(counts[0], [0; 3]);
-        assert_eq!(counts[1], [0; 3]);
-        assert_eq!(counts[2], [1, 0, 1]);
+        #[cfg(not(cocycle_h2_bench))]
+        {
+            assert_eq!(counts[0], [0; 3]);
+            assert_eq!(counts[1], [0; 3]);
+            assert_eq!(counts[2], [1, 0, 1]);
+        }
+        #[cfg(cocycle_h2_bench)]
+        assert!(counts.is_empty());
         let diagram = assemble_diagram(2, Coverage::Complete, raw.clone()).unwrap();
         assert!(diagram.dimension(2).unwrap().is_empty());
 

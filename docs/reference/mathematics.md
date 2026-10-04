@@ -325,6 +325,40 @@ paths. If H1 combinatorial indexing overflows on an H2+ request, use the full
 tuple-based generic path. One WorkBudget includes handoff extraction, conversion,
 topology generation and continuation; allocation or interruption returns no result.
 
+### Experimental fixed-tuple H2 baseline
+
+The private T3 prototype is available in tests and builds explicitly using
+`--cfg cocycle_h2_bench`. Normal builds keep the generic H2 continuation. The
+benchmark configuration selects only exact F2 diagram-only H2 requests; H3+,
+odd primes, representatives and blocked approximate sources keep their routes.
+It has no apparent, emergent or virtual H2 shortcuts.
+
+Triangles and tetrahedra use `[usize; 3]` and `[usize; 4]`, without narrowed
+vertices or tetrahedron binomial indexing. The shared total order compares
+maximum edge value, then decreasing colex vertices. Enumerate the complete
+triangle level, including H1 death triangles; clearing skips their reduction
+only. Sparse tetrahedra use a three-way sorted adjacency intersection. Dense
+visits test all candidate vertices against the three triangle vertices. Both
+charge failed candidates/comparisons to the same WorkBudget.
+
+Process triangles in reverse order and pivot on the earliest forward tetrahedron.
+Store every pivot owner, including zero-length pairs, and a parity-normalized
+list of triangle positions for V, including its diagonal. Reconstruct C V on
+each owner addition and cancel both rows and transformation positions by parity.
+Source positions in V precede the active column in reverse computation order;
+each elimination advances the pivot in forward order. Independent explicit
+boundary matrices and all-edge tetrahedron enumeration check intervals, order,
+triangularity and R = C V. This is a finite validation baseline for further
+experiments, not production admission or an arbitrary-dimensional proof.
+
+Test-only ownership landmarks record the H1 return with already-owned death
+tuples, clearing-set extraction, triangle-level construction after edge release,
+and H2 reduction start. H1 death extraction occurs during H1 pairing, before its
+return; it is not a separate late decoding pass. Vector capacities and elapsed
+offsets describe those objects, not total live allocations or process RSS. The
+prototype deliberately retains its triangle clearing set and allocates fresh
+per-column scratch; lifetime and capacity-reuse experiments belong to M1.
+
 ### Implicit reconstruction invariant
 
 Maintain $R=CV$. For each pivot, store
