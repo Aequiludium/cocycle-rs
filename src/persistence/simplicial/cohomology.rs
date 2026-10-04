@@ -43,12 +43,18 @@ pub(in crate::persistence) fn compute(
         }
         let mut owners: HashMap<Vec<usize>, usize> = HashMap::new();
         let mut columns: Vec<Column<usize>> = Vec::new();
+        #[cfg(test)]
+        profiling::record(dimension, |s| s.simplices = level.len());
         for position in (0..level.len()).rev() {
             budget.step()?;
             let simplex = &level[position];
             if cleared.contains(&simplex.vertices) {
+                #[cfg(test)]
+                profiling::record(dimension, |s| s.cleared += 1);
                 continue;
             }
+            #[cfg(test)]
+            profiling::record(dimension, |s| s.processed += 1);
             let mut working = Column::new();
             append(access, simplex, 1, field, &mut working, budget)?;
             let mut transform = Column::unit(position);
@@ -58,7 +64,15 @@ pub(in crate::persistence) fn compute(
                     push_interval(&mut raw, (dimension, simplex.value, None))?;
                     break;
                 };
+                #[cfg(test)]
+                profiling::record(dimension, |s| s.pivot_lookups += 1);
                 if let Some(&owner) = owners.get(&pivot.vertices) {
+                    #[cfg(test)]
+                    profiling::record(dimension, |s| {
+                        s.pivot_hits += 1;
+                        s.column_additions += 1;
+                        s.reconstructions += 1;
+                    });
                     let factor = field.negate(coefficient);
                     for (&source, &value) in columns[owner].entries() {
                         budget.step()?;
@@ -73,6 +87,11 @@ pub(in crate::persistence) fn compute(
                     }
                     transform.add_scaled(&columns[owner], factor, field, &mut || budget.step())?;
                 } else {
+                    #[cfg(test)]
+                    profiling::record(dimension, |s| {
+                        s.stored_transform_entries += transform.entries().count();
+                        s.largest_transform = s.largest_transform.max(transform.entries().count());
+                    });
                     push_interval(&mut raw, (dimension, simplex.value, Some(pivot.value)))?;
                     owners.try_reserve(1).map_err(|_| allocation())?;
                     columns.try_reserve(1).map_err(|_| allocation())?;
@@ -116,9 +135,16 @@ fn append(
             .unwrap();
         let coefficient = field.multiply(factor, field.orientation(omitted));
         working.add_term(row, coefficient, field);
+        #[cfg(test)]
+        profiling::record(simplex.dimension(), |s| {
+            s.peak_working_column = s.peak_working_column.max(working.entries().count())
+        });
         Ok(())
     })
 }
+
+#[cfg(test)]
+mod profiling;
 fn push_interval(raw: &mut RawIntervals, interval: (usize, f64, Option<f64>)) -> Result<()> {
     raw.try_reserve(1).map_err(|_| allocation())?;
     raw.push(interval);

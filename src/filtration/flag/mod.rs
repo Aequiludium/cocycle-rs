@@ -3,6 +3,8 @@ mod access;
 mod cliques;
 mod expansion;
 pub(crate) use cliques::CliqueAccess;
+#[cfg(test)]
+pub(crate) use cliques::cofacet_counts;
 pub(crate) use expansion::{expand, expand_access, expand_access_with};
 mod dense;
 mod index;

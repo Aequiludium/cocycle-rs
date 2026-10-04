@@ -369,6 +369,85 @@ fn high_dimensions_match_independent_boundary_reduction() {
         }
     }
 }
+
+#[test]
+fn exhaustive_small_h2_and_seeded_missing_edge_filtrations_match_boundary_oracle() {
+    // n<=4: all {0,1,2,missing} edge assignments, not a claim about 4^15 n=6.
+    // Missing is represented by value 3 in the dense input with cutoff <=2.
+    let mut seed = 20261004_u64;
+    for n in 0_usize..=6 {
+        let count = n * n.saturating_sub(1) / 2;
+        let samples = if n <= 4 {
+            4_usize.pow(count as u32)
+        } else {
+            128
+        };
+        for sample in 0..samples {
+            let mut code = sample;
+            let values: Vec<_> = (0..count)
+                .map(|_| {
+                    let value = if n <= 4 {
+                        let v = code % 4;
+                        code /= 4;
+                        v
+                    } else {
+                        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                        ((seed >> 32) % 4) as usize
+                    };
+                    value as f64
+                })
+                .collect();
+            for cutoff in [0., 1., 2.] {
+                let edges: Vec<_> = (0..n)
+                    .flat_map(|b| (0..b).map(move |a| (a, b)))
+                    .filter_map(|(a, b)| {
+                        let value = values[b * (b - 1) / 2 + a];
+                        (value <= cutoff).then_some((a, b, value))
+                    })
+                    .collect();
+                let graph = FlagFiltration::new(
+                    WeightedGraph::new(
+                        n,
+                        edges
+                            .iter()
+                            .map(|&(a, b, value)| WeightedEdge {
+                                vertices: [a, b],
+                                value,
+                            })
+                            .collect(),
+                    )
+                    .unwrap(),
+                );
+                let expected = boundary_oracle(n, &edges, 2);
+                let options = PersistenceOptions::new(2, Some(cutoff)).unwrap();
+                let dense = compute_rips_from_distances(
+                    matrix(&values, n),
+                    &options,
+                    &ExecutionLimits::default(),
+                )
+                .unwrap();
+                let sparse = compute_flag(&graph, &options, &ExecutionLimits::default()).unwrap();
+                assert_eq!(
+                    bars(dense.diagram()),
+                    expected,
+                    "dense n={n} sample={sample} cutoff={cutoff}"
+                );
+                assert_eq!(
+                    bars(sparse.diagram()),
+                    expected,
+                    "sparse n={n} sample={sample} cutoff={cutoff}"
+                );
+                assert_eq!(sparse.diagram().coverage(), Coverage::Complete);
+                let coverage = if values.iter().any(|&v| v > cutoff) {
+                    Coverage::Through(cutoff)
+                } else {
+                    Coverage::Complete
+                };
+                assert_eq!(dense.diagram().coverage(), coverage);
+            }
+        }
+    }
+}
 #[test]
 fn sparse_high_dimensions_do_not_densify() {
     let input = FlagFiltration::new(
