@@ -82,6 +82,9 @@ def build_variant(name, output, local, log):
     shutil.copytree(REPO / 'src', root / 'src')
     for filename in ('Cargo.toml', 'Cargo.lock'):
         shutil.copy2(REPO / filename, root / filename)
+    # Cargo validates explicit targets even when only --lib is requested.
+    (root / 'benches').mkdir()
+    shutil.copy2(REPO / 'benches/rips.rs', root / 'benches/rips.rs')
     source = root / 'src/persistence/flag/cohomology/mod.rs'
     generic = root / 'src/persistence/simplicial/cohomology.rs'
     if name == 'scratch':
