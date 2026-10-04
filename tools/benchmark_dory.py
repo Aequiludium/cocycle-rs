@@ -50,11 +50,12 @@ def run(args):
     text = original.read_text().replace('%.12lf', '%.17g').replace('%0.12lf', '%.17g')
     generated.write_text(text)
     binary = output / 'dory'
-    command = ['gcc', str(generated), '-O3', '-fopenmp', '-pthread', '-DSAVEPD', '-lm', '-o', str(binary)]
+    command = ['gcc', str(generated), '-I', str(source / 'Dory'), '-O3', '-fopenmp', '-pthread', '-DSAVEPD', '-lm', '-o', str(binary)]
     with (output / 'build.log').open('w') as log:
         subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
     environment = {**identity, 'source_revision': 'b6d9b081f626adc60b224bb044c04e7abf5cc599',
                    'license': 'MIT', 'original_sha256': sha256(original), 'capture_sha256': sha256(generated),
+                   'headers_sha256': {p.name: sha256(p) for p in sorted((source / 'Dory').glob('*.h'))},
                    'binary_sha256': sha256(binary), 'build_command': command,
                    'compiler': subprocess.check_output(['gcc', '--version'], text=True),
                    'platform': platform.platform(), 'scope': __doc__, 'threads': 1,

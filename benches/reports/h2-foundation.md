@@ -4,9 +4,10 @@
 
 ## Frozen experiment contract
 
-T0 fixes the ordinary generic kernel at
+T0 freezes measured R0 at
+`a1a7cb629187fbc17c9e2e638ee8ae4bf19c2656`, based on main
 `9e6715f4c2e0118ab738486bd747ec3e361397de`. Counter additions compile only under
-`cfg(test)`; ordinary release measurements retain this kernel. The harness
+`cfg(test)`; ordinary release measurements retain the generic algorithm. The harness
 revision and fingerprints are recorded separately by each controller. Associated
 PR: the Phase-3 foundation PR, supplied at submission; no earlier PR is replaced.
 
@@ -66,6 +67,19 @@ complete pairing handoff; M1/M2 own later lifetime/reuse ablations.
 
 ## Results
 
-Measurement results are added after the implementation and harness commit is
-frozen. Generated sources, manifests, fixtures, commands and samples remain in
-ignored target directories with distinct baseline/candidate identities.
+The R0 quick pipeline run passed all 23 cases, 69 worker schedules and 897 fresh
+processes (one warmup plus 12 measured samples each), with no exclusions or
+failed cases. Source fingerprint:
+`6b9251ef5d3b85d67dc8b7aec359748aa9f447432aeb33a3419e28b72cb5a52e`.
+Kernel and harness are both the R0 SHA above. Linux Rust 1.91.0, native compiler
+commands/header/binary hashes and machine/CPU identity are in environment.json.
+This establishes scoped baseline measurements and repeated output agreement,
+not a speed ranking. Local-only evidence root:
+`target/benchmarks/commit-a1a7cb629187/phase3-baseline/run-001/`.
+
+Dory attempt 001 failed compilation because the numeric-capture copy initially
+omitted the pinned sort.h include path; its build.log is retained. The corrected
+adapter adds that source include directory and records header hashes before a
+fresh attempt. Generated sources, manifests, fixtures, commands and samples
+remain in ignored target directories with distinct identities. No durable public
+artifact store is configured; local evidence is not a public archive.
