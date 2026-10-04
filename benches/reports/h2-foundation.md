@@ -83,3 +83,23 @@ adapter adds that source include directory and records header hashes before a
 fresh attempt. Generated sources, manifests, fixtures, commands and samples
 remain in ignored target directories with distinct identities. No durable public
 artifact store is configured; local evidence is not a public archive.
+
+The n=32 R0 run also passed all 23 cases/897 processes under the same source
+fingerprint. Its harness is `f04e6ba6340e64635b41180b5bc41d32e635ee52` and measured
+kernel is R0; evidence is phase3-baseline/run-002. Counter run-001 exercised all
+23 n=32 fixtures in separate Windows Rust 1.98.1 test processes. For high_fill32,
+generic H1 processed 353/384 edges; H2 cleared 353/2287 triangles, processed
+1934, made 408 additions and visited 56947 candidate vertices. Failed candidates
+are included; these are work counts, not ordinary release timings.
+
+Dory run-002 (harness f04e6ba above) validated five n=16 geometric families,
+13 captures each. The equal clique exited 139 and the octahedron omitted [1,2)
+in H2; both failures remain in results.json and invalidate that run's overall
+summary. Source inspection finds strict edge < threshold selection and forced
+matrix cone truncation. Those tied cases are outside the validated Dory domain,
+not retroactively passing exclusions. Run-003 uses harness
+`393d9699b0514d0f1f5494cc432cd650e2122d1d`, explicitly selects
+uniform32/sphere32/noisy_sphere32, and passes all 39 captures. Both sphere cases
+contain a positive H2 interval, so this is not solely empty-H2 validation.
+Dory process timers have coarse 0.01-second resolution on these small inputs;
+their raw values/RSS establish resource snapshots only. No ranking is reported.
