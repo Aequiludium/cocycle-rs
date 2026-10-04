@@ -4,6 +4,7 @@ Generated variants change only explicit release or same-type heap reset sites.
 They never enter the ordinary library. Run fresh serial processes on Linux.
 """
 import argparse
+import ast
 from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
@@ -17,7 +18,7 @@ import subprocess
 import sys
 
 from benchmark_rips_pipeline import (REPO, compare_samples, phase3_cases,
-                                     provenance, schedule, worker)
+                                     canonical, provenance, schedule, worker)
 from build_native import PINS, sha256
 
 
@@ -44,9 +45,14 @@ def scratch_source(source):
     source = replace_once(source, declaration,
                           '        working.clear();\n        transform.clear();')
     marker = '    for j in (0..triangles.len()).rev() {'
-    return replace_once(source, marker,
-                        '    let mut working: BinaryHeap<Reverse<TupleEntry<4>>> = BinaryHeap::new();\n'
-                        '    let mut transform = BinaryHeap::new();\n' + marker)
+    source = replace_once(source, marker,
+                          '    let mut working: BinaryHeap<Reverse<TupleEntry<4>>> = BinaryHeap::new();\n'
+                          '    let mut transform = BinaryHeap::new();\n' + marker)
+    end = ('        "h2_reduction_end",\n        &raw,\n        &triangles,\n'
+           '        &cleared,\n        &owners,\n        &columns,\n        (0, 0),')
+    return replace_once(source, end, end.rsplit('(0, 0),', 1)[0]
+                        + '(working.capacity() * std::mem::size_of::<Reverse<TupleEntry<4>>>(),\n'
+                        + '         transform.capacity() * std::mem::size_of::<usize>()),')
 
 
 def workspace_cases():
@@ -99,6 +105,7 @@ def build_variant(name, output, local, log):
     # Test-only capacity accounting is compiled separately from latency.
     run(['cargo', 'test', '--locked', '--offline', '--release', '--lib', '--no-run',
          '--message-format=json'])
+    run(['cargo', 'test', '--locked', '--offline', '--release', '--lib'])
     tests = list((root / 'target/release/deps').glob('cocycle-*'))
     tests = [path for path in tests if path.is_file() and os.access(path, os.X_OK)]
     if len(tests) != 1:
@@ -125,9 +132,35 @@ def summarize(samples, names):
     return result
 
 
+def trace_result(stdout, returncode, anchor):
+    result = {'returncode': returncode, 'events': []}
+    try:
+        if returncode:
+            raise ValueError('diagnostic process failed')
+        result['events'] = [json.loads(line.split('workspace_event=', 1)[1])
+                            for line in stdout.splitlines() if 'workspace_event=' in line]
+        if not result['events']:
+            raise ValueError('missing workspace events')
+        raw, = [ast.literal_eval(line.split('workspace_intervals=', 1)[1].replace('Some(', '('))
+                for line in stdout.splitlines() if 'workspace_intervals=' in line]
+        intervals = [[dimension, birth, death] for dimension, birth, death in raw
+                     if death is None or death != birth]
+        if canonical({'intervals': intervals}) != canonical(anchor):
+            raise ValueError('diagnostic interval multiset mismatch')
+        for event in result['events']:
+            if any(type(value) is not int or value < 0 for value in event['vec_capacity_bytes'].values()):
+                raise ValueError('invalid vector capacity observation')
+        result['intervals_validated'] = True
+    except (ValueError, TypeError, KeyError, SyntaxError) as error:
+        result['comparison_error'] = str(error)
+    return result
+
+
 def run(args):
     if sys.platform != 'linux' or args.samples < 10:
         raise ValueError('Linux and at least ten independent measured processes per cell required')
+    if args.cpu not in os.sched_getaffinity(0):
+        raise ValueError('CPU must belong to the inherited allowed affinity')
     identity = provenance('HEAD')
     initial = fingerprint(REPO)
     output = args.output.resolve()
@@ -144,14 +177,42 @@ def run(args):
             raise ValueError('native reference binary hash mismatch')
         shutil.copy2(native / name, local / name)
     variants = {}
-    with (output / 'build.log').open('w') as log:
-        for name in ('joint', 'lifetime', 'scratch'):
-            variants[name] = build_variant(name, output, local, log)
+    if args.reuse_build:
+        previous = json.loads((args.reuse_build / 'environment.json').read_text())
+        if (previous['kernel_commit'] != identity['kernel_commit']
+                or previous['controller_sha256'] != sha256(Path(__file__))
+                or previous['native_environment_sha256'] != sha256(args.native_environment)):
+            raise ValueError('repeat requires exactly the same frozen kernel, controller and references')
+        for name, item in previous['variants'].items():
+            if fingerprint(args.reuse_build / name) != item['source_sha256']:
+                raise ValueError('generated source changed before repeat')
+            for kind, key in (('binary', 'binary_sha256'), ('trace', 'trace_sha256')):
+                original = Path(item[kind])
+                if sha256(original) != item[key]:
+                    raise ValueError('frozen executable changed before repeat')
+                destination = local / (name if kind == 'binary' else name + '-trace')
+                shutil.copy2(original, destination)
+                item[kind] = str(destination)
+            variants[name] = item
+    else:
+        with (output / 'build.log').open('w') as log:
+            for name in ('joint', 'lifetime', 'scratch'):
+                variants[name] = build_variant(name, output, local, log)
     # Finish all builds before any measured process; no compilation during runs.
     environment = {**identity, 'source_sha256': initial, 'variants': variants,
                    'native_environment_sha256': sha256(args.native_environment), 'pins': PINS,
+                   'native_environment': reference,
+                   'harness_files_sha256': {name: sha256(REPO / name) for name in
+                                            ('benches/pipeline/cocycle.rs', 'tools/benchmark_workspace.py',
+                                             'tools/benchmark_rips_pipeline.py', 'tools/benchmark_inputs.py',
+                                             'tools/compare_rips.py', 'tools/build_native.py')},
                    'controller_sha256': sha256(Path(__file__)), 'samples': args.samples,
-                   'warmups': 1, 'cpu': args.cpu, 'platform': platform.platform(),
+                   'order_seed': args.order_seed,
+                   'reuse_build': str(args.reuse_build) if args.reuse_build else None,
+                   'warmups': 1, 'cpu': args.cpu, 'allowed_cpus': sorted(os.sched_getaffinity(0)),
+                   'cpuinfo': Path('/proc/cpuinfo').read_text().split('\n\n')[0],
+                   'platform': platform.platform(),
+                   'timeout_seconds': 30, 'address_space_mib': 2048,
                    'rustc': subprocess.check_output(['rustc', '-Vv'], text=True),
                    'started_utc': datetime.now(timezone.utc).isoformat(),
                    'protocol': 'cocycle-workspace-v1', 'worker_protocol': 'cocycle-rips-pipeline-v2',
@@ -170,8 +231,8 @@ def run(args):
         record = {'case': case.name, 'dimension': case.fixture.q,
                   'fixture_sha256': sha256(path), 'samples': [], 'traces': {}}
         records.append(record)
-        anchor = None
-        for entry in schedule(names, args.samples, 20261004 + index):
+        anchors = {}
+        for entry in schedule(names, args.samples, args.order_seed + index):
             name = entry['backend']
             sample = worker([str(local / name), str(path), case.path, case.layout,
                              str(case.epsilon), 'no'], case, 30, 2048, args.cpu)
@@ -179,31 +240,37 @@ def run(args):
             record['samples'].append(sample)
             if sample['status'] == 'completed':
                 try:
-                    if anchor is None:
-                        anchor = sample
-                    compare_samples(anchor, sample, case)
+                    # Native references may omit coverage or representative
+                    # metadata shared by two later Rust samples.
+                    for anchor in [sample, *anchors.values()]:
+                        compare_samples(anchor, sample, case)
+                    anchors.setdefault(name, sample)
                 except ValueError as error:
                     sample['comparison_error'] = str(error)
-            (output / 'results.json').write_text(json.dumps(records, indent=2) + '\n')
-        record['summary'] = summarize(record['samples'], names)
         for name in variants:
             env = dict(os.environ, COCYCLE_H2_FIXTURE=str(path), COCYCLE_H2_ROUTE='dispatch',
                        COCYCLE_WORKSPACE_TRACE='1')
-            result = subprocess.run(['taskset', '-c', str(args.cpu), variants[name]['trace'],
-                                     'simplicial::cohomology::profiling::profile_h2', '--ignored',
-                                     '--nocapture', '--test-threads=1'], env=env,
-                                    capture_output=True, text=True, timeout=30)
             trace_path = output / (case.name + '-' + name + '.log')
-            trace_path.write_text(result.stdout + result.stderr)
-            record['traces'][name] = {'returncode': result.returncode, 'log_sha256': sha256(trace_path),
-                                     'events': [json.loads(line.split('workspace_event=', 1)[1])
-                                                for line in result.stdout.splitlines()
-                                                if line.startswith('workspace_event=')]}
+            try:
+                result = subprocess.run(['taskset', '-c', str(args.cpu), variants[name]['trace'],
+                                         'simplicial::cohomology::profiling::profile_h2', '--ignored',
+                                         '--nocapture', '--test-threads=1'], env=env,
+                                        capture_output=True, text=True, timeout=30)
+                trace_path.write_text(result.stdout + result.stderr)
+                record['traces'][name] = trace_result(
+                    result.stdout, result.returncode, next(iter(anchors.values()), None))
+            except subprocess.TimeoutExpired as error:
+                trace_path.write_text(repr(error))
+                record['traces'][name] = {'events': [], 'comparison_error': 'diagnostic timeout'}
+            record['traces'][name]['log_sha256'] = sha256(trace_path)
+        valid_traces = all(trace.get('intervals_validated') for trace in record['traces'].values())
+        rows = record['samples'] if valid_traces else [*record['samples'], {'status': 'trace_error'}]
+        record['summary'] = summarize(rows, names)
         (output / 'results.json').write_text(json.dumps(records, indent=2) + '\n')
         print(case.name, {name: row['median_ms'] for name, row in record['summary'].items()}, flush=True)
     passed = all(all(sample['status'] == 'completed' and 'comparison_error' not in sample
                      for sample in record['samples'])
-                 and all(trace['returncode'] == 0 for trace in record['traces'].values())
+                 and all(trace.get('intervals_validated') for trace in record['traces'].values())
                  for record in records)
     unchanged = fingerprint(REPO) == initial and provenance('HEAD') == identity
     summary = {'status': 'passed' if passed and unchanged else 'failed',
@@ -221,4 +288,6 @@ if __name__ == '__main__':
     parser.add_argument('--native-environment', type=Path, required=True)
     parser.add_argument('--samples', type=int, default=15)
     parser.add_argument('--cpu', type=int, default=0)
+    parser.add_argument('--order-seed', type=int, default=20261004)
+    parser.add_argument('--reuse-build', type=Path)
     run(parser.parse_args())

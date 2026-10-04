@@ -11,10 +11,19 @@ from benchmark_rips_pipeline import (Case, cases, compare_samples, exclusion,
                                     instrument_sparse, measure_case, provenance, schedule,
                                     timing_scope, validate_output, worker)
 from compare_rips import Fixture
-from benchmark_workspace import summarize, workspace_cases, replace_once
+from benchmark_workspace import summarize, workspace_cases, replace_once, trace_result
 
 
 class PipelineTests(unittest.TestCase):
+    def test_workspace_traces_need_validated_intervals_not_only_exit_zero(self):
+        event = 'workspace_event={"vec_capacity_bytes":{"working":32}}\n'
+        raw = 'workspace_intervals=[(0, 0.0, Some(1.0)), (0, 0.0, None), (1, 1.0, Some(1.0))]\n'
+        expected = {'intervals': [[0, 0., None], [0, 0., 1.]]}
+        self.assertTrue(trace_result(event + raw, 0, expected)['intervals_validated'])
+        for stdout in (event, raw, event + raw + raw, event + raw.replace('1.0)), (0', '2.0)), (0')):
+            self.assertIn('comparison_error', trace_result(stdout, 0, expected))
+        self.assertIn('comparison_error', trace_result(event + raw, 9, expected))
+
     def test_workspace_cases_cover_controls_and_keep_unique_artifacts(self):
         rows = list(workspace_cases())
         self.assertEqual(len(rows), len({row.name for row in rows}))

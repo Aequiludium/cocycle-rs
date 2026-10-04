@@ -774,10 +774,36 @@ fn run_h2(
     cleared
         .try_reserve(deaths.len())
         .map_err(|_| allocation("H2 clearing"))?;
+    #[cfg(test)]
+    let handoff_capacity_bytes = deaths.capacity() * std::mem::size_of::<[usize; 3]>();
+    #[cfg(test)]
+    let handoff_len = deaths.len();
     for key in deaths {
         budget.step()?;
         cleared.insert(key);
+        #[cfg(test)]
+        if cleared.len() == handoff_len {
+            crate::persistence::simplicial::cohomology::workspace_event(
+                "h2_handoff_conversion_overlap",
+                2,
+                &[("handoff", handoff_capacity_bytes)],
+                &[
+                    ("cleared", cleared.len()),
+                    ("clearing_slots", cleared.capacity()),
+                ],
+            )?;
+        }
     }
+    #[cfg(test)]
+    crate::persistence::simplicial::cohomology::workspace_event(
+        "h2_handoff_converted",
+        2,
+        &[],
+        &[
+            ("cleared", cleared.len()),
+            ("clearing_slots", cleared.capacity()),
+        ],
+    )?;
     #[cfg(test)]
     _stats.events.push((
         "handoff-extracted",
@@ -805,6 +831,22 @@ fn run_h2(
             Ok(true)
         })?;
     }
+    #[cfg(test)]
+    crate::persistence::simplicial::cohomology::workspace_event(
+        "h2_triangle_assembly",
+        2,
+        &[
+            (
+                "edges",
+                edges.capacity() * std::mem::size_of::<SimplexEntry>(),
+            ),
+            (
+                "triangles",
+                triangles.capacity() * std::mem::size_of::<TupleEntry<3>>(),
+            ),
+        ],
+        &[],
+    )?;
     drop(edges);
     budget.check()?;
     triangles.sort_unstable();
@@ -830,6 +872,16 @@ fn run_h2(
         columns.len(),
         columns.capacity(),
     ));
+    #[cfg(test)]
+    profiling::h2_workspace_event(
+        "h2_reduction_start",
+        &raw,
+        &triangles,
+        &cleared,
+        &owners,
+        &columns,
+        (0, 0),
+    )?;
     for j in (0..triangles.len()).rev() {
         budget.step()?;
         let triangle = triangles[j];
@@ -914,7 +966,30 @@ fn run_h2(
                 break;
             }
         }
+        #[cfg(test)]
+        profiling::h2_workspace_event(
+            "h2_column_complete",
+            &raw,
+            &triangles,
+            &cleared,
+            &owners,
+            &columns,
+            (
+                working.capacity() * std::mem::size_of::<Reverse<TupleEntry<4>>>(),
+                transform.capacity() * std::mem::size_of::<usize>(),
+            ),
+        )?;
     }
+    #[cfg(test)]
+    profiling::h2_workspace_event(
+        "h2_reduction_end",
+        &raw,
+        &triangles,
+        &cleared,
+        &owners,
+        &columns,
+        (0, 0),
+    )?;
     budget.check()?;
     Ok(raw)
 }

@@ -16,6 +16,9 @@ pub(in crate::persistence) fn workspace_heap_growth(before: usize, after: usize)
         }
     });
 }
+pub(in crate::persistence) fn workspace_force_failure(failure: Option<(&'static str, Error)>) {
+    WORKSPACE_FAILURE.with_borrow_mut(|state| *state = failure);
+}
 pub(in crate::persistence) fn workspace_event(
     event: &str,
     dimension: usize,
@@ -240,16 +243,16 @@ fn profile_h2() {
     let mut budget = WorkBudget::new(&execution).unwrap();
     COUNTERS.with_borrow_mut(Vec::clear);
     crate::filtration::flag::cofacet_counts(true);
-    if mode == "dense" {
+    let raw = if mode == "dense" {
         let values: Vec<f64> = words.map(|v| v.parse().unwrap()).collect();
         assert_eq!(values.len(), count);
         let matrix = DissimilarityMatrixView::new(&values, n, MatrixLayout::LowerTriangle).unwrap();
         let stop = cutoff
             .min(crate::filtration::rips::cone_radius(matrix, &mut || budget.step()).unwrap());
         if dispatch {
-            crate::persistence::flag::compute_dense(matrix, q, cutoff, field, &mut budget).unwrap();
+            crate::persistence::flag::compute_dense(matrix, q, cutoff, field, &mut budget).unwrap()
         } else {
-            compute(&CliqueAccess::Dense(matrix, stop), q, field, &mut budget).unwrap();
+            compute(&CliqueAccess::Dense(matrix, stop), q, field, &mut budget).unwrap()
         }
     } else {
         assert_eq!(mode, "flag");
@@ -264,11 +267,12 @@ fn profile_h2() {
             .collect();
         let graph = WeightedGraph::new(n, edges).unwrap();
         if dispatch {
-            crate::persistence::flag::compute_graph(&graph, q, cutoff, field, &mut budget).unwrap();
+            crate::persistence::flag::compute_graph(&graph, q, cutoff, field, &mut budget).unwrap()
         } else {
-            compute(&CliqueAccess::Sparse(&graph, cutoff), q, field, &mut budget).unwrap();
+            compute(&CliqueAccess::Sparse(&graph, cutoff), q, field, &mut budget).unwrap()
         }
-    }
+    };
+    println!("workspace_intervals={raw:?}");
     COUNTERS.with_borrow(|rows| {
         for (dimension, stats) in rows.iter().enumerate().skip(1) {
             println!("dimension={dimension} {stats:?}");

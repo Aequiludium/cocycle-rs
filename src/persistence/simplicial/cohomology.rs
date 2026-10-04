@@ -292,7 +292,9 @@ mod profiling;
 #[cfg(test)]
 pub(in crate::persistence) use profiling::take_counts;
 #[cfg(test)]
-pub(in crate::persistence) use profiling::{workspace_event, workspace_heap_growth};
+pub(in crate::persistence) use profiling::{
+    workspace_event, workspace_force_failure, workspace_heap_growth,
+};
 fn push_interval(raw: &mut RawIntervals, interval: (usize, f64, Option<f64>)) -> Result<()> {
     raw.try_reserve(1).map_err(|_| allocation())?;
     raw.push(interval);
