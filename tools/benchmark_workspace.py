@@ -95,9 +95,14 @@ def build_variant(name, output, local, log):
     env = dict(os.environ, RUSTFLAGS='--cfg cocycle_h2_bench')
     commands = []
 
-    def run(command):
+    def run(command, capture=False):
         commands.append(command)
-        subprocess.run(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+        result = subprocess.run(command, cwd=root, env=env,
+                                stdout=subprocess.PIPE if capture else log,
+                                stderr=log, text=True, check=True)
+        if capture:
+            log.write(result.stdout)
+        return result
 
     run(['cargo', 'build', '--locked', '--offline', '--release', '--lib'])
     binary = local / name
@@ -106,11 +111,13 @@ def build_variant(name, output, local, log):
          f'cocycle={root}/target/release/libcocycle.rlib', '-L',
          f'dependency={root}/target/release/deps', '-o', str(binary)])
     # Test-only capacity accounting is compiled separately from latency.
-    run(['cargo', 'test', '--locked', '--offline', '--release', '--lib', '--no-run',
-         '--message-format=json'])
+    test_build = run(['cargo', 'test', '--locked', '--offline', '--release', '--lib', '--no-run',
+                      '--message-format=json'], capture=True)
     run(['cargo', 'test', '--locked', '--offline', '--release', '--lib'])
-    tests = list((root / 'target/release/deps').glob('cocycle-*'))
-    tests = [path for path in tests if path.is_file() and os.access(path, os.X_OK)]
+    # DrvFS may mark .d files executable; use Cargo's actual artifact identity.
+    messages = [json.loads(line) for line in test_build.stdout.splitlines()]
+    tests = [Path(message['executable']) for message in messages
+             if message.get('reason') == 'compiler-artifact' and message.get('executable')]
     if len(tests) != 1:
         raise ValueError('expected exactly one diagnostic test executable')
     diagnostic = local / (name + '-trace')
