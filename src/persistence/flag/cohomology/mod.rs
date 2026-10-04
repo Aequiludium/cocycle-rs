@@ -637,8 +637,12 @@ fn allocation(context: &'static str) -> Error {
 }
 
 fn push_heap<T: Ord>(heap: &mut BinaryHeap<T>, value: T) -> Result<()> {
+    #[cfg(test)]
+    let before = heap.capacity();
     heap.try_reserve(1)
         .map_err(|_| allocation("Rips working heap"))?;
+    #[cfg(test)]
+    crate::persistence::simplicial::cohomology::workspace_heap_growth(before, heap.capacity());
     heap.push(value);
     Ok(())
 }

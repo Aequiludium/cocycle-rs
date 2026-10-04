@@ -154,7 +154,8 @@ def run(args):
                    'warmups': 1, 'cpu': args.cpu, 'platform': platform.platform(),
                    'rustc': subprocess.check_output(['rustc', '-Vv'], text=True),
                    'started_utc': datetime.now(timezone.utc).isoformat(),
-                   'protocol': 'cocycle-rips-pipeline-v2', 'parallel_workers': False,
+                   'protocol': 'cocycle-workspace-v1', 'worker_protocol': 'cocycle-rips-pipeline-v2',
+                   'parallel_workers': False,
                    'scope': 'controlled M1 ablations, not production admission',
                    'direct_allocator_bytes': None, 'allocator_calls': None,
                    'frequency_and_host_load': 'uncontrolled'}
@@ -218,6 +219,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--native-environment', type=Path, required=True)
-    parser.add_argument('--samples', type=int, default=12)
+    parser.add_argument('--samples', type=int, default=15)
     parser.add_argument('--cpu', type=int, default=0)
     run(parser.parse_args())

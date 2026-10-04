@@ -7,6 +7,14 @@ use std::cell::RefCell;
 thread_local! {
     static WORKSPACE_TRACE: RefCell<Option<std::time::Instant>> = const { RefCell::new(None) };
     static WORKSPACE_FAILURE: RefCell<Option<(&'static str, Error)>> = const { RefCell::new(None) };
+    static HEAP_GROWTH: RefCell<[usize; 2]> = const { RefCell::new([0; 2]) };
+}
+pub(in crate::persistence) fn workspace_heap_growth(before: usize, after: usize) {
+    WORKSPACE_TRACE.with_borrow(|trace| {
+        if trace.is_some() && after > before {
+            HEAP_GROWTH.with_borrow_mut(|counts| counts[usize::from(before != 0)] += 1);
+        }
+    });
 }
 pub(in crate::persistence) fn workspace_event(
     event: &str,
@@ -26,10 +34,11 @@ pub(in crate::persistence) fn workspace_event(
             values.iter().map(|(name, value)| format!("\"{name}\":{value}"))
                 .collect::<Vec<_>>().join(",")
         };
+        let growth = HEAP_GROWTH.with_borrow(|counts| *counts);
         println!(
-            "workspace_event={{\"event\":\"{event}\",\"dimension\":{dimension},\"elapsed_ns\":{},\"rss_kib\":{},\"hwm_kib\":{},\"vec_capacity_bytes\":{{{}}},\"counts\":{{{}}}}}",
+            "workspace_event={{\"event\":\"{event}\",\"dimension\":{dimension},\"elapsed_ns\":{},\"rss_kib\":{},\"hwm_kib\":{},\"vec_capacity_bytes\":{{{}}},\"counts\":{{{}}},\"heap_capacity_new\":{},\"heap_capacity_grow\":{}}}",
             started.elapsed().as_nanos(), memory("VmRSS:"), memory("VmHWM:"),
-            fields(capacities), fields(counts),
+            fields(capacities), fields(counts), growth[0], growth[1],
         );
     });
     WORKSPACE_FAILURE.with_borrow(|failure| match failure {
@@ -225,6 +234,7 @@ fn profile_h2() {
     let dispatch = std::env::var("COCYCLE_H2_ROUTE").is_ok_and(|v| v == "dispatch");
     if std::env::var_os("COCYCLE_WORKSPACE_TRACE").is_some() {
         WORKSPACE_TRACE.with_borrow_mut(|trace| *trace = Some(std::time::Instant::now()));
+        HEAP_GROWTH.with_borrow_mut(|counts| *counts = [0; 2]);
     }
     let execution = crate::execution::Execution::default();
     let mut budget = WorkBudget::new(&execution).unwrap();
