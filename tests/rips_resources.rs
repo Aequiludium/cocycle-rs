@@ -92,6 +92,53 @@ fn f2_h1_paths_recover_at_every_work_budget() {
 }
 
 #[test]
+fn f2_h2_handoff_recovers_at_every_work_budget() {
+    // Octahedral boundary: exactly one H2 class at 1, filled at 2.
+    let values: Vec<_> = (0..6)
+        .flat_map(|b| (0..b).map(move |a| if a / 2 == b / 2 { 2. } else { 1. }))
+        .collect();
+    let view = DissimilarityMatrixView::new(&values, 6, MatrixLayout::LowerTriangle).unwrap();
+    let exact = threshold_rips_from_distances(view, None).unwrap();
+    let flag = FlagFiltration::new(exact.graph().clone());
+    for cutoff in [None, Some(1.)] {
+        let options = PersistenceOptions::new(2, cutoff).unwrap();
+        let coverage = cutoff.map_or(Coverage::Complete, Coverage::Through);
+        let mut intervals =
+            vec![PersistenceInterval::new(0, 0., IntervalEnd::Finite(1.)).unwrap(); 5];
+        intervals.push(
+            PersistenceInterval::new(
+                0,
+                0.,
+                cutoff.map_or(IntervalEnd::Essential, |through| {
+                    IntervalEnd::RightCensored { through }
+                }),
+            )
+            .unwrap(),
+        );
+        intervals.push(
+            PersistenceInterval::new(
+                2,
+                1.,
+                cutoff.map_or(IntervalEnd::Finite(2.), |through| {
+                    IntervalEnd::RightCensored { through }
+                }),
+            )
+            .unwrap(),
+        );
+        let expected = PersistenceDiagram::new(2, coverage, intervals).unwrap();
+        for compute in [
+            Box::new(|limits: &ExecutionLimits<'_>| {
+                compute_rips_from_distances(view, &options, limits)
+            }) as Computation<'_>,
+            Box::new(|limits| compute_threshold_rips(&exact, &options, limits)),
+            Box::new(|limits| compute_flag(&flag, &options, limits)),
+        ] {
+            check_every_work_budget(compute, &expected);
+        }
+    }
+}
+
+#[test]
 fn all_rips_paths_recover_after_budget_and_cancellation_failures() {
     let values: Vec<_> = (0..8)
         .flat_map(|b| (0..b).map(move |a| if a / 2 == b / 2 { 2. } else { 1. }))

@@ -86,7 +86,24 @@ struct Stats {
 
 pub(super) fn compute(rips: &impl FlagAccess, budget: &mut WorkBudget<'_>) -> Result<RawIntervals> {
     let mut stats = Stats::default();
-    run_access::<true, true, PRODUCTION_SHORTCUTS>(rips, &mut stats, budget)
+    run_access::<true, true, PRODUCTION_SHORTCUTS, false>(rips, &mut stats, budget, &mut Vec::new())
+}
+
+/// Complete death-triangle handoff, including zero pairs without stored owners.
+/// Const specialization removes collection work and allocation from H1-only calls.
+pub(super) fn compute_with_clearing(
+    rips: &impl FlagAccess,
+    budget: &mut WorkBudget<'_>,
+) -> Result<(RawIntervals, Vec<[usize; 3]>)> {
+    let mut cleared = Vec::new();
+    let raw = run_access::<true, true, PRODUCTION_SHORTCUTS, true>(
+        rips,
+        &mut Stats::default(),
+        budget,
+        &mut cleared,
+    )?;
+    // All edge positions, owners, transformations and heaps have been dropped.
+    Ok((raw, cleared))
 }
 
 // Retain independent optimization configurations for the dense test oracle.
@@ -102,17 +119,19 @@ fn run<const IMPLICIT: bool, const CLEAR: bool, const CONE: bool, const SHORTCUT
     } else {
         cutoff
     };
-    run_access::<IMPLICIT, CLEAR, SHORTCUTS>(
+    run_access::<IMPLICIT, CLEAR, SHORTCUTS, false>(
         &DenseFlag::new(input.into(), stop)?,
         stats,
         &mut budget,
+        &mut Vec::new(),
     )
 }
 
-fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
+fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8, const HANDOFF: bool>(
     rips: &impl FlagAccess,
     stats: &mut Stats,
     budget: &mut WorkBudget<'_>,
+    cleared: &mut Vec<[usize; 3]>,
 ) -> Result<RawIntervals> {
     let edges = rips.edges(&mut || budget.step())?;
     budget.check()?;
@@ -174,6 +193,17 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
             #[cfg(test)]
             {
                 stats.skipped_apparent += 1;
+            }
+            if HANDOFF {
+                // The initialization certificate returns the omitted death row.
+                collect_death(
+                    rips,
+                    shortcut.ok_or(Error::InternalInvariant {
+                        reason: "apparent pair without death triangle",
+                    })?,
+                    cleared,
+                    budget,
+                )?;
             }
             continue;
         }
@@ -248,6 +278,9 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
                     reason: "H0 death edge paired in H1",
                 });
             }
+            if HANDOFF {
+                collect_death(rips, pivot, cleared, budget)?;
+            }
             let mut additions = Vec::new();
             while let Some(k) = pop_parity(&mut transform, budget)? {
                 additions
@@ -309,6 +342,20 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
         }
     }
     Ok(raw)
+}
+
+fn collect_death(
+    rips: &impl FlagAccess,
+    triangle: SimplexEntry,
+    cleared: &mut Vec<[usize; 3]>,
+    budget: &mut WorkBudget<'_>,
+) -> Result<()> {
+    budget.step()?;
+    cleared
+        .try_reserve(1)
+        .map_err(|_| allocation("H1 death triangles"))?;
+    cleared.push(rips.triangle_vertices(triangle.id));
+    Ok(())
 }
 
 /// Initialize the original column, retaining independently testable strategies.

@@ -24,6 +24,14 @@ pub(super) fn record(dimension: usize, update: impl FnOnce(&mut Stats)) {
         update(&mut rows[dimension]);
     });
 }
+pub(in crate::persistence) fn take_counts() -> Vec<[usize; 3]> {
+    COUNTERS.with_borrow_mut(|rows| {
+        std::mem::take(rows)
+            .into_iter()
+            .map(|s| [s.simplices, s.processed, s.cleared])
+            .collect()
+    })
+}
 
 #[test]
 #[ignore = "explicit counter process; ordinary latency uses pipeline release workers"]
@@ -44,6 +52,7 @@ fn profile_h2() {
     };
     let count: usize = words.next().unwrap().parse().unwrap();
     let field = PrimeField::new(words.next().unwrap().parse().unwrap()).unwrap();
+    let dispatch = std::env::var("COCYCLE_H2_ROUTE").is_ok_and(|v| v == "dispatch");
     let execution = crate::execution::Execution::default();
     let mut budget = WorkBudget::new(&execution).unwrap();
     COUNTERS.with_borrow_mut(Vec::clear);
@@ -54,7 +63,11 @@ fn profile_h2() {
         let matrix = DissimilarityMatrixView::new(&values, n, MatrixLayout::LowerTriangle).unwrap();
         let stop = cutoff
             .min(crate::filtration::rips::cone_radius(matrix, &mut || budget.step()).unwrap());
-        compute(&CliqueAccess::Dense(matrix, stop), q, field, &mut budget).unwrap();
+        if dispatch {
+            crate::persistence::flag::compute_dense(matrix, q, cutoff, field, &mut budget).unwrap();
+        } else {
+            compute(&CliqueAccess::Dense(matrix, stop), q, field, &mut budget).unwrap();
+        }
     } else {
         assert_eq!(mode, "flag");
         let edges = (0..count)
@@ -67,7 +80,11 @@ fn profile_h2() {
             })
             .collect();
         let graph = WeightedGraph::new(n, edges).unwrap();
-        compute(&CliqueAccess::Sparse(&graph, cutoff), q, field, &mut budget).unwrap();
+        if dispatch {
+            crate::persistence::flag::compute_graph(&graph, q, cutoff, field, &mut budget).unwrap();
+        } else {
+            compute(&CliqueAccess::Sparse(&graph, cutoff), q, field, &mut budget).unwrap();
+        }
     }
     COUNTERS.with_borrow(|rows| {
         for (dimension, stats) in rows.iter().enumerate().skip(1) {

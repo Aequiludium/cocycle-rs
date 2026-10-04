@@ -19,7 +19,7 @@ pub(in crate::persistence) fn compute(
     budget: &mut WorkBudget<'_>,
 ) -> Result<RawIntervals> {
     budget.check()?;
-    let mut level = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
+    let level = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
     let mut forest = UnionFind::new(access.vertex_count())?;
     let mut cleared = HashSet::new();
     cleared.try_reserve(level.len()).map_err(|_| allocation())?;
@@ -28,6 +28,8 @@ pub(in crate::persistence) fn compute(
         .map_err(|_| allocation())?;
     for edge in &level {
         budget.step()?;
+        #[cfg(test)]
+        profiling::record(0, |s| s.processed += 1);
         if forest.merge(
             access.vertex_position(edge.vertices[0]),
             access.vertex_position(edge.vertices[1]),
@@ -37,7 +39,63 @@ pub(in crate::persistence) fn compute(
         }
     }
     raw.extend((0..forest.components()).map(|_| (0, 0.0, None)));
-    for dimension in 1..=max_dimension.min(access.vertex_count().saturating_sub(1)) {
+    reduce_dimensions(
+        access,
+        1..=max_dimension,
+        field,
+        raw,
+        level,
+        cleared,
+        budget,
+    )
+}
+
+/// Continue exact F2 flag persistence without redoing H0 or H1 reduction.
+/// Death keys own original vertices; topology enumeration still includes them.
+pub(in crate::persistence) fn continue_from_h1(
+    access: &impl ZeroBornSimplicialAccess,
+    max_dimension: usize,
+    raw: RawIntervals,
+    deaths: Vec<[usize; 3]>,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    budget.check()?;
+    let mut cleared = HashSet::new();
+    cleared
+        .try_reserve(deaths.len())
+        .map_err(|_| allocation())?;
+    for triangle in deaths {
+        budget.step()?;
+        let mut key = Vec::new();
+        key.try_reserve_exact(3).map_err(|_| allocation())?;
+        key.extend(triangle);
+        cleared.insert(key);
+    }
+    let edges = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
+    let triangles = next_dimension(access, &edges, &mut || budget.step())?;
+    drop(edges);
+    reduce_dimensions(
+        access,
+        2..=max_dimension,
+        PrimeField::new(2)?,
+        raw,
+        triangles,
+        cleared,
+        budget,
+    )
+}
+
+fn reduce_dimensions(
+    access: &impl ZeroBornSimplicialAccess,
+    dimensions: std::ops::RangeInclusive<usize>,
+    field: PrimeField,
+    mut raw: RawIntervals,
+    mut level: Vec<Simplex>,
+    mut cleared: HashSet<Vec<usize>>,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    let max_dimension = *dimensions.end();
+    for dimension in dimensions.take_while(|&d| d < access.vertex_count()) {
         if level.is_empty() {
             break;
         }
@@ -145,6 +203,8 @@ fn append(
 
 #[cfg(test)]
 mod profiling;
+#[cfg(test)]
+pub(in crate::persistence) use profiling::take_counts;
 fn push_interval(raw: &mut RawIntervals, interval: (usize, f64, Option<f64>)) -> Result<()> {
     raw.try_reserve(1).map_err(|_| allocation())?;
     raw.push(interval);
