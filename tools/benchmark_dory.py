@@ -75,6 +75,10 @@ def run(args):
     from compare_rips import Fixture
     selected.append(Fixture('octahedron', 'dense', 6, 2, None,
                             [2. if a // 2 == b // 2 else 1. for b in range(6) for a in range(b)]))
+    if args.case:
+        selected = [f for f in selected if f.name in args.case]
+        if {f.name for f in selected} != set(args.case):
+            raise ValueError('unknown case; select exact names from the frozen workload matrix')
     for fixture in selected:
         directory = output / fixture.name
         directory.mkdir()
@@ -128,4 +132,5 @@ if __name__ == '__main__':
     parser.add_argument('--samples', type=int, default=12)
     parser.add_argument('--quick', action='store_true')
     parser.add_argument('--timeout', type=float, default=30.)
+    parser.add_argument('--case', action='append', help='select audited cases; omitted cases are not passes')
     run(parser.parse_args())
