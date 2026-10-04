@@ -125,3 +125,37 @@ must check that summary before using per-case statistics.
 Generated outputs belong under ignored `target/` or in external artifact storage.
 They must not be committed as loose files or archives; see the
 [storage policy](../reporting.md#storage-and-evidence-lifecycle).
+
+## Dimension-boundary workspace ablations
+
+After freezing the private H2 prototype, M1 uses the same pipeline v2 worker and
+fixture convention with a separate controller:
+
+```sh
+python3 tools/benchmark_workspace.py --native-environment target/rips-pipeline/environment.json --samples 12 --cpu 0 --output target/workspace-run-001
+```
+
+The native environment identifies hash-checked, pinned GUDHI/Ripser workers from
+an earlier completed pipeline build. The controller generates three source-bound
+Rust variants under its fresh output directory: joint baseline, explicit release
+of generic transformation columns before next-level assembly, and reuse of the
+two identically typed H2 heaps within a dimension. It refuses source-hook drift.
+These are controlled experiments, not ordinary-library selectors or production
+admission. The H1-to-H2 release route remains identical where existing scopes
+already release the reducer. H3 controls audit the existing generic continuation;
+they do not implement T9 or M2.
+
+All builds finish before serial measurement begins. Executables reside on Linux
+local storage; fixtures, source/build/binary hashes and every warmup/measured
+sample remain in the output. Complete interval multisets are checked against both
+native references; a failure withholds rankings for the entire case.
+
+Test-only `workspace_event` traces run in separate processes after each latency
+schedule. They observe boundary timestamps, Vec/heap capacity bytes including
+nested vertex/transform payloads, hash-table logical entries/slots, BTreeMap
+entries, sampled VmRSS and VmHWM. They do not measure allocator metadata, exact
+live allocator bytes or allocator calls; those unavailable fields remain null.
+Trace timings and RSS include the diagnostic work and must not be pooled with
+ordinary worker latency or interpreted as process-memory equations. Boundary
+failure tests simulate recoverable allocation errors and cancellation; they do
+not claim universal recovery from real allocator exhaustion.

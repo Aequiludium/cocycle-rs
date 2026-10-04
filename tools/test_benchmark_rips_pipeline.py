@@ -11,9 +11,30 @@ from benchmark_rips_pipeline import (Case, cases, compare_samples, exclusion,
                                     instrument_sparse, measure_case, provenance, schedule,
                                     timing_scope, validate_output, worker)
 from compare_rips import Fixture
+from benchmark_workspace import summarize, workspace_cases, replace_once
 
 
 class PipelineTests(unittest.TestCase):
+    def test_workspace_cases_cover_controls_and_keep_unique_artifacts(self):
+        rows = list(workspace_cases())
+        self.assertEqual(len(rows), len({row.name for row in rows}))
+        self.assertEqual({row.fixture.q for row in rows}, {1, 2, 3})
+        self.assertEqual({row.fixture.n for row in rows}, {6, 16, 32})
+        self.assertTrue(any('high_fill' in row.name for row in rows))
+        self.assertTrue(any('duplicates' in row.name for row in rows))
+        for source in ('missing', 'marker marker'):
+            with self.assertRaises(ValueError):
+                replace_once(source, 'marker', 'replacement')
+
+    def test_workspace_failure_withholds_all_rankings_and_keeps_samples(self):
+        rows = [{'backend': 'joint', 'warmup': False, 'status': 'completed',
+                 'elapsed_ms': 1., 'peak_rss_kib': 100},
+                {'backend': 'scratch', 'warmup': False, 'status': 'timeout'}]
+        result = summarize(rows, ['joint', 'scratch'])
+        self.assertIsNone(result['joint']['median_ms'])
+        self.assertIsNone(result['scratch']['median_ms'])
+        self.assertEqual(result['scratch']['samples'], 1)
+
     def setUp(self):
         self.case = Case(Fixture('pair', 'dense', 2, 0, None, [1.]), 'dense')
         self.output = {'status': 'completed', 'elapsed_ms': 5., 'phases_ms': [1.] * 5,

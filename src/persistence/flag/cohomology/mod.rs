@@ -106,6 +106,22 @@ pub(super) fn compute_with_clearing(
         &mut cleared,
     )?;
     // All edge positions, owners, transformations and heaps have been dropped.
+    #[cfg(test)]
+    crate::persistence::simplicial::cohomology::workspace_event(
+        "h1_released",
+        1,
+        &[
+            (
+                "intervals",
+                raw.capacity() * std::mem::size_of::<(usize, f64, Option<f64>)>(),
+            ),
+            (
+                "handoff",
+                cleared.capacity() * std::mem::size_of::<[usize; 3]>(),
+            ),
+        ],
+        &[("deaths", cleared.len())],
+    )?;
     Ok((raw, cleared))
 }
 
@@ -344,6 +360,55 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8, cons
             raw.push((1, edge.value, None));
         }
     }
+    #[cfg(test)]
+    crate::persistence::simplicial::cohomology::workspace_event(
+        "h1_handoff_complete",
+        1,
+        &[
+            (
+                "edges",
+                edges.capacity() * std::mem::size_of::<SimplexEntry>(),
+            ),
+            (
+                "cycle_flags",
+                cycle_edges.capacity() * std::mem::size_of::<bool>(),
+            ),
+            ("forest", forest.capacity_bytes()),
+            (
+                "columns",
+                columns.capacity() * std::mem::size_of::<TransformColumn>(),
+            ),
+            (
+                "transform_payload",
+                columns
+                    .iter()
+                    .map(|column| column.additions.capacity() * std::mem::size_of::<EdgePosition>())
+                    .sum(),
+            ),
+            (
+                "working",
+                working.capacity() * std::mem::size_of::<Reverse<SimplexEntry>>(),
+            ),
+            (
+                "transform_scratch",
+                transform.capacity() * std::mem::size_of::<EdgePosition>(),
+            ),
+            (
+                "intervals",
+                raw.capacity() * std::mem::size_of::<(usize, f64, Option<f64>)>(),
+            ),
+            (
+                "handoff",
+                cleared.capacity() * std::mem::size_of::<[usize; 3]>(),
+            ),
+        ],
+        &[
+            ("owners", pivot_owners.len()),
+            ("owner_slots", pivot_owners.capacity()),
+            ("stored_columns", columns.len()),
+            ("deaths", cleared.len()),
+        ],
+    )?;
     Ok(raw)
 }
 
