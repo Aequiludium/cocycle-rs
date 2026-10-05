@@ -20,6 +20,9 @@ The associated tasks are [M2 #48](https://github.com/Aequiludium/cocycle-rs/issu
 [T10 #44](https://github.com/Aequiludium/cocycle-rs/issues/44) and
 [T11 #45](https://github.com/Aequiludium/cocycle-rs/issues/45).
 
+Associated closeout: [PR #53](https://github.com/Aequiludium/cocycle-rs/pull/53),
+stacked on [M1 PR #52](https://github.com/Aequiludium/cocycle-rs/pull/52).
+
 ## Per-mechanism admission
 
 | Mechanism | Correctness / transfer condition | Serial outcome |
