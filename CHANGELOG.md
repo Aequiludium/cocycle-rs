@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Prepare diagram distances directly from borrowed logical dimension views.
+  Remove the facade's finite/essential point arrays; Wasserstein builds its
+  scaled points directly and Bottleneck owns its coordinate preparation.
+  Essential matching streams in birth order. Public signatures, numeric rules
+  and context checks are unchanged; repeated scans count toward execution work.
 - Add opt-in `diagram_distances::PreparedDiagram` for scoped reuse of immutable
   operand preparation in repeated bottleneck, W1 and W2 comparisons. Each value
   binds a source, dimension, metric and optional result context, with fresh

@@ -259,6 +259,13 @@ bottleneck and Wasserstein modules own matching, numeric preparation and private
 workspaces. Start with the [distance example](../../examples/diagram_distances.rs)
 and [mathematical contract](../reference/mathematics.md#16-diagram-matching-distances).
 
+The facade passes borrowed `DiagramDimension` views and finite counts into the
+kernels. It allocates no shared point arrays; essential births are matched by
+streaming their canonical subsequences. Bottleneck owns private coordinate and
+index buffers, while Wasserstein determines its scale while filling its own
+point vectors and normalizes them in place. Repeated scans retain the shared
+execution budget, including visits that skip essential or finite intervals.
+
 Decide the ground metric and Wasserstein order explicitly. Preserve repeated
 intervals, require complete coverage and distinguish unequal essential counts
 (mathematical infinity) from failed arithmetic (an error). For example, a single

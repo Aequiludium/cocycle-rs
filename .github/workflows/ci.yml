@@ -34,7 +34,7 @@ jobs:
       - run: python tools/check_docs.py
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
-      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs benches/distances/preparation.rs benches/distances/preparation_probe.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -188,6 +188,34 @@ jobs:
             target/rips-pipeline-smoke/measurements.json
             target/rips-pipeline-smoke/fixtures/
             target/rips-pipeline-smoke/build/build.log
+
+  distance-preparation:
+    name: Distance preparation reproducer smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.91.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python tools/reproduce_distance_preparation.py --mode all --samples 2 --iterations 3 --output target/distance-preparation-smoke
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: distance-preparation-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            target/distance-preparation-smoke/*.json
+            target/distance-preparation-smoke/*.jsonl
+            target/distance-preparation-smoke/fixture.bin
+            target/distance-preparation-smoke/*/identity.json
+            target/distance-preparation-smoke/*/build.log
 
   distances:
     name: Native diagram-distance references

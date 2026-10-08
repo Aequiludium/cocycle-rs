@@ -43,6 +43,8 @@ fn prepared_queries_preserve_numeric_essential_and_ordering_contracts() {
         diagram(&[[-2., 0.]]),
         diagram(&[[3., 4.], [0., 2.], [0., 2.]]),
         with_essential(&[[0., 1.]], &[3., -2.]),
+        with_essential(&[[-4., -2.], [-4., -2.]], &[-5., -3., -3., 2.]),
+        with_essential(&[], &[3., -2., -4., -2.]),
         with_essential(&[], &[1.]),
         diagram(&[[0., f64::from_bits(1)]]),
         diagram(&[[1., f64::from_bits(1.0_f64.to_bits() + 1)]]),
@@ -697,6 +699,22 @@ fn essential_overflow_is_an_error_not_count_mismatch_infinity() {
             distance(&a, &b, 0),
             Err(Error::NumericalFailure { .. })
         ));
+    }
+}
+
+#[test]
+fn essential_births_do_not_enter_finite_power_scaling() {
+    let a = with_essential(&[[0., 2e-200]], &[f64::MAX]);
+    let b = with_essential(&[], &[f64::MAX]);
+    assert_eq!(bottleneck_distance(&a, &b, 0).unwrap(), 1e-200);
+    assert_eq!(wasserstein_1_infinity(&a, &b, 0).unwrap(), 1e-200);
+    let w2 = wasserstein_2_euclidean(&a, &b, 0).unwrap();
+    assert!((w2 / 1e-200 - 2.0_f64.sqrt()).abs() < 4.0 * f64::EPSILON);
+    // Count mismatch precedes finite arithmetic, even for an underflowing bar.
+    let underflow = with_essential(&[[0., f64::from_bits(1)]], &[0.]);
+    let empty = diagram(&[]);
+    for distance in DISTANCES {
+        assert_eq!(distance(&underflow, &empty, 0).unwrap(), f64::INFINITY);
     }
 }
 

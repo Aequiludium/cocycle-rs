@@ -2,6 +2,7 @@
 //! Adapted from Topp; the parent module retains the MIT attribution.
 
 use super::{Metric, allocation, buffer, sum_size};
+use crate::diagram::{DiagramDimension, IntervalEnd};
 use crate::execution::WorkBudget;
 use crate::{Error, Result};
 
@@ -34,59 +35,136 @@ pub(in crate::diagram_distances) struct Point {
     pub(super) half: f64,
 }
 
-pub(super) fn prepare<const CONTROLLED: bool>(
-    input: &[[f64; 2]],
-    scale: f64,
+pub(super) fn prepare_dimensions<const CONTROLLED: bool>(
+    first: &DiagramDimension<'_>,
+    second: &DiagramDimension<'_>,
+    counts: (usize, usize),
     budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<Vec<Point>> {
+) -> Result<(Vec<Point>, Vec<Point>, f64)> {
+    // Find the common scale while filling the algorithm-owned vectors. Then
+    // normalize those same vectors in place: no second logical-view scan and
+    // no intermediate coordinate arrays, including on duplicate-heavy inputs.
+    let (mut first, a, first_valid) =
+        collect_points(first.iter().map(|i| (i.birth(), i.end())), counts.0, budget)?;
+    let (mut second, b, second_valid) = collect_points(
+        second.iter().map(|i| (i.birth(), i.end())),
+        counts.1,
+        budget,
+    )?;
+    let scale = scale_for(a.max(b));
+    if scale == 1.0 {
+        // Division by one leaves the fields computed during collection intact.
+        // Wide exponent ranges still take the original checked scaling path.
+        if !first_valid || !second_valid {
+            return Err(numerical());
+        }
+    } else {
+        normalize(&mut first, scale, budget)?;
+        normalize(&mut second, scale, budget)?;
+    }
+    Ok((first, second, scale))
+}
+
+fn collect_points<const CONTROLLED: bool>(
+    input: impl Iterator<Item = (f64, IntervalEnd)>,
+    count: usize,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<(Vec<Point>, f64, bool)> {
     let mut result = Vec::new();
-    result
-        .try_reserve_exact(input.len())
-        .map_err(|_| allocation())?;
-    for (index, &[birth, death]) in input.iter().enumerate() {
-        if CONTROLLED && index % 256 == 0 {
-            budget.step_by((input.len() - index).min(256))?;
-        }
-        let b = birth / scale;
-        let d = death / scale;
-        // Scaling by a power of two must be reversible: no implicit quantization
-        // or collapsed intervals are accepted when the exponent range is wide.
-        if !b.is_finite() || !d.is_finite() || b * scale != birth || d * scale != death || b >= d {
-            return Err(numerical());
-        }
-        let half = (d - b) * 0.5;
-        if !half.is_finite() || half <= 0.0 {
-            return Err(numerical());
-        }
+    if count == 0 {
+        return Ok((result, 0.0, true));
+    }
+    result.try_reserve_exact(count).map_err(|_| allocation())?;
+    let mut largest = 0.0_f64;
+    let mut valid = true;
+    for (birth, end) in input {
+        budget.step()?;
+        let IntervalEnd::Finite(death) = end else {
+            continue;
+        };
+        largest = largest.max(birth.abs()).max(death.abs());
+        let half = (death - birth) * 0.5;
+        valid &= birth.is_finite()
+            && death.is_finite()
+            && birth < death
+            && half.is_finite()
+            && half > 0.0;
         result.push(Point {
-            coordinates: [b, d],
-            midpoint: b * 0.5 + d * 0.5,
+            coordinates: [birth, death],
+            midpoint: birth * 0.5 + death * 0.5,
             half,
         });
     }
+    Ok((result, largest, valid))
+}
+
+fn normalize<const CONTROLLED: bool>(
+    points: &mut [Point],
+    scale: f64,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<()> {
+    for chunk in points.chunks_mut(256) {
+        budget.step_by(chunk.len())?;
+        for point in chunk {
+            let [birth, death] = point.coordinates;
+            let b = birth / scale;
+            let d = death / scale;
+            // Scaling by a power of two must be reversible: no implicit quantization
+            // or collapsed intervals are accepted when the exponent range is wide.
+            if !b.is_finite()
+                || !d.is_finite()
+                || b * scale != birth
+                || d * scale != death
+                || b >= d
+            {
+                return Err(numerical());
+            }
+            let half = (d - b) * 0.5;
+            if !half.is_finite() || half <= 0.0 {
+                return Err(numerical());
+            }
+            *point = Point {
+                coordinates: [b, d],
+                midpoint: b * 0.5 + d * 0.5,
+                half,
+            };
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn prepare<const CONTROLLED: bool>(
+    input: impl Iterator<Item = (f64, IntervalEnd)>,
+    count: usize,
+    scale: f64,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<Vec<Point>> {
+    let (mut result, _, _) = collect_points(input, count, budget)?;
+    normalize(&mut result, scale, budget)?;
     Ok(result)
 }
 
 pub(super) fn power_scale<const CONTROLLED: bool>(
-    first: &[[f64; 2]],
-    second: &[[f64; 2]],
+    input: impl Iterator<Item = (f64, IntervalEnd)>,
     budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<f64> {
     let mut largest = 0.0_f64;
-    for points in [first, second] {
-        for chunk in points.chunks(256) {
-            budget.step_by(chunk.len())?;
-            for point in chunk {
-                largest = largest.max(point[0].abs()).max(point[1].abs());
-            }
+    for (birth, end) in input {
+        budget.step()?;
+        if let IntervalEnd::Finite(death) = end {
+            largest = largest.max(birth.abs()).max(death.abs());
         }
     }
+    Ok(scale_for(largest))
+}
+
+fn scale_for(largest: f64) -> f64 {
     if largest == 0.0 || (2.0_f64.powi(-200)..=2.0_f64.powi(200)).contains(&largest) {
-        return Ok(1.0);
+        return 1.0;
     }
     let exponent = ((largest.to_bits() >> 52) & 0x7ff) as i32 - 1023;
     // A normal scaling factor also scales the smallest subnormal up to 2^-52.
-    Ok(2.0_f64.powi(exponent.max(-1022)))
+    2.0_f64.powi(exponent.max(-1022))
 }
 
 pub(super) fn square(value: f64) -> Result<f64> {
