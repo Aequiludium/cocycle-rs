@@ -22,6 +22,15 @@ from benchmark_rips_pipeline import (REPO, compare_samples, phase3_cases,
 from build_native import PINS, sha256
 
 
+HARNESS_FILES = ('benches/pipeline/cocycle.rs', 'tools/benchmark_workspace.py',
+                 'tools/benchmark_rips_pipeline.py', 'tools/benchmark_inputs.py',
+                 'tools/compare_rips.py', 'tools/build_native.py')
+
+
+def harness_fingerprint(root):
+    return {name: sha256(root / name) for name in HARNESS_FILES}
+
+
 def replace_once(source, old, new):
     if source.count(old) != 1:
         raise ValueError('workspace ablation no longer matches its frozen source')
@@ -129,11 +138,12 @@ def build_variant(name, output, local, log):
             'binary': str(binary), 'trace': str(diagnostic)}
 
 
-def summarize(samples, names):
+def summarize(samples, names, *, traces_valid=True):
     result = {}
+    valid = traces_valid and all(sample['status'] == 'completed' and 'comparison_error' not in sample
+                                 for sample in samples)
     for name in names:
         rows = [sample for sample in samples if sample['backend'] == name and not sample['warmup']]
-        valid = all(sample['status'] == 'completed' and 'comparison_error' not in sample for sample in samples)
         times = [sample['elapsed_ms'] for sample in rows] if valid else []
         result[name] = {'samples': len(rows), 'median_ms': statistics.median(times) if times else None,
                         'min_ms': min(times, default=None), 'max_ms': max(times, default=None),
@@ -173,6 +183,7 @@ def run(args):
         raise ValueError('CPU must belong to the inherited allowed affinity')
     identity = provenance('HEAD')
     initial = fingerprint(REPO)
+    initial_harness = harness_fingerprint(REPO)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Linux-local executable storage avoids DrvFS executable paging effects.
@@ -190,9 +201,11 @@ def run(args):
     if args.reuse_build:
         previous = json.loads((args.reuse_build / 'environment.json').read_text())
         if (previous['kernel_commit'] != identity['kernel_commit']
+                or previous.get('source_sha256') != initial
+                or previous.get('harness_files_sha256') != initial_harness
                 or previous['controller_sha256'] != sha256(Path(__file__))
                 or previous['native_environment_sha256'] != sha256(args.native_environment)):
-            raise ValueError('repeat requires exactly the same frozen kernel, controller and references')
+            raise ValueError('repeat requires exactly the same frozen source, harness, kernel and references')
         for name, item in previous['variants'].items():
             if fingerprint(args.reuse_build / name) != item['source_sha256']:
                 raise ValueError('generated source changed before repeat')
@@ -222,10 +235,7 @@ def run(args):
     environment = {**identity, 'source_sha256': initial, 'variants': variants,
                    'native_environment_sha256': sha256(args.native_environment), 'pins': PINS,
                    'native_environment': reference,
-                   'harness_files_sha256': {name: sha256(REPO / name) for name in
-                                            ('benches/pipeline/cocycle.rs', 'tools/benchmark_workspace.py',
-                                             'tools/benchmark_rips_pipeline.py', 'tools/benchmark_inputs.py',
-                                             'tools/compare_rips.py', 'tools/build_native.py')},
+                   'harness_files_sha256': initial_harness,
                    'controller_sha256': sha256(Path(__file__)), 'samples': args.samples,
                    'order_seed': args.order_seed,
                    'reuse_build': str(args.reuse_build) if args.reuse_build else None,
@@ -284,15 +294,15 @@ def run(args):
                 record['traces'][name] = {'events': [], 'comparison_error': 'diagnostic timeout'}
             record['traces'][name]['log_sha256'] = sha256(trace_path)
         valid_traces = all(trace.get('intervals_validated') for trace in record['traces'].values())
-        rows = record['samples'] if valid_traces else [*record['samples'], {'status': 'trace_error'}]
-        record['summary'] = summarize(rows, names)
+        record['summary'] = summarize(record['samples'], names, traces_valid=valid_traces)
         (output / 'results.json').write_text(json.dumps(records, indent=2) + '\n')
         print(case.name, {name: row['median_ms'] for name, row in record['summary'].items()}, flush=True)
     passed = all(all(sample['status'] == 'completed' and 'comparison_error' not in sample
                      for sample in record['samples'])
                  and all(trace.get('intervals_validated') for trace in record['traces'].values())
                  for record in records)
-    unchanged = fingerprint(REPO) == initial and provenance('HEAD') == identity
+    unchanged = (fingerprint(REPO) == initial and harness_fingerprint(REPO) == initial_harness
+                 and provenance('HEAD') == identity)
     summary = {'status': 'passed' if passed and unchanged else 'failed',
                'cases': len(records), 'processes': sum(len(record['samples']) for record in records),
                'trace_processes': len(records) * len(variants), 'source_unchanged': unchanged,
