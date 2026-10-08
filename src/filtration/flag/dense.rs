@@ -1,7 +1,7 @@
 //! Dense distance access, without materializing triangles or copying inputs.
 use super::index::SimplexIndex;
 use super::{FlagAccess, SimplexEntry};
-use crate::geometry::DissimilarityMatrixView;
+use crate::geometry::{DissimilarityMatrixView, MatrixLayout};
 use crate::{Error, Result};
 
 pub(crate) struct DenseFlag<'a> {
@@ -48,6 +48,7 @@ impl FlagAccess for DenseFlag<'_> {
     fn edge_vertices(&self, id: usize) -> [usize; 2] {
         self.index.edge_vertices(id)
     }
+    #[cfg(any(test, cocycle_h2_bench))]
     fn triangle_vertices(&self, id: usize) -> [usize; 3] {
         self.index.triangle_vertices(id)
     }
@@ -55,11 +56,41 @@ impl FlagAccess for DenseFlag<'_> {
         let [a, b, c] = self.index.triangle_vertices(triangle.id);
         self.edge(a, b).max(self.edge(a, c)).max(self.edge(b, c))
     }
+    #[inline]
     fn visit_cofacets(
         &self,
         edge: SimplexEntry,
         checkpoint: &mut impl FnMut() -> Result<()>,
+        visitor: impl FnMut(SimplexEntry) -> Result<bool>,
+    ) -> Result<()> {
+        let values = self.input.values();
+        let n = self.input.len();
+        match self.input.layout() {
+            MatrixLayout::LowerTriangle => self.visit_with(edge, checkpoint, visitor, |i, j| {
+                crate::canonical_zero(values[self.index.edge(i, j)])
+            }),
+            MatrixLayout::UpperTriangle => {
+                let pairs = self.index.edge(0, n);
+                self.visit_with(edge, checkpoint, visitor, |i, j| {
+                    let (a, b) = if i < j { (i, j) } else { (j, i) };
+                    crate::canonical_zero(values[pairs - self.index.edge(0, n - a) + b - a - 1])
+                })
+            }
+            MatrixLayout::Square => self.visit_with(edge, checkpoint, visitor, |i, j| {
+                crate::canonical_zero(values[i * n + j])
+            }),
+        }
+    }
+}
+
+impl DenseFlag<'_> {
+    #[inline]
+    fn visit_with(
+        &self,
+        edge: SimplexEntry,
+        checkpoint: &mut impl FnMut() -> Result<()>,
         mut visitor: impl FnMut(SimplexEntry) -> Result<bool>,
+        distance: impl Fn(usize, usize) -> f64,
     ) -> Result<()> {
         let [a, b] = self.edge_vertices(edge.id);
         for v in (0..self.input.len()).rev() {
@@ -67,10 +98,7 @@ impl FlagAccess for DenseFlag<'_> {
             if v == a || v == b {
                 continue;
             }
-            let value = edge
-                .value
-                .max(self.input.get(a, v).unwrap())
-                .max(self.input.get(b, v).unwrap());
+            let value = edge.value.max(distance(a, v)).max(distance(b, v));
             if value <= self.cutoff
                 && !visitor(SimplexEntry {
                     id: self.index.triangle(a, b, v),

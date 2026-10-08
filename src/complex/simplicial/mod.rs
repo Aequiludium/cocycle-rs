@@ -4,8 +4,8 @@ mod simplex;
 
 use crate::{Error, Result};
 pub use incidence::BoundaryTerm;
-pub(crate) use simplex::compare_filtration;
 pub use simplex::{Simplex, SimplexId};
+pub(crate) use simplex::{compare_filtration, finite_filtration_le};
 use std::collections::HashMap;
 
 /// An immutable simplicial complex storing finite filtration values.

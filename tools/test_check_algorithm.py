@@ -21,9 +21,15 @@ class AlgorithmChecksTests(unittest.TestCase):
         tests = [command for command in commands if command[:2] == ["cargo", "test"]]
         self.assertTrue(any("--lib" in command and "persistence::" in command
                             for command in tests))
-        self.assertTrue(any(all(name in command for name in
-                               ("filtered_complex", "prime_fields", "rips_resources", "rips_api"))
+        self.assertTrue(any("--lib" in command and "filtration::flag::" in command
                             for command in tests))
+        self.assertTrue(any(all(name in command for name in
+                               ("filtered_complex", "prime_fields", "rips_resources", "rips_api",
+                                "rips_expansion"))
+                            for command in tests))
+        formatting = next(command for command in commands if command[0] == "rustfmt")
+        self.assertIn("src/filtration/flag/bitset.rs", formatting)
+        self.assertIn("src/execution/mod.rs", formatting)
         self.assertTrue(any(command[0] == "rustdoc" and
                             "docs/development/persistence-reduction.md" in command
                             for command in commands))

@@ -6,6 +6,20 @@
   requests computing H2+, with complete ordinary/emergent/virtual death-triangle
   clearing passed to the generic continuation. Preserve full generic fallback
   for indexing overflow, odd primes, representatives and blocked approximation.
+- Share adaptive neighbor-bitset selection across matrix and graph inputs,
+  including capped point clouds, while preserving supplied-graph coverage.
+
+- Reduce repeated edge preparation and working-heap maintenance in exact F2 Rips
+  H1 computation. Select adjacency access for suitably sparse matrices while
+  preserving f64 values, filtration order, interval multiplicity and coverage.
+- Use ordered coboundary cursors for suitably dense exact F2 Rips H1 matrices.
+  Keep one live triangle per source cursor and skip collectively cancelling
+  prefixes when reconstructing pivot owners. Specialize dense matrix visits by
+  layout while retaining safe indexing and cooperative execution checks.
+- Specialize unlimited exact F2 H1 execution to remove runtime budget polling.
+  Preserve the shared budget whenever a work limit or cancellation flag is set.
+  Use bounded neighbor bitsets to reject costly empty matrix coboundaries when
+  useful, and reuse checked index prefixes for safe ordered-cursor reads.
 
 ## 0.1.1
 

@@ -30,6 +30,18 @@ matrices, and apparent pairs; §4 for H0/union-find. Cocycle independently imple
 these invariants in Rust. Its internal order must satisfy each optimization's
 conditions; citing Ripser does not establish correctness automatically.
 
+## AP21
+
+Manu Aggarwal and Vipul Periwal. **Dory: Overcoming Barriers to Computing
+Persistent Homology**.
+[arXiv v3](https://arxiv.org/abs/2103.05608v3),
+[full text](https://arxiv.org/pdf/2103.05608v3).
+
+Relevant locations: §4.2 for ordered cofacet traversal and §4.3.2 for implicit
+working columns and lower-bound seeks. Cocycle independently implements ordered
+cursors with a heap of their current rows. It retains its existing filtration
+and colex order instead of adopting Dory's paired simplex indexing.
+
 ## CSO13
 
 Frédéric Chazal, Vin de Silva and Steve Oudot. **Persistence stability for

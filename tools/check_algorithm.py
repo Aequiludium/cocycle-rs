@@ -49,14 +49,15 @@ DOMAINS = {
         "tests": ("diagram_distances", "execution"),
         "example": "diagram_distances",
         "guides": ("docs/development/diagram-analysis.md",),
-        "unit_filter": "diagram_distances::",
+        "unit_filters": ("diagram_distances::",),
     },
     "persistence-reduction": {
-        "sources": ("src/algebra", "src/persistence"),
-        "tests": ("filtered_complex", "prime_fields", "rips_resources", "rips_api"),
+        "sources": ("src/algebra", "src/persistence", "src/filtration/flag", "src/execution"),
+        "tests": ("filtered_complex", "prime_fields", "rips_resources", "rips_api",
+                  "rips_expansion"),
         "example": "flag_persistence",
         "guides": ("docs/development/persistence-reduction.md",),
-        "unit_filter": "persistence::",
+        "unit_filters": ("persistence::", "filtration::flag::"),
     },
 }
 
@@ -78,8 +79,8 @@ def check_algorithm(domain):
     # Explicit --example is necessary: ordinary cargo test does not run the
     # constructor's colocated algorithm tests.
     run(["cargo", "test", "--locked", "--all-features", *targets])
-    if "unit_filter" in selected:
-        run(["cargo", "test", "--locked", "--all-features", "--lib", selected["unit_filter"]])
+    for unit_filter in selected.get("unit_filters", ()):
+        run(["cargo", "test", "--locked", "--all-features", "--lib", unit_filter])
     run(["cargo", "run", "--locked", "--example", selected["example"]])
     library = library_artifact()
     for guide in selected["guides"]:
