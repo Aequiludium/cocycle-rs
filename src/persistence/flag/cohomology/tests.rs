@@ -172,12 +172,12 @@ fn original_column_initialization_reuses_storage_and_checks_only_the_first_equal
     let edge = SimplexEntry { id: 0, value: 1. };
     let first_equal = SimplexEntry { id: 1, value: 1. };
     let mut working = Coboundary::with_capacity(16);
-    working.push(Reverse(SimplexEntry { id: 99, value: 9. }));
+    working.push(Reverse(SimplexEntry { id: 99, value: 9. }.into()));
     let capacity = working.capacity();
     let mut stats = Stats::default();
     let mut budget = WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
     assert_eq!(
-        initialize_coboundary::<APPARENT_EMERGENT>(
+        initialize_coboundary::<APPARENT_EMERGENT, true>(
             &access,
             edge,
             &HashMap::new(),
@@ -197,7 +197,7 @@ fn original_column_initialization_reuses_storage_and_checks_only_the_first_equal
     let owners = HashMap::from([(first_equal.id, ColumnPosition(0))]);
     let mut stats = Stats::default();
     assert_eq!(
-        initialize_coboundary::<APPARENT_EMERGENT>(
+        initialize_coboundary::<APPARENT_EMERGENT, true>(
             &access,
             edge,
             &owners,
@@ -210,14 +210,14 @@ fn original_column_initialization_reuses_storage_and_checks_only_the_first_equal
     );
     assert_eq!(stats.initial_candidates, 5);
     assert_eq!(stats.cofacets, 3);
-    assert_eq!(working.pop(), Some(Reverse(first_equal)));
+    assert_eq!(working.pop(), Some(Reverse(first_equal.into())));
     assert_eq!(
         working.pop(),
-        Some(Reverse(SimplexEntry { id: 0, value: 1. }))
+        Some(Reverse(SimplexEntry { id: 0, value: 1. }.into()))
     );
     assert_eq!(
         working.pop(),
-        Some(Reverse(SimplexEntry { id: 4, value: 2. }))
+        Some(Reverse(SimplexEntry { id: 4, value: 2. }.into()))
     );
     assert!(working.is_empty());
 }
@@ -235,7 +235,7 @@ fn original_column_fallback_handles_empty_no_equal_and_apparent_only_rejection()
         let mut stats = Stats::default();
         let mut budget = WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
         assert_eq!(
-            initialize_coboundary::<APPARENT>(
+            initialize_coboundary::<APPARENT, true>(
                 &access,
                 edge,
                 &HashMap::new(),
@@ -292,7 +292,7 @@ fn single_pass_visits_failed_prefixes_once_and_reuses_alternating_buffers() {
             };
             let mut budget =
                 WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
-            let result = initialize_coboundary::<APPARENT_EMERGENT>(
+            let result = initialize_coboundary::<APPARENT_EMERGENT, true>(
                 &access,
                 SimplexEntry { id: 0, value: 1. },
                 &owners,
@@ -319,7 +319,7 @@ fn initial_scan_work_failure_does_not_poison_reused_input_or_heap() {
     let mut budget =
         WorkBudget::new(&crate::persistence::ExecutionLimits::new(Some(1), None)).unwrap();
     assert_eq!(
-        initialize_coboundary::<APPARENT_EMERGENT>(
+        initialize_coboundary::<APPARENT_EMERGENT, true>(
             &access,
             edge,
             &HashMap::new(),
@@ -332,7 +332,7 @@ fn initial_scan_work_failure_does_not_poison_reused_input_or_heap() {
     );
     let mut budget = WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
     assert_eq!(
-        initialize_coboundary::<APPARENT_EMERGENT>(
+        initialize_coboundary::<APPARENT_EMERGENT, true>(
             &access,
             edge,
             &HashMap::new(),
@@ -345,7 +345,7 @@ fn initial_scan_work_failure_does_not_poison_reused_input_or_heap() {
     );
     assert_eq!(
         working.pop(),
-        Some(Reverse(SimplexEntry { id: 0, value: 2. }))
+        Some(Reverse(SimplexEntry { id: 0, value: 2. }.into()))
     );
 }
 
@@ -399,9 +399,9 @@ fn check_virtual_access(
             let mut budget =
                 WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
             let raw = if shortcuts == APPARENT_EMERGENT {
-                run_access::<true, true, APPARENT_EMERGENT>(access, stats, &mut budget)
+                run_access::<true, true, APPARENT_EMERGENT, true>(access, stats, &mut budget)
             } else {
-                run_access::<true, true, ALL_SHORTCUTS>(access, stats, &mut budget)
+                run_access::<true, true, ALL_SHORTCUTS, true>(access, stats, &mut budget)
             }
             .unwrap();
             assert_eq!(&assemble_diagram(1, coverage, raw).unwrap(), expected);
@@ -440,7 +440,7 @@ pub(super) fn check_transform(
     let mut actual = std::collections::BTreeSet::new();
     for row in working
         .iter()
-        .map(|row| row.0)
+        .map(|row| row.0.simplex())
         .chain(std::iter::once(pivot))
     {
         if !actual.insert(row) {
@@ -555,7 +555,7 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
         candidates: std::cell::Cell::new(0),
     };
     let mut stats = Stats::default();
-    run_access::<true, true, ALL_SHORTCUTS>(
+    run_access::<true, true, ALL_SHORTCUTS, true>(
         &access,
         &mut stats,
         &mut WorkBudget::new(&limits).unwrap(),
@@ -566,7 +566,7 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
     for cancel_at in 1..=total {
         access.cancel_at = cancel_at;
         access.candidates.set(0);
-        let error = run_access::<true, true, ALL_SHORTCUTS>(
+        let error = run_access::<true, true, ALL_SHORTCUTS, true>(
             &access,
             &mut Stats::default(),
             &mut WorkBudget::new(&limits).unwrap(),
@@ -575,7 +575,7 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
         assert_eq!(error, Error::Cancelled, "checkpoint {cancel_at}");
         assert!(flag.load(Ordering::Relaxed));
         flag.store(false, Ordering::Relaxed);
-        let raw = run_access::<true, true, ALL_SHORTCUTS>(
+        let raw = run_access::<true, true, ALL_SHORTCUTS, true>(
             &dense,
             &mut Stats::default(),
             &mut WorkBudget::new(&limits).unwrap(),
@@ -695,4 +695,133 @@ fn shortcut_and_reconstruction_paths_are_exercised() {
         stats.shortcuts > 0 && stats.column_additions > 0 && stats.stored_entries > 0,
         "{stats:?}"
     );
+}
+
+#[test]
+fn working_rows_preserve_f64_bits_order_and_f2_multiplicity() {
+    // Values and IDs are listed in the required forward order independently.
+    let values = [
+        0.0,
+        f64::from_bits(1),
+        f64::MIN_POSITIVE,
+        1.0,
+        f64::from_bits(1.0_f64.to_bits() + 1),
+        1.0e300,
+        f64::MAX,
+    ];
+    let rows: Vec<_> = values
+        .into_iter()
+        .flat_map(|value| [usize::MAX, 257, 1, 0].map(|id| SimplexEntry { id, value }))
+        .collect();
+    for (i, &left) in rows.iter().enumerate() {
+        let encoded = WorkingEntry::from(left);
+        assert_eq!(encoded.simplex().value.to_bits(), left.value.to_bits());
+        assert_eq!(encoded.simplex().id, left.id);
+        for (j, &right) in rows.iter().enumerate() {
+            let right = WorkingEntry::from(right);
+            assert_eq!(encoded.cmp(&right), i.cmp(&j));
+            assert_eq!(encoded < right, i < j);
+            assert_eq!(encoded <= right, i <= j);
+            assert_eq!(encoded > right, i > j);
+            assert_eq!(encoded >= right, i >= j);
+            assert_eq!(encoded == right, i == j);
+        }
+    }
+    let mut heap = Coboundary::new();
+    for (i, &row) in rows.iter().enumerate().rev() {
+        // Two copies vanish, while three copies retain their common row.
+        for _ in 0..2 + usize::from(i % 3 == 0) {
+            heap.push(Reverse(row.into()));
+        }
+    }
+    let mut budget = WorkBudget::new(&crate::execution::Execution::default()).unwrap();
+    for &expected in rows.iter().step_by(3) {
+        assert_eq!(
+            pop_parity(&mut heap, &mut budget).unwrap(),
+            Some(Reverse(expected.into()))
+        );
+    }
+    assert!(heap.is_empty());
+}
+
+#[test]
+fn cofacet_batches_cancel_shared_triangles_and_recover_after_interruption() {
+    // 01 and 02 share triangle 012. The remaining triangles 013 and 023 survive.
+    let input = DissimilarityView::new(&[1.; 6], 4).unwrap();
+    let access = DenseFlag::new(input.into(), 1.).unwrap();
+    let mut heap = Coboundary::new();
+    let mut scratch = Vec::with_capacity(8);
+    let capacity = scratch.capacity();
+    let mut stats = Stats::default();
+    let mut budget = WorkBudget::new(&crate::execution::Execution::default()).unwrap();
+    for id in [0, 1] {
+        append_coboundary(
+            &access,
+            SimplexEntry { id, value: 1. },
+            &mut heap,
+            &mut scratch,
+            &mut stats,
+            &mut budget,
+        )
+        .unwrap();
+        assert!(scratch.is_empty());
+        assert_eq!(scratch.capacity(), capacity);
+    }
+    for id in [2, 1] {
+        assert_eq!(
+            pop_parity(&mut heap, &mut budget).unwrap(),
+            Some(Reverse(SimplexEntry { id, value: 1. }.into()))
+        );
+    }
+    assert_eq!(pop_parity(&mut heap, &mut budget).unwrap(), None);
+    let edge = SimplexEntry { id: 0, value: 1. };
+    let mut limited = WorkBudget::new(&crate::execution::Execution::default().max_work(1)).unwrap();
+    assert_eq!(
+        append_coboundary(
+            &access,
+            edge,
+            &mut heap,
+            &mut scratch,
+            &mut stats,
+            &mut limited
+        ),
+        Err(Error::WorkLimitExceeded { limit: 1 })
+    );
+    assert!(heap.is_empty());
+    // Reuse both buffers after a partial enumeration; its prefix must be cleared.
+    append_coboundary(
+        &access,
+        edge,
+        &mut heap,
+        &mut scratch,
+        &mut stats,
+        &mut budget,
+    )
+    .unwrap();
+    for id in [1, 0] {
+        assert_eq!(
+            pop_parity(&mut heap, &mut budget).unwrap(),
+            Some(Reverse(SimplexEntry { id, value: 1. }.into()))
+        );
+    }
+    assert!(heap.is_empty());
+    let flag = std::sync::atomic::AtomicBool::new(false);
+    let controls = crate::execution::Execution::default()
+        .max_work(8)
+        .cancellation(&flag);
+    let mut cancelled = WorkBudget::new(&controls).unwrap();
+    // Cancel after all four candidates, before committing the prepared batch.
+    cancelled.cancel_at_work(4);
+    assert_eq!(
+        append_coboundary(
+            &access,
+            edge,
+            &mut heap,
+            &mut scratch,
+            &mut stats,
+            &mut cancelled
+        ),
+        Err(Error::Cancelled)
+    );
+    assert!(heap.is_empty());
 }

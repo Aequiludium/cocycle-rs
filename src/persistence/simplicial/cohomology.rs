@@ -19,7 +19,9 @@ pub(in crate::persistence) fn compute(
     budget: &mut WorkBudget<'_>,
 ) -> Result<RawIntervals> {
     budget.check()?;
-    let mut level = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
+    #[cfg(test)]
+    record_dimension(0);
+    let level = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
     let mut forest = UnionFind::new(access.vertex_count())?;
     let mut cleared = HashSet::new();
     cleared.try_reserve(level.len()).map_err(|_| allocation())?;
@@ -37,10 +39,88 @@ pub(in crate::persistence) fn compute(
         }
     }
     raw.extend((0..forest.components()).map(|_| (0, 0.0, None)));
-    for dimension in 1..=max_dimension.min(access.vertex_count().saturating_sub(1)) {
+    reduce_dimensions(
+        access,
+        ReductionStart {
+            dimension: 1,
+            level,
+            cleared,
+            intervals: raw,
+        },
+        max_dimension,
+        field,
+        budget,
+    )
+}
+
+/// Reduce only `min_dimension..=max_dimension`. The initial clearing set must
+/// contain *all* pivots of the preceding dimension under this access and order,
+/// including zero-lifetime pairs. An empty set is valid only if that rank is zero.
+/// Enumerating lower levels constructs topology; it does not reduce H0/H1 again.
+pub(in crate::persistence) fn compute_range(
+    access: &impl ZeroBornSimplicialAccess,
+    min_dimension: usize,
+    max_dimension: usize,
+    field: PrimeField,
+    cleared: HashSet<Vec<usize>>,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    budget.check()?;
+    if min_dimension == 0 {
+        return Err(Error::InternalInvariant {
+            reason: "cohomology continuation must start above H0",
+        });
+    }
+    if min_dimension > max_dimension || min_dimension >= access.vertex_count() {
+        return Ok(Vec::new());
+    }
+    let mut level = access.vertices()?;
+    for _ in 0..min_dimension {
+        level = next_dimension(access, &level, &mut || budget.step())?;
+        if level.is_empty() {
+            return Ok(Vec::new());
+        }
+    }
+    reduce_dimensions(
+        access,
+        ReductionStart {
+            dimension: min_dimension,
+            level,
+            cleared,
+            intervals: Vec::new(),
+        },
+        max_dimension,
+        field,
+        budget,
+    )
+}
+
+struct ReductionStart {
+    dimension: usize,
+    level: Vec<Simplex>,
+    cleared: HashSet<Vec<usize>>,
+    intervals: RawIntervals,
+}
+
+fn reduce_dimensions(
+    access: &impl ZeroBornSimplicialAccess,
+    start: ReductionStart,
+    max_dimension: usize,
+    field: PrimeField,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    let ReductionStart {
+        dimension: first_dimension,
+        mut level,
+        mut cleared,
+        intervals: mut raw,
+    } = start;
+    for dimension in first_dimension..=max_dimension.min(access.vertex_count().saturating_sub(1)) {
         if level.is_empty() {
             break;
         }
+        #[cfg(test)]
+        record_dimension(dimension);
         let mut owners: HashMap<Vec<usize>, usize> = HashMap::new();
         let mut columns: Vec<Column<usize>> = Vec::new();
         for position in (0..level.len()).rev() {
@@ -128,4 +208,18 @@ fn allocation() -> Error {
     Error::AllocationFailed {
         context: "dimension-generic cohomology",
     }
+}
+
+// Per-thread diagnostics verify backend selection without production counters.
+#[cfg(test)]
+std::thread_local! {
+    static REDUCED_DIMENSIONS: std::cell::RefCell<Vec<usize>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+#[cfg(test)]
+fn record_dimension(dimension: usize) {
+    REDUCED_DIMENSIONS.with(|trace| trace.borrow_mut().push(dimension));
+}
+#[cfg(test)]
+pub(in crate::persistence) fn take_reduced_dimensions() -> Vec<usize> {
+    REDUCED_DIMENSIONS.with(|trace| std::mem::take(&mut *trace.borrow_mut()))
 }

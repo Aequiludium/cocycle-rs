@@ -14,8 +14,9 @@ calculation. Maintainer/CI checks retain the broader integration coverage below.
 The [construction tutorial](complex-construction.md) validates explicit topology
 before composing it with persistence. The distance path adds public context checks
 and private matching oracles. The [reduction tutorial](persistence-reduction.md)
-starts from hand-derived boundary columns, checks transformations independently
-and then exercises source/field/representative integration. The CI quality job exercises all four focused
+starts from hand-derived boundary columns, checks transformations and flag access
+independently, and then exercises higher-dimensional and source/field/representative
+integration. The CI quality job exercises all four focused
 commands; platform jobs run their examples and explicitly execute the construction
 example's colocated tests in debug/release. MSRV also runs those example tests.
 
@@ -39,6 +40,10 @@ example's colocated tests in debug/release. MSRV also runs those example tests.
 | `src/diagram_distances/bottleneck/tests.rs`, `src/diagram_distances/wasserstein/tests.rs` | Kernel oracles, adaptive routes, forced alternatives and diagnostic counters |
 | `src/persistence/reference/` | Independent explicit filtration and boundary reducer |
 | `src/filtration/flag/dense.rs` tests | Indexing, overflow, and independent cofacet enumeration |
+| `src/filtration/flag/bitset.rs` tests | Independent cofacets, adaptive-cache selection, early stops and checkpoint failures |
+| `src/persistence/flag/ordered/tests.rs` | Independent triangle order/seeks, full R = C V replay, stored/virtual owners and H2 clearing handoff |
+| `src/persistence/flag/dispatch/tests.rs` | No generic H0/H1 rerun on F2 high-dimensional requests, shared point/matrix/graph cache selection and every-checkpoint combined controls |
+| `tests/rips_api.rs` | Point/matrix/prepared/explicit entry parity, high-dimensional cutoff/coverage and odd-field preservation |
 | `src/persistence/flag/cohomology/tests.rs` | Independent optimization combinations, transformation replay, duality, cancellation checkpoints and difficult numeric cases |
 | `tools/test_*.py` | Source/documentation checks, external comparison, and benchmark protocol behavior |
 | `docs/development/diagram-analysis.md` | Executable contributor example: finite counts, multiplicity, endpoint exclusions and computed dimensions |
@@ -114,6 +119,19 @@ first equal-valued cofacet, alternating heap capacities, parity cancellation and
 repeated virtual-owner use. F2/H1 resource tests interrupt at every work budget
 below completion and retry the same read-only input; private tests also cancel
 at each cofacet checkpoint. Concurrent calls verify per-call state isolation.
+
+Ordered-cursor tests independently enumerate original edge coboundaries with
+vertex triples and replay stored V using set XOR. A cloned working cursor column
+must equal the full replay, not merely its pivot or final diagram. Directed
+fixtures require stored additions, virtual additions and omitted pairs to occur.
+H1 death-triangle handoffs are checked against full generic reduction through H3
+in all matrix layouts. Backend tracing is per-thread and compiled only in tests:
+F2 high-dimensional requests must never run generic H0/H1. Shared-bitset tests use
+an analytic K_32,32 Euclidean fixture through capped points, a matrix, prepared
+Rips and a supplied graph. Combined-budget tests fail/cancel at every work
+checkpoint and verify successful retries. Public octahedral-sphere tests check
+H2 through points, layouts, prepared graphs and explicit sources, preserving the
+distinction between Rips censoring and supplied-graph essentiality.
 
 The diagnostic stages in `tools/profile_rips.py` are `explicit`, `clearing`,
 `implicit`, `cone`, `apparent`, `two-pass`, `emergent`, `virtual-two-pass` and

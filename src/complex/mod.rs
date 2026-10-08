@@ -7,7 +7,7 @@ pub use graph::{Neighbor, WeightedEdge, WeightedGraph};
 mod simplicial;
 pub use simplicial::{BoundaryTerm, Simplex, SimplexId, SimplicialComplex};
 
-pub(crate) use simplicial::compare_filtration;
+pub(crate) use simplicial::{compare_filtration, finite_filtration_le};
 
 mod filtered;
 pub use filtered::FilteredComplex;

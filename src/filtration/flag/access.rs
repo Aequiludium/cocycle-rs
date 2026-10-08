@@ -3,7 +3,7 @@ use super::SimplexEntry;
 use crate::Result;
 
 /// Exact flag access: edges in forward order, cofacets in decreasing ID order,
-/// latest facet in the same total order. All values are finite/canonical and all
+/// latest facet in the same total order. All values are finite/nonnegative/canonical and all
 /// triangle faces exist. Callers never assume a cone for arbitrary sparse input.
 pub(crate) trait FlagAccess {
     fn vertex_count(&self) -> usize;

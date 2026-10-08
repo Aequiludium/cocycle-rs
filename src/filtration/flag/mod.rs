@@ -4,8 +4,11 @@ mod cliques;
 mod expansion;
 pub(crate) use cliques::CliqueAccess;
 pub(crate) use expansion::{expand, expand_access, expand_access_with};
+mod bitset;
+pub(crate) use bitset::BitsetFlag;
 mod dense;
 mod index;
+pub(crate) use index::{SimplexIndex, choose};
 mod order;
 mod sparse;
 

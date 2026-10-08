@@ -6,6 +6,10 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
 #[cfg(test)]
+use super::clearing::IgnoreTriangles;
+use super::clearing::TriangleClearing;
+use super::edges::{ColumnPosition, EdgePosition};
+#[cfg(test)]
 use crate::filtration::flag::DenseFlag;
 use crate::filtration::flag::{FlagAccess, SimplexEntry};
 #[cfg(test)]
@@ -13,11 +17,65 @@ use crate::filtration::rips::cone_radius;
 #[cfg(test)]
 use crate::geometry::DissimilarityView;
 use crate::persistence::execution::WorkBudget;
-use crate::persistence::union_find::UnionFind;
 use crate::{Error, Result};
 
-type RawIntervals = Vec<(usize, f64, Option<f64>)>;
-type Coboundary = BinaryHeap<Reverse<SimplexEntry>>;
+use crate::persistence::RawIntervals;
+type Coboundary = BinaryHeap<Reverse<WorkingEntry>>;
+
+// Working rows carry canonical nonnegative finite values, stored as their exact
+// f64 bits. Integer equality preserves F2 cancellation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WorkingEntry {
+    id: usize,
+    value_bits: u64,
+}
+impl From<SimplexEntry> for WorkingEntry {
+    fn from(row: SimplexEntry) -> Self {
+        debug_assert!(row.value.is_finite() && !row.value.is_sign_negative());
+        Self {
+            id: row.id,
+            value_bits: row.value.to_bits(),
+        }
+    }
+}
+impl WorkingEntry {
+    fn simplex(self) -> SimplexEntry {
+        SimplexEntry {
+            id: self.id,
+            value: f64::from_bits(self.value_bits),
+        }
+    }
+}
+impl Ord for WorkingEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.simplex().cmp(&other.simplex())
+    }
+}
+impl PartialOrd for WorkingEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+    fn lt(&self, other: &Self) -> bool {
+        crate::complex::finite_filtration_le(
+            f64::from_bits(self.value_bits),
+            f64::from_bits(other.value_bits),
+            self.id > other.id,
+        )
+    }
+    fn le(&self, other: &Self) -> bool {
+        crate::complex::finite_filtration_le(
+            f64::from_bits(self.value_bits),
+            f64::from_bits(other.value_bits),
+            self.id >= other.id,
+        )
+    }
+    fn gt(&self, other: &Self) -> bool {
+        other.lt(self)
+    }
+    fn ge(&self, other: &Self) -> bool {
+        other.le(self)
+    }
+}
 
 const NO_SHORTCUTS: u8 = 0;
 const APPARENT: u8 = 1;
@@ -27,14 +85,6 @@ const VIRTUAL_APPARENT: u8 = 4;
 const APPARENT_EMERGENT: u8 = APPARENT | EMERGENT;
 const ALL_SHORTCUTS: u8 = APPARENT_EMERGENT | VIRTUAL_APPARENT;
 const PRODUCTION_SHORTCUTS: u8 = ALL_SHORTCUTS;
-
-/// Position in the forward-ordered edge array, not a combinatorial simplex ID.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct EdgePosition(usize);
-
-/// Position in the stored transformation-column array.
-#[derive(Clone, Copy)]
-struct ColumnPosition(usize);
 
 struct TransformColumn {
     // The diagonal entry of V is implicit. Other entries index later edges in
@@ -84,9 +134,20 @@ struct Stats {
     peak_transform_heap: usize,
 }
 
-pub(super) fn compute(rips: &impl FlagAccess, budget: &mut WorkBudget<'_>) -> Result<RawIntervals> {
-    let mut stats = Stats::default();
-    run_access::<true, true, PRODUCTION_SHORTCUTS>(rips, &mut stats, budget)
+/// Retain every H1 death triangle for a subsequent H2 reduction.
+pub(super) fn compute_with_clearing<const CONTROLLED: bool>(
+    rips: &impl FlagAccess,
+    edges: Vec<SimplexEntry>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
+    reduce_edges::<true, true, PRODUCTION_SHORTCUTS, CONTROLLED>(
+        rips,
+        edges,
+        &mut Stats::default(),
+        budget,
+        clearing,
+    )
 }
 
 // Retain independent optimization configurations for the dense test oracle.
@@ -102,52 +163,62 @@ fn run<const IMPLICIT: bool, const CLEAR: bool, const CONE: bool, const SHORTCUT
     } else {
         cutoff
     };
-    run_access::<IMPLICIT, CLEAR, SHORTCUTS>(
+    run_access::<IMPLICIT, CLEAR, SHORTCUTS, true>(
         &DenseFlag::new(input.into(), stop)?,
         stats,
         &mut budget,
     )
 }
 
-fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
+#[cfg(test)]
+fn run_access<
+    const IMPLICIT: bool,
+    const CLEAR: bool,
+    const SHORTCUTS: u8,
+    const CONTROLLED: bool,
+>(
     rips: &impl FlagAccess,
     stats: &mut Stats,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<RawIntervals> {
     let edges = rips.edges(&mut || budget.step())?;
+    reduce_edges::<IMPLICIT, CLEAR, SHORTCUTS, CONTROLLED>(
+        rips,
+        edges,
+        stats,
+        budget,
+        &mut IgnoreTriangles,
+    )
+}
+
+fn reduce_edges<
+    const IMPLICIT: bool,
+    const CLEAR: bool,
+    const SHORTCUTS: u8,
+    const CONTROLLED: bool,
+>(
+    rips: &impl FlagAccess,
+    edges: Vec<SimplexEntry>,
+    stats: &mut Stats,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
     budget.check()?;
     #[cfg(test)]
     {
         stats.edges = edges.len();
     }
-    // Classify edges in forward filtration order. Clearing and the reverse
-    // reduction below must use this same ordering, including ties.
-    let mut forest = UnionFind::new(rips.vertex_count())?;
-    let mut cycle_edges = Vec::new();
-    cycle_edges
-        .try_reserve_exact(edges.len())
-        .map_err(|_| allocation("Rips cycle edges"))?;
-    let mut raw = Vec::new();
-    // H0 contributes exactly n intervals before removing zero bars. Grow for
-    // actual H1 output rather than reserving space for zero-lifetime pairs.
-    raw.try_reserve(rips.vertex_count())
-        .map_err(|_| allocation("Rips intervals"))?;
-    for edge in &edges {
-        budget.step()?;
-        let [a, b] = rips.edge_vertices(edge.id);
-        let merged = forest.merge(a, b);
-        cycle_edges.push(!merged);
-        if merged {
-            raw.push((0, 0.0, Some(edge.value)));
-        }
-    }
-    raw.extend((0..forest.components()).map(|_| (0, 0.0, None)));
+    let super::edges::EdgePreparation {
+        cycles: cycle_edges,
+        intervals: mut raw,
+    } = super::edges::classify(rips, &edges, budget)?;
 
     // Map triangle ids to stored transformation columns; edge and
     // additions in those columns are positions in edges, not simplex ids.
     let mut pivot_owners: HashMap<usize, ColumnPosition> = HashMap::new();
     let mut columns: Vec<TransformColumn> = Vec::new();
     let mut working = Coboundary::new();
+    let mut scratch = Vec::new();
     let mut transform = BinaryHeap::new();
     for j in (0..edges.len()).rev() {
         budget.step()?;
@@ -157,7 +228,7 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
         working.clear();
         transform.clear();
         let edge = edges[j];
-        let (shortcut, apparent_pair) = initialize_coboundary::<SHORTCUTS>(
+        let (shortcut, apparent_pair) = initialize_coboundary::<SHORTCUTS, CONTROLLED>(
             rips,
             edge,
             &pivot_owners,
@@ -175,6 +246,9 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
             {
                 stats.skipped_apparent += 1;
             }
+            clearing.record(shortcut.ok_or(Error::InternalInvariant {
+                reason: "apparent pair missing its triangle",
+            })?)?;
             continue;
         }
         let pivot = if let Some(pivot) = shortcut {
@@ -182,9 +256,10 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
         } else {
             loop {
                 budget.step()?;
-                let Some(Reverse(pivot)) = pop_parity(&mut working, budget)? else {
+                let Some(Reverse(entry)) = pop_parity(&mut working, budget)? else {
                     break None;
                 };
+                let pivot = entry.simplex();
                 let Some(&owner) = pivot_owners.get(&pivot.id) else {
                     if SHORTCUTS & VIRTUAL_APPARENT != 0
                         && let Some(edge) = zero_apparent_facet(rips, pivot, stats, budget)?
@@ -202,8 +277,8 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
                                 reason: "zero apparent facet violates reduction order",
                             });
                         }
-                        push_heap(&mut working, Reverse(pivot))?;
-                        append_coboundary(rips, edge, &mut working, stats, budget)?;
+                        push_heap(&mut working, Reverse(pivot.into()))?;
+                        append_coboundary(rips, edge, &mut working, &mut scratch, stats, budget)?;
                         push_heap(&mut transform, EdgePosition(position))?;
                         #[cfg(test)]
                         {
@@ -216,23 +291,37 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
                     break Some(pivot);
                 };
                 // Put the pivot back: adding the owner's column cancels it.
-                push_heap(&mut working, Reverse(pivot))?;
+                push_heap(&mut working, Reverse(pivot.into()))?;
                 let column = &columns[owner.0];
                 #[cfg(test)]
                 {
                     stats.column_additions += 1;
                 }
                 if IMPLICIT {
-                    append_coboundary(rips, edges[column.edge.0], &mut working, stats, budget)?;
+                    append_coboundary(
+                        rips,
+                        edges[column.edge.0],
+                        &mut working,
+                        &mut scratch,
+                        stats,
+                        budget,
+                    )?;
                     push_heap(&mut transform, column.edge)?;
                     for &k in &column.additions {
-                        append_coboundary(rips, edges[k.0], &mut working, stats, budget)?;
+                        append_coboundary(
+                            rips,
+                            edges[k.0],
+                            &mut working,
+                            &mut scratch,
+                            stats,
+                            budget,
+                        )?;
                         push_heap(&mut transform, k)?;
                     }
                 } else {
                     #[cfg(test)]
                     for &row in &column.reduced {
-                        push_heap(&mut working, Reverse(row))?;
+                        push_heap(&mut working, Reverse(row.into()))?;
                     }
                 }
                 #[cfg(test)]
@@ -243,6 +332,7 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
             }
         };
         if let Some(pivot) = pivot {
+            clearing.record(pivot)?;
             if !cycle_edges[j] {
                 return Err(Error::InternalInvariant {
                     reason: "H0 death edge paired in H1",
@@ -265,11 +355,12 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
             #[cfg(test)]
             if !IMPLICIT {
                 if shortcut.is_some() {
-                    append_coboundary(rips, edge, &mut working, stats, budget)?;
+                    append_coboundary(rips, edge, &mut working, &mut scratch, stats, budget)?;
                 } else {
-                    push_heap(&mut working, Reverse(pivot))?;
+                    push_heap(&mut working, Reverse(pivot.into()))?;
                 }
-                while let Some(Reverse(row)) = pop_parity(&mut working, budget)? {
+                while let Some(Reverse(entry)) = pop_parity(&mut working, budget)? {
+                    let row = entry.simplex();
                     reduced.push(row);
                 }
             }
@@ -312,17 +403,24 @@ fn run_access<const IMPLICIT: bool, const CLEAR: bool, const SHORTCUTS: u8>(
 }
 
 /// Initialize the original column, retaining independently testable strategies.
-fn initialize_coboundary<const SHORTCUTS: u8>(
+fn initialize_coboundary<const SHORTCUTS: u8, const CONTROLLED: bool>(
     rips: &impl FlagAccess,
     edge: SimplexEntry,
     pivot_owners: &HashMap<usize, ColumnPosition>,
     working: &mut Coboundary,
     stats: &mut Stats,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<(Option<SimplexEntry>, bool)> {
     #[cfg(test)]
     if stats.two_pass_initialization {
-        return initialize_two_pass::<SHORTCUTS>(rips, edge, pivot_owners, working, stats, budget);
+        return initialize_two_pass::<SHORTCUTS, CONTROLLED>(
+            rips,
+            edge,
+            pivot_owners,
+            working,
+            stats,
+            budget,
+        );
     }
     // Recover the existing heap allocation as an unsorted scratch buffer.
     let mut rows = std::mem::take(working).into_vec();
@@ -380,7 +478,7 @@ fn initialize_coboundary<const SHORTCUTS: u8>(
             }
             rows.try_reserve(1)
                 .map_err(|_| allocation("Rips working heap"))?;
-            rows.push(Reverse(triangle));
+            rows.push(Reverse(triangle.into()));
             Ok(true)
         },
     )?;
@@ -406,13 +504,13 @@ fn initialize_coboundary<const SHORTCUTS: u8>(
 /// Probe without caching a prefix; enumerate the full column on failure.
 /// Omission stays independent so tests can compare all four combinations.
 #[cfg(test)]
-fn initialize_two_pass<const SHORTCUTS: u8>(
+fn initialize_two_pass<const SHORTCUTS: u8, const CONTROLLED: bool>(
     rips: &impl FlagAccess,
     edge: SimplexEntry,
     owners: &HashMap<usize, ColumnPosition>,
     working: &mut Coboundary,
     stats: &mut Stats,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<(Option<SimplexEntry>, bool)> {
     working.clear();
     let mut found = None;
@@ -464,7 +562,7 @@ fn initialize_two_pass<const SHORTCUTS: u8>(
             },
             |triangle| {
                 count_cofacet(stats);
-                push_heap(working, Reverse(triangle))?;
+                push_heap(working, Reverse(triangle.into()))?;
                 Ok(true)
             },
         )?;
@@ -477,11 +575,11 @@ fn initialize_two_pass<const SHORTCUTS: u8>(
 
 /// A zero apparent pair is determined by mutual earliest-cofacet/latest-facet
 /// tests, not by equal filtration values alone. No ownership is stored for it.
-fn zero_apparent_facet(
+fn zero_apparent_facet<const CONTROLLED: bool>(
     rips: &impl FlagAccess,
     triangle: SimplexEntry,
     stats: &mut Stats,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<Option<SimplexEntry>> {
     let edge = rips.latest_facet(triangle);
     if edge.value != triangle.value {
@@ -529,9 +627,9 @@ fn push_heap<T: Ord>(heap: &mut BinaryHeap<T>, value: T) -> Result<()> {
 }
 
 /// F2 cancellation, including repeated entries introduced by multiple additions.
-fn pop_parity<T: Ord + Copy>(
+fn pop_parity<T: Ord + Copy, const CONTROLLED: bool>(
     heap: &mut BinaryHeap<T>,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<Option<T>> {
     while !heap.is_empty() {
         budget.step()?;
@@ -557,13 +655,15 @@ fn count_cofacet(_stats: &mut Stats) {
     }
 }
 
-fn append_coboundary(
+fn append_coboundary<const CONTROLLED: bool>(
     rips: &impl FlagAccess,
     edge: SimplexEntry,
     heap: &mut Coboundary,
+    scratch: &mut Vec<Reverse<WorkingEntry>>,
     stats: &mut Stats,
-    budget: &mut WorkBudget<'_>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
 ) -> Result<()> {
+    scratch.clear();
     #[cfg(test)]
     let mut candidates = 0;
     rips.visit_cofacets(
@@ -577,10 +677,18 @@ fn append_coboundary(
         },
         |row| {
             count_cofacet(stats);
-            push_heap(heap, Reverse(row))?;
+            scratch
+                .try_reserve(1)
+                .map_err(|_| allocation("Rips cofacet batch"))?;
+            scratch.push(Reverse(row.into()));
             Ok(true)
         },
     )?;
+    budget.check()?;
+    heap.try_reserve(scratch.len())
+        .map_err(|_| allocation("Rips working heap"))?;
+    heap.extend(scratch.drain(..));
+    budget.check()?;
     #[cfg(test)]
     {
         stats.reconstruction_candidates += candidates;
