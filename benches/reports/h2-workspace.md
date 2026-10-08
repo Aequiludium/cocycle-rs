@@ -277,7 +277,14 @@ python3 tools/benchmark_workspace.py --native-environment path/to/environment.js
 ```
 
 Reuse the first build-bearing directory, not a repeat directory. Fresh runs
-record their actual SHA and controller hash. The archived measured controller
+record their actual SHA and controller hash. Repetition also requires identical
+current source and full harness fingerprints, in addition to the clean checkout,
+commit, reference and retained-executable checks. A failed diagnostic keeps its
+logs and process samples in `results.json`, writes a failed `summary.json` and
+withholds every backend's ranking for that case. Timeout, missing-event,
+interval-mismatch and build-identity regression tests exercise these paths
+without running native binaries; they do not add performance measurements.
+The archived measured controller
 and recovery script reproduce the original artifact lifecycle; the final
 retention fix does not relabel those original measurements. Local quality/MSRV,
 examples, guide doctests and 91 Python tests passed. The local collaboration
