@@ -65,10 +65,12 @@ class DocumentationTests(unittest.TestCase):
     def test_benchmark_reports_and_native_guides_are_checked(self):
         self.write("benches/native/README.md", "[Missing](gone.cpp)\n")
         self.write("benches/reports/nested/report.md", "[Missing](gone.json)\n")
+        self.write("benches/optimization/README.md", "[Missing](gone.rs)\n")
         status, _, stderr = self.run_check()
         self.assertEqual(status, 1)
         self.assertIn("benches/native/README.md", stderr)
         self.assertIn("benches/reports/nested/report.md", stderr)
+        self.assertIn("benches/optimization/README.md", stderr)
 
     def test_reference_links_resolve_local_targets_and_headings(self):
         self.write("docs/reference/math.md", "# Coverage\n")
