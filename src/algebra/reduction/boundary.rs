@@ -59,14 +59,10 @@ fn reduce_impl<const BASES: bool>(
                     transform.add_scaled(&transforms[owner], factor, field, checkpoint)?;
                 }
             } else {
-                // F2 pivots are already one. Avoid traversing an unchanged
-                // reduced column and transformation merely to normalize it.
-                if coefficient != 1 {
-                    let inverse = field.inverse(coefficient)?;
-                    current.scale(inverse, field, checkpoint)?;
-                    if BASES {
-                        transform.scale(inverse, field, checkpoint)?;
-                    }
+                let inverse = field.inverse(coefficient)?;
+                current.scale(inverse, field, checkpoint)?;
+                if BASES {
+                    transform.scale(inverse, field, checkpoint)?;
                 }
                 deaths[pivot] = Some(j);
                 break;

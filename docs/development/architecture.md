@@ -177,11 +177,6 @@ records why uniform boundary routing was rejected on current main. Selection
 follows requested dimension and source invariants, without a size threshold or
 public backend option. Source interfaces, prime fields, coverage and result
 ownership are preserved. There is no dense production critical-set backend.
-
-Shared sparse columns update a coefficient through one ordered-map entry lookup.
-Unit factors avoid field multiplication, and already-unit pivots avoid inverse
-calculation and an unchanged-column scaling pass. This applies to diagram and
-R/V reduction without changing pairing order or adding an F2-only reducer.
 The [performance and integration report](../../benches/reports/critical-sets.md)
 records the measured tradeoffs and deferred dense-kernel opportunities.
 
