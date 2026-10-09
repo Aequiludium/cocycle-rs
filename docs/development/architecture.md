@@ -163,22 +163,20 @@ No backend registry or Alpha/cubical construction is implied. See the
 
 | Capability | Implemented owner and selection |
 | --- | --- |
-| Supplied diagrams | Shared `boundary::diagram` / `algebra::reduction::reduce_pairs` for general filtrations and H2+; zero-born concrete H0/H1 retains shared coface reduction |
+| Supplied diagrams | Generic filtered cells and general simplicial filtrations share `boundary::diagram` / `reduce_pairs`; zero-born concrete simplices retain the existing shared coface route |
 | Implicit flag/Rips | Existing specialized dispatch, including the admitted F2 H0/H1-to-H2+ continuation and generic fallbacks |
 | Representatives | Separate requested output; basis transformations are retained only when needed |
 | Critical sets | Opt-in sparse `CriticalSetWorkspace` with lazy dual and bounded Partial U |
 | Independent F2 reducer | Test/reference benchmark only; no public engine selection |
 
-Supplied simplicial diagram requests computing H2+ use the same boundary core
-as signed filtrations. Zero-born H0/H1 requests retain the existing shared coface
-kernel with a nonnegative or absent cutoff; implicit flag/Rips uses that kernel
-for continuation and fallback as well. The [integration report](../../benches/reports/critical-sets.md)
-records why uniform boundary routing was rejected on current main. Selection
-follows requested dimension and source invariants, without a size threshold or
-public backend option. Source interfaces, prime fields, coverage and result
-ownership are preserved. There is no dense production critical-set backend.
-The [performance and integration report](../../benches/reports/critical-sets.md)
-records the measured tradeoffs and deferred dense-kernel opportunities.
+The generic filtered-cell path is the common boundary-reduction optimization
+owner. Existing zero-born concrete requests retain the shared coface kernel,
+which also serves implicit flag/Rips continuation and fallback. The
+[integration report](../../benches/reports/critical-sets.md) records why both
+uniform boundary routing and an H2+-only change were rejected on current main.
+The public interfaces, prime fields, coverage and result ownership are preserved.
+No dense production critical-set backend, engine option or adaptive size threshold
+is introduced; high-dimensional dense ideas remain follow-up work.
 
 Each implemented domain has a directory, even while its implementation is small.
 The domain's `mod.rs` documents its scope and exports its public API; named child
@@ -297,10 +295,9 @@ the compact H1 entry order use the comparison authority in `complex/simplicial`.
 `SimplicialFiltration` retains construction dimension and scale provenance
 separately for exact Rips, approximation and supplied flags. The old expansion
 types remain available during migration.
-Explicit H0/H1 zero-born computation retains union-find and coface clearing.
-Other diagram inputs use `simplicial/input.rs` to convert selected stored
-boundaries to field columns; representative requests additionally retain
-basis transformations. The immutable concrete type supplies face closure, ordered unique IDs
+Explicit zero-born computation retains union-find and coface clearing. Other
+diagram inputs use `simplicial/input.rs` to convert selected stored boundaries
+to field columns; representative requests additionally retain basis transformations. The immutable concrete type supplies face closure, ordered unique IDs
 and oriented incidence, so this reader does not recheck them or compute the
 boundary square. Its ID map covers only selected simplices, and ordered traversal
 stops at the analysis cutoff. It still visits preceding higher-dimensional cells

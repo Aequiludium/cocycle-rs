@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-- Route supplied simplicial H2+ diagram-only requests through the shared
-  filtered-cell boundary reducer. Preserve the existing zero-born H0/H1 coface
-  route, concrete source metadata and certified coverage; representatives remain
-  opt-in and implicit flag/Rips dispatch stays specialized.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

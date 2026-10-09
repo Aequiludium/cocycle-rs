@@ -45,13 +45,9 @@ pub(super) fn compute(
         let (diagram, representatives) =
             representatives::compute_explicit(source, options, requests, coverage, budget)?;
         (diagram, Some(representatives))
-    } else if options.max_homology_dimension() <= 1
-        && options.max_edge().is_none_or(|t| t >= 0.)
-        && source.has_zero_born_vertices()
-    {
-        // Retain the shared coface path for low-dimensional zero-born inputs.
-        // Higher-dimensional and general filtrations use the boundary core;
-        // selection follows simplex invariants, not scale/source metadata.
+    } else if options.max_edge().is_none_or(|t| t >= 0.) && source.has_zero_born_vertices() {
+        // Select by the actual simplex invariant, not source/scale metadata.
+        // Stored cofaces retain non-flag topology and arbitrary simplex values.
         let access = ZeroBornExplicitAccess {
             complex: source,
             vertex_count: source.vertex_count(),
@@ -73,8 +69,6 @@ pub(super) fn compute(
             None,
         )
     } else {
-        // The trusted reader and generic filtered-cell reader share this reducer,
-        // while source metadata and certified coverage remain adapter-owned.
         (
             super::boundary::diagram(
                 input::read(source, options, budget)?,

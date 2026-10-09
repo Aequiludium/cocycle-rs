@@ -725,9 +725,9 @@ domain; source translation alone is not independent evidence.
 
 ## 17. Supplied filtered-cell boundary contract
 
-Generic filtered cells, general supplied simplicial filtrations and supplied
-simplicial H2+ diagram requests share the same boundary-pair reducer. Zero-born
-supplied H0/H1 retains the coface reduction described in section 13. The simplicial reader uses constructor-validated
+Generic filtered cells and general supplied simplicial filtrations share the
+same boundary-pair reducer. Zero-born supplied simplices retain the coface
+reduction described in section 13. The simplicial reader uses constructor-validated
 oriented incidence; the generic reader checks its external contract. Caller
 source certificates determine coverage, even when the retained boundary columns
 alone appear complete. Representative basis extraction is a separate request.
