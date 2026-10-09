@@ -9,6 +9,8 @@ pub(crate) trait FlagAccess {
     fn vertex_count(&self) -> usize;
     fn edges(&self, checkpoint: &mut impl FnMut() -> Result<()>) -> Result<Vec<SimplexEntry>>;
     fn edge_vertices(&self, id: usize) -> [usize; 2];
+    /// Decode while the source index is live; returned vertices are owned IDs.
+    fn triangle_vertices(&self, id: usize) -> [usize; 3];
     fn latest_facet(&self, triangle: SimplexEntry) -> SimplexEntry;
     /// Check every candidate (including rejected ones). Visitor false stops early.
     fn visit_cofacets(

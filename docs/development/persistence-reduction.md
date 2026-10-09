@@ -110,7 +110,12 @@ assert_eq!(result.diagram(), &expected);
 ## Connect a default operation when appropriate
 
 `source.rs` handles supported sources and context. `flag/dispatch.rs` selects H0,
-specialized F2 H1 or general cohomology for exact flag inputs; algorithms never
+specialized F2 H1 or general cohomology for exact flag inputs.
+F2 diagram-only H2+ retains specialized H0/H1 and hands all
+ordinary/emergent/virtual death triangles to generic continuation at dimension 2.
+The owned original-vertex keys survive H1 workspace release; clearing removes
+columns while preserving topology for next-level generation. Generic index
+fallbacks and odd-prime requests still use full cohomology. Algorithms never
 call back into it. Explicit and approximate Rips adapters call simplicial
 cohomology directly. `simplicial::finish_zero_born` implements the existing choice
 between an implicit diagram and materialized simplicial representatives, only

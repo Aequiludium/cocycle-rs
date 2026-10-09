@@ -271,7 +271,7 @@ imply continuity of thresholded interval counts.
 
 ## 9. Implicit Rips persistent cohomology
 
-This section specifies the production H1 path. The explicit boundary oracle
+This section specifies the production H1 path and exact F2 H2+ handoff. The explicit boundary oracle
 remains independent. Cohomology, clearing, implicit columns, and shortcut pairs
 have separate conditions; see [B21 §§3.2–3.5 and §4](bibliography.md#b21).
 
@@ -309,6 +309,21 @@ Clearing skips H0 merge edges: the adjacent-dimension pairing guarantees their
 coboundaries reduce to zero. Tests disabling clearing still reduce them, verify
 that result, and never mistake them for H1 births. Collect edges even after the
 graph becomes connected.
+
+### H1-to-H2 clearing handoff
+
+For exact diagram-only F2 H2+ requests, specialized H0/H1 supplies owned intervals
+and every H1 death triangle to the generic continuation starting at dimension 2.
+Ordinary and emergent pivots and omitted zero apparent pairs all belong to this
+clearing set; neither stored owners nor positive-lifetime intervals alone are
+complete. Triangle keys are decoded to original vertex triples before H1 reducer
+storage is released. The continuation enumerates complete topology, including
+cleared triangles, without rerunning generic H0 or H1. An equal-weight K3 has
+empty H2; failing to clear its virtual death triangle would invent an H2 birth.
+Odd-prime, explicit/blocked sources and representatives retain their established
+paths. If H1 combinatorial indexing overflows on an H2+ request, use the full
+tuple-based generic path. One WorkBudget includes handoff extraction, conversion,
+topology generation and continuation; allocation or interruption returns no result.
 
 ### Implicit reconstruction invariant
 

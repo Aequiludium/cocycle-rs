@@ -399,9 +399,19 @@ fn check_virtual_access(
             let mut budget =
                 WorkBudget::new(&crate::persistence::ExecutionLimits::default()).unwrap();
             let raw = if shortcuts == APPARENT_EMERGENT {
-                run_access::<true, true, APPARENT_EMERGENT>(access, stats, &mut budget)
+                run_access::<true, true, APPARENT_EMERGENT, false>(
+                    access,
+                    stats,
+                    &mut budget,
+                    &mut Vec::new(),
+                )
             } else {
-                run_access::<true, true, ALL_SHORTCUTS>(access, stats, &mut budget)
+                run_access::<true, true, ALL_SHORTCUTS, false>(
+                    access,
+                    stats,
+                    &mut budget,
+                    &mut Vec::new(),
+                )
             }
             .unwrap();
             assert_eq!(&assemble_diagram(1, coverage, raw).unwrap(), expected);
@@ -511,6 +521,9 @@ impl<A: FlagAccess> FlagAccess for CancelAccess<'_, A> {
     fn edge_vertices(&self, id: usize) -> [usize; 2] {
         self.inner.edge_vertices(id)
     }
+    fn triangle_vertices(&self, id: usize) -> [usize; 3] {
+        self.inner.triangle_vertices(id)
+    }
     fn latest_facet(&self, triangle: SimplexEntry) -> SimplexEntry {
         self.inner.latest_facet(triangle)
     }
@@ -555,10 +568,11 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
         candidates: std::cell::Cell::new(0),
     };
     let mut stats = Stats::default();
-    run_access::<true, true, ALL_SHORTCUTS>(
+    run_access::<true, true, ALL_SHORTCUTS, false>(
         &access,
         &mut stats,
         &mut WorkBudget::new(&limits).unwrap(),
+        &mut Vec::new(),
     )
     .unwrap();
     assert!(stats.apparent_candidates > 0 && stats.virtual_additions > 0);
@@ -566,19 +580,21 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
     for cancel_at in 1..=total {
         access.cancel_at = cancel_at;
         access.candidates.set(0);
-        let error = run_access::<true, true, ALL_SHORTCUTS>(
+        let error = run_access::<true, true, ALL_SHORTCUTS, false>(
             &access,
             &mut Stats::default(),
             &mut WorkBudget::new(&limits).unwrap(),
+            &mut Vec::new(),
         )
         .unwrap_err();
         assert_eq!(error, Error::Cancelled, "checkpoint {cancel_at}");
         assert!(flag.load(Ordering::Relaxed));
         flag.store(false, Ordering::Relaxed);
-        let raw = run_access::<true, true, ALL_SHORTCUTS>(
+        let raw = run_access::<true, true, ALL_SHORTCUTS, false>(
             &dense,
             &mut Stats::default(),
             &mut WorkBudget::new(&limits).unwrap(),
+            &mut Vec::new(),
         )
         .unwrap();
         assert_eq!(
@@ -586,6 +602,147 @@ fn cancellation_at_each_cofacet_checkpoint_preserves_input_and_reentrancy() {
             expected
         );
     }
+}
+
+// Independent forward boundary matrix, including zero-length index pairs.
+// Neither production cofacet enumeration nor reduction is used for expectations.
+fn boundary_death_triangles(
+    n: usize,
+    values: &[f64],
+    cutoff: f64,
+) -> std::collections::BTreeSet<[usize; 3]> {
+    use std::collections::{BTreeSet, HashMap};
+    let mut cells = Vec::new();
+    for mask in 1_usize..1 << n {
+        if mask.count_ones() > 3 {
+            continue;
+        }
+        let mut value = 0_f64;
+        for b in 0..n {
+            for a in 0..b {
+                if mask & (1 << a) != 0 && mask & (1 << b) != 0 {
+                    value = value.max(values[b * (b - 1) / 2 + a]);
+                }
+            }
+        }
+        if value <= cutoff {
+            cells.push((mask, value));
+        }
+    }
+    cells.sort_by(|a, b| {
+        a.1.total_cmp(&b.1)
+            .then(a.0.count_ones().cmp(&b.0.count_ones()))
+            .then(b.0.cmp(&a.0))
+    });
+    let positions: HashMap<_, _> = cells.iter().enumerate().map(|(i, c)| (c.0, i)).collect();
+    let mut reduced: Vec<BTreeSet<usize>> = Vec::new();
+    let mut owners: HashMap<usize, usize> = HashMap::new();
+    let mut deaths = BTreeSet::new();
+    for (position, &(mask, _)) in cells.iter().enumerate() {
+        let mut column = BTreeSet::new();
+        if mask.count_ones() > 1 {
+            for v in 0..n {
+                if mask & (1 << v) != 0 {
+                    column.insert(positions[&(mask ^ (1 << v))]);
+                }
+            }
+        }
+        while let Some(&pivot) = column.last() {
+            if let Some(&owner) = owners.get(&pivot) {
+                column = column
+                    .symmetric_difference(&reduced[owner])
+                    .copied()
+                    .collect();
+            } else {
+                owners.insert(pivot, position);
+                if mask.count_ones() == 3 {
+                    let vertices: Vec<_> = (0..n).filter(|&v| mask & (1 << v) != 0).collect();
+                    deaths.insert(vertices.try_into().unwrap());
+                }
+                break;
+            }
+        }
+        reduced.push(column);
+    }
+    deaths
+}
+
+#[test]
+fn complete_handoff_matches_independent_death_indices_with_all_shortcuts() {
+    let mut seed = 20261004_u64;
+    let mut total_virtual = 0;
+    let mut total_stored = 0;
+    let mut total_shortcuts = 0;
+    for n in 3_usize..=6 {
+        let count = n * (n - 1) / 2;
+        let samples = if n <= 4 {
+            3_usize.pow(count as u32)
+        } else {
+            64
+        };
+        for sample in 0..samples {
+            let mut code = sample;
+            let values: Vec<_> = (0..count)
+                .map(|_| {
+                    if n <= 4 {
+                        let v = code % 3;
+                        code /= 3;
+                        v as f64
+                    } else {
+                        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                        ((seed >> 32) % 4) as f64
+                    }
+                })
+                .collect();
+            let input = DissimilarityView::new(&values, n).unwrap();
+            for cutoff in [0., 1., 2.] {
+                let access = DenseFlag::new(input.into(), cutoff).unwrap();
+                let expected = boundary_death_triangles(n, &values, cutoff);
+                let execution = crate::execution::Execution::default();
+                macro_rules! check {
+                    ($shortcuts:ident) => {{
+                        let mut stats = Stats::default();
+                        let mut keys = Vec::new();
+                        run_access::<true, true, $shortcuts, true>(
+                            &access,
+                            &mut stats,
+                            &mut WorkBudget::new(&execution).unwrap(),
+                            &mut keys,
+                        )
+                        .unwrap();
+                        assert_eq!(keys.len(), stats.stored_columns + stats.skipped_apparent);
+                        let actual: std::collections::BTreeSet<_> = keys.iter().copied().collect();
+                        assert_eq!(keys.len(), actual.len(), "duplicate death key");
+                        assert_eq!(
+                            actual, expected,
+                            "n={n} sample={sample} cutoff={cutoff} shortcuts={}",
+                            $shortcuts
+                        );
+                        total_virtual += stats.skipped_apparent;
+                        total_stored += stats.stored_columns;
+                        total_shortcuts += stats.shortcuts;
+                    }};
+                }
+                check!(NO_SHORTCUTS);
+                check!(APPARENT_EMERGENT);
+                check!(ALL_SHORTCUTS);
+                let mut unused = Vec::new();
+                run_access::<true, true, ALL_SHORTCUTS, false>(
+                    &access,
+                    &mut Stats::default(),
+                    &mut WorkBudget::new(&execution).unwrap(),
+                    &mut unused,
+                )
+                .unwrap();
+                assert_eq!(
+                    unused.capacity(),
+                    0,
+                    "H1-only must not allocate clearing keys"
+                );
+            }
+        }
+    }
+    assert!(total_virtual > 0 && total_stored > 0 && total_shortcuts > 0);
 }
 
 struct Matrix(Vec<Vec<usize>>);
