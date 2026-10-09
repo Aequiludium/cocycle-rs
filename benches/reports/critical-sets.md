@@ -29,7 +29,7 @@ smoke checks with finite artifact retention.
 
 | Item | Recorded value |
 | --- | --- |
-| Associated PR | Pending submission; bound in a documentation-only follow-up |
+| Associated PR | [Aequiludium/cocycle-rs #101](https://github.com/Aequiludium/cocycle-rs/pull/101) |
 | Final measured candidate | `bf0069ba4df7068d0b89e75722863e68faa671dc`, clean feature revision |
 | Merged main | `cedf5965b774855614b761a1ad311d9dc7992c49`; ordinary merge `a3a234f4d3983e0b9ca0d9f9eed91e19916e96df` |
 | Replayable harness | `0202534e3376360f6c5d16cbf2673e2ec4998aa1`; measured controller and adapter bytes unchanged in final candidate |
