@@ -174,6 +174,11 @@ filtrations rather than a separate coface reduction route. This preserves source
 interfaces, prime fields, coverage and result ownership. The coface kernel is
 still required for implicit flag/Rips continuation and fallback. There is no
 dense production critical-set backend or automatic sparse/dense threshold.
+
+Shared sparse columns update a coefficient through one ordered-map entry lookup.
+Unit factors avoid field multiplication, and already-unit pivots avoid inverse
+calculation and an unchanged-column scaling pass. This applies to diagram and
+R/V reduction without changing pairing order or adding an F2-only reducer.
 The [performance and integration report](../../benches/reports/critical-sets.md)
 records the measured tradeoffs and deferred dense-kernel opportunities.
 
@@ -294,10 +299,9 @@ the compact H1 entry order use the comparison authority in `complex/simplicial`.
 `SimplicialFiltration` retains construction dimension and scale provenance
 separately for exact Rips, approximation and supplied flags. The old expansion
 types remain available during migration.
-Explicit builder computation reads stored incidence, retaining H0 union-find
-and dimension-wise clearing for zero-born inputs. Other inputs and representative
-requests use `simplicial/input.rs` to convert selected stored boundaries to field
-columns. The immutable concrete type supplies face closure, ordered unique IDs
+Explicit builder computation uses `simplicial/input.rs` to convert selected
+stored boundaries to field columns; representative requests additionally retain
+basis transformations. The immutable concrete type supplies face closure, ordered unique IDs
 and oriented incidence, so this reader does not recheck them or compute the
 boundary square. Its ID map covers only selected simplices, and ordered traversal
 stops at the analysis cutoff. It still visits preceding higher-dimensional cells
