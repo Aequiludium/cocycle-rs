@@ -9,6 +9,10 @@ computes only the required bounded rows of U = V inverse. This is a concrete
 critical-set operation; ordinary persistence requests retain their own storage
 policy. No foreign runtime or optimizer dependency is required.
 
+The [paper framework and three algorithms](../research/big-steps.md) explain the
+reduction and critical-set method. The [performance and integration report](../../benches/reports/critical-sets.md)
+records measured costs and why the public API exposes one sparse workspace.
+
 ## Query a finite point
 
 ```rust

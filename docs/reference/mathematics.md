@@ -725,6 +725,12 @@ domain; source translation alone is not independent evidence.
 
 ## 17. Supplied filtered-cell boundary contract
 
+Generic filtered cells and diagram-only supplied simplicial sources share the
+same boundary-pair reducer. The simplicial reader uses constructor-validated
+oriented incidence; the generic reader checks its external contract. Caller
+source certificates determine coverage, even when the retained boundary columns
+alone appear complete. Representative basis extraction is a separate request.
+
 For ordered cells c_i, let D[j,i] be the integer incidence coefficient of c_j in
 the boundary of c_i. Nonzero entries require j < i, dimension(c_j) =
 dimension(c_i)-1 and f(c_j) <= f(c_i). The mathematical source must satisfy D^2=0

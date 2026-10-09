@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Route supplied simplicial diagram-only requests through the shared filtered-cell
+  boundary reducer. Preserve concrete source metadata and certified coverage;
+  representatives remain opt-in and implicit flag/Rips dispatch stays specialized.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

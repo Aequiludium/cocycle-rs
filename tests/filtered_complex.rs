@@ -28,6 +28,77 @@ fn alpha_triangle() -> SimplicialComplex {
     .unwrap()
 }
 #[test]
+fn supplied_tetrahedron_preserves_h2_fields_cutoffs_and_source_context() -> Result<()> {
+    for base in [0., -4.] {
+        let vertices = [10, 30, 90, 120];
+        let mut cells = Vec::new();
+        for mask in 1_usize..16 {
+            let simplex_vertices: Vec<_> = vertices
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| ((mask >> i) & 1 == 1).then_some(v))
+                .collect();
+            let value = base + simplex_vertices.len() as f64 - 1.;
+            cells.push(Simplex::new(simplex_vertices, value)?);
+        }
+        let source = SimplicialComplex::new(cells)?;
+        for prime in [2, 3, 65537] {
+            let field = PrimeField::new(prime)?;
+            let concrete = source
+                .persistence()
+                .field(field)
+                .max_homology_dimension(2)
+                .compute()?;
+            let filtered = PersistenceBuilder::from_complex(&source)
+                .field(field)
+                .max_homology_dimension(2)
+                .compute()?;
+            assert_eq!(concrete.diagram(), filtered.diagram());
+            // K4 has three independent graph cycles. Its four triangular faces
+            // kill those cycles and create one sphere, killed by the tetrahedron.
+            let expected = [
+                (0, base, IntervalEnd::Finite(base + 1.), 3),
+                (0, base, IntervalEnd::Essential, 1),
+                (1, base + 1., IntervalEnd::Finite(base + 2.), 3),
+                (2, base + 2., IntervalEnd::Finite(base + 3.), 1),
+            ];
+            for (dimension, birth, end, count) in expected {
+                assert_eq!(
+                    concrete
+                        .diagram()
+                        .intervals()
+                        .filter(|bar| bar.dimension() == dimension
+                            && bar.birth() == birth
+                            && bar.end() == end)
+                        .count(),
+                    count
+                );
+            }
+            assert_eq!(concrete.diagram().len(), 8);
+            assert!(matches!(
+                concrete.context().filtration().source(),
+                FiltrationSource::SuppliedSimplicial
+            ));
+            let capped = source
+                .persistence()
+                .field(field)
+                .max_homology_dimension(2)
+                .max_filtration_value(base + 2.5)
+                .compute()?;
+            let h2 = capped.diagram().dimension(2)?.iter().next().unwrap();
+            assert_eq!(h2.birth(), base + 2.);
+            assert_eq!(
+                h2.end(),
+                IntervalEnd::RightCensored {
+                    through: base + 2.5
+                }
+            );
+            assert_eq!(capped.diagram().coverage(), Coverage::Through(base + 2.5));
+        }
+    }
+    Ok(())
+}
+#[test]
 fn delayed_triangle_uses_all_simplex_values_and_preserves_certified_ranges() -> Result<()> {
     let complex = alpha_triangle();
     assert_eq!(complex.max_filtration_value(), Some(1. / 3.));

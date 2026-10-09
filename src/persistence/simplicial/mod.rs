@@ -7,7 +7,6 @@ use crate::complex::SimplicialComplex;
 use crate::diagram::{PersistenceDiagram, Representative};
 use crate::execution::WorkBudget;
 use crate::filtration::Coverage;
-use crate::filtration::simplicial::ZeroBornExplicitAccess;
 use crate::{Error, Result};
 pub(super) fn source_range(
     coverage: Coverage,
@@ -45,30 +44,10 @@ pub(super) fn compute(
         let (diagram, representatives) =
             representatives::compute_explicit(source, options, requests, coverage, budget)?;
         (diagram, Some(representatives))
-    } else if options.max_edge().is_none_or(|t| t >= 0.) && source.has_zero_born_vertices() {
-        // Select by the actual simplex invariant, not source/scale metadata.
-        // Stored cofaces retain non-flag topology and arbitrary simplex values.
-        let access = ZeroBornExplicitAccess {
-            complex: source,
-            vertex_count: source.vertex_count(),
-            cutoff: options
-                .max_edge()
-                .unwrap_or_else(|| source.max_filtration_value().unwrap_or(0.)),
-        };
-        (
-            super::assemble_diagram(
-                options.max_homology_dimension(),
-                coverage,
-                cohomology::compute(
-                    &access,
-                    options.max_homology_dimension(),
-                    options.field(),
-                    budget,
-                )?,
-            )?,
-            None,
-        )
     } else {
+        // Supplied simplicial diagrams share the filtered-cell boundary reducer.
+        // This reader relies on constructor validation and preserves the source
+        // certificate; implicit flag requests keep their specialized dispatch.
         (
             super::boundary::diagram(
                 input::read(source, options, budget)?,

@@ -143,8 +143,8 @@ files. Public paths are re-exported from domains, not every private directory.
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
 | `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
 
-`CriticalSetWorkspace` is opt-in and reuses the serial F2 lazy reducer without
-changing persistence dispatch. It retains primal R/V, constructs dual R/V only
+`CriticalSetWorkspace` is opt-in and reuses the serial F2 lazy reducer. It retains
+primal R/V, constructs dual R/V only
 on demand, transposes V only for queried dimensions and solves bounded U rows
 without retaining the inverse. The [usage guide](../guides/critical-sets.md)
 defines source identity, update validity and execution boundaries. Parallel
@@ -158,6 +158,24 @@ The public `FilteredComplex` contract drives generic boundary reduction. It does
 not require simplex vertex lists, construction methods or mutable algorithm keys.
 No backend registry or Alpha/cubical construction is implied. See the
 [filtered-complex guide](../guides/filtered-complexes.md) for source semantics.
+
+### Integrated computation paths
+
+| Capability | Implemented owner and selection |
+| --- | --- |
+| Supplied diagrams | `persistence::boundary::diagram` and `algebra::reduction::reduce_pairs`; generic cells validate their contract and concrete simplices read validated incidence |
+| Implicit flag/Rips | Existing specialized dispatch, including the admitted F2 H0/H1-to-H2+ continuation and generic fallbacks |
+| Representatives | Separate requested output; basis transformations are retained only when needed |
+| Critical sets | Opt-in sparse `CriticalSetWorkspace` with lazy dual and bounded Partial U |
+| Independent F2 reducer | Test/reference benchmark only; no public engine selection |
+
+Supplied zero-born simplicial diagrams use the same boundary core as signed
+filtrations rather than a separate coface reduction route. This preserves source
+interfaces, prime fields, coverage and result ownership. The coface kernel is
+still required for implicit flag/Rips continuation and fallback. There is no
+dense production critical-set backend or automatic sparse/dense threshold.
+The [performance and integration report](../../benches/reports/critical-sets.md)
+records the measured tradeoffs and deferred dense-kernel opportunities.
 
 Each implemented domain has a directory, even while its implementation is small.
 The domain's `mod.rs` documents its scope and exports its public API; named child

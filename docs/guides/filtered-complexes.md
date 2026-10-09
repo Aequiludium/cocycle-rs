@@ -9,6 +9,13 @@ Both paths compute ordinary persistence over a selected prime field. They suppor
 signed scales and unequal vertex birth times. Alpha geometry and a production
 cubical container are not implemented by these interfaces.
 
+Diagram-only supplied simplicial and generic filtered-cell requests use the same
+boundary reduction core. The concrete adapter reads constructor-validated stored
+incidence; the generic adapter validates the external cell contract. Concrete
+source metadata and construction coverage remain attached to the result. Cycle
+and cocycle requests retain the separate representative computation. Implicit
+flag/Rips requests continue to use their specialized dispatch.
+
 Algorithm authors can follow the [construction walkthrough](../development/complex-construction.md)
 for a tested lower-star constructor example and its focused development command.
 
