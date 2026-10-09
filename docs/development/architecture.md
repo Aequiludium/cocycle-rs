@@ -67,6 +67,7 @@ src/
       access.rs                  private dense/sparse access contract
       dense.rs                   matrix-backed edges and cofacets
       sparse.rs                  sorted neighbor-intersection cofacets
+      bitset.rs                  bounded adaptive empty-intersection cache
       index.rs                   checked edge/triangle IDs and decoding
       order.rs                   compact H1 entry comparison adapter
       cliques.rs                 dense/sparse clique enumeration
@@ -100,6 +101,12 @@ src/
     flag/
       mod.rs                     supplied-graph entry points and context
       dispatch.rs                default exact H0/F2 H1/general algorithm selection
+      selection.rs               named empirical matrix access policy
+      edges.rs                   shared forward classification and typed positions
+      clearing.rs                complete H1 death-triangle handoff to H2
+      ordered.rs                 ordered-cursor F2 H1 reduction
+      ordered/tests.rs           independent cursor enumeration and R = C V replay
+      dispatch/tests.rs          backend selection, entry parity and combined controls
       h0.rs                      independent H0 edge scan
       cohomology/
         mod.rs                   shared dense/sparse implicit F2 H1 reduction
@@ -219,8 +226,10 @@ access and complete triangle topology still support higher-level generation.
 Odd primes, representatives and blocked approximation retain their existing
 routes. Index overflow on a higher-dimensional request keeps full generic fallback.
 
-Within `src/persistence/flag/cohomology/mod.rs`, `run_access` classifies edges in
-forward order and reduces their coboundaries in reverse order.
+Both F2 H1 engines call `flag/edges.rs` to classify edges in forward order.
+`flag/cohomology/mod.rs` reduces coboundaries in reverse order; `flag/ordered.rs`
+merges ordered cursor suffixes. They share edge/column position types and exact
+ordering, while retaining their distinct working representations.
 `initialize_coboundary` scans each original column once, combining initialization
 with the apparent/emergent shortcut decision. If the first equal-valued candidate
 cannot take a shortcut, the collected cofacets form the ordinary working column.
@@ -239,9 +248,14 @@ already processed in reverse order can supply a virtual owner. This preserves
 the [reconstruction invariant](../reference/mathematics.md#implicit-reconstruction-invariant).
 Explicit reduced-column payloads and replay checks exist only in tests.
 
-Higher-dimensional and odd-prime implicit Rips/flag requests dispatch to
-`simplicial/cohomology.rs`. This zero-born path
-classifies H0 edges, then advances through dimensions with clearing. It retains
+Odd-prime implicit Rips/flag requests dispatch to `simplicial/cohomology.rs`,
+which classifies H0 edges and advances through dimensions with clearing.
+F2 high-dimensional requests retain the selected specialized H0/H1 path and use
+`continue_from_h1` only for H2 and above. `flag/clearing.rs` transfers all H1 death
+triangles, including omitted zero pairs, to seed H2 clearing. No pivots certify
+no triangles and no higher cliques. The tuple-based full generic path remains
+available when compact H1 IDs cannot fit usize. These paths share the operation
+budget and ordinary output assembly. The generic reducer retains
 one ordered simplex dimension, pivot owners and coefficient-bearing transformation
 columns; reduced
 coboundaries are regenerated on demand. Ordered vertex tuples avoid binomial-ID

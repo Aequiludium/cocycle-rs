@@ -57,8 +57,9 @@ tutorial doctests. Diagram analysis does not run persistent homology; constructi
 checks also verify persistence of hand-derived complexes. Distance checks run
 public contracts, private matching oracles and the distance example; context tests
 also compute small supplied and Rips filtrations. Reduction checks run direct
-algorithm and independent-oracle tests, plus filtered-source, field, representative
-and resource integration tests. They use the existing flag example. The lower-star example's
+algorithm, flag-access and independent-oracle tests, plus higher-dimensional,
+filtered-source, field, representative and resource integration tests. They use
+the existing flag example. The lower-star example's
 colocated tests are explicitly run with `cargo test --example complex_construction`;
 ordinary `cargo test` alone does not execute them. No native C++ setup is needed.
 Python invokes the local Rust toolchain; generated files remain in Cargo's target

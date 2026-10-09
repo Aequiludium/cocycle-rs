@@ -1,12 +1,15 @@
 //! Default selection for exact flag inputs; algorithms do not call this module.
+use super::clearing::{IgnoreTriangles, TriangleClearing, TrianglePivots};
 use super::{cohomology, h0};
+use crate::Result;
 use crate::algebra::PrimeField;
-use crate::complex::WeightedGraph;
+use crate::complex::{WeightedEdge, WeightedGraph};
 use crate::execution::WorkBudget;
-use crate::filtration::flag::{CliqueAccess, DenseFlag, SparseFlag};
+use crate::filtration::flag::{
+    BitsetFlag, CliqueAccess, DenseFlag, FlagAccess, SimplexEntry, SparseFlag,
+};
 use crate::geometry::DissimilarityMatrixView;
 use crate::persistence::{RawIntervals, simplicial};
-use crate::{Error, Result};
 
 pub(in crate::persistence) fn compute_dense(
     input: DissimilarityMatrixView<'_>,
@@ -17,54 +20,106 @@ pub(in crate::persistence) fn compute_dense(
 ) -> Result<RawIntervals> {
     budget.check()?;
     if dimension == 0 {
-        h0::compute(
+        return h0::compute(
             input.len(),
             (0..input.len()).flat_map(|b| (0..b).map(move |a| (a, b, input.get(a, b).unwrap()))),
             cutoff,
             budget,
-        )
-    } else {
-        let stop = cutoff.min(crate::filtration::rips::cone_radius(input, &mut || {
-            budget.step()
-        })?);
-        if field.characteristic() != 2 {
-            return simplicial::cohomology::compute(
-                &CliqueAccess::Dense(input, stop),
-                dimension,
-                field,
-                budget,
-            );
-        }
-        let access = match DenseFlag::new(input, stop) {
-            Ok(access) => access,
-            Err(Error::SizeOverflow { .. }) if dimension > 1 => {
-                return simplicial::cohomology::compute(
-                    &CliqueAccess::Dense(input, stop),
-                    dimension,
-                    field,
-                    budget,
-                );
-            }
-            Err(error) => return Err(error),
-        };
-        budget.check()?;
-        #[cfg(cocycle_h2_bench)]
-        if dimension == 2 {
-            return cohomology::compute_h2(&access, &CliqueAccess::Dense(input, stop), budget);
-        }
-        if dimension == 1 {
-            cohomology::compute(&access, budget)
-        } else {
-            let (raw, cleared) = cohomology::compute_with_clearing(&access, budget)?;
-            simplicial::cohomology::continue_from_h1(
-                &CliqueAccess::Dense(input, stop),
-                dimension,
-                raw,
-                cleared,
-                budget,
-            )
-        }
+        );
     }
+    let stop = if field.characteristic() == 2 && budget.is_unlimited() {
+        stopping_scale(input, cutoff, &mut WorkBudget::unlimited())?
+    } else {
+        stopping_scale(input, cutoff, budget)?
+    };
+    let access = CliqueAccess::Dense(input, stop);
+    if field.characteristic() != 2
+        || (dimension > 1 && !super::selection::supports_h1_indices(input.len()))
+    {
+        return simplicial::cohomology::compute(&access, dimension, field, budget);
+    }
+    #[cfg(cocycle_h2_bench)]
+    if dimension == 2 {
+        return cohomology::compute_h2(&DenseFlag::new(input, stop)?, &access, budget);
+    }
+    if dimension == 1 {
+        return dense_h1(input, stop, budget, &mut IgnoreTriangles);
+    }
+    let mut clearing = TrianglePivots::default();
+    let intervals = dense_h1(input, stop, budget, &mut clearing)?;
+    finish_higher(
+        &access,
+        input.len(),
+        dimension,
+        field,
+        intervals,
+        clearing,
+        budget,
+    )
+}
+
+fn stopping_scale<const CONTROLLED: bool>(
+    input: DissimilarityMatrixView<'_>,
+    cutoff: f64,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
+    Ok(
+        cutoff.min(crate::filtration::rips::cone_radius(input, &mut || {
+            budget.step()
+        })?),
+    )
+}
+
+fn dense_h1(
+    input: DissimilarityMatrixView<'_>,
+    stop: f64,
+    budget: &mut WorkBudget<'_>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
+    // Real limits/cancellation share the original budget; only unlimited calls
+    // specialize the F2 H1 hot loop to compile-time no-op checkpoints.
+    if budget.is_unlimited() {
+        compute_dense_h1(input, stop, &mut WorkBudget::unlimited(), clearing)
+    } else {
+        compute_dense_h1(input, stop, budget, clearing)
+    }
+}
+
+fn compute_dense_h1<const CONTROLLED: bool>(
+    input: DissimilarityMatrixView<'_>,
+    stop: f64,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
+    let access = DenseFlag::new(input, stop)?;
+    let edges = access.edges(&mut || budget.step())?;
+    budget.check()?;
+    let pairs = crate::geometry::pair_count(input.len()).ok_or(crate::Error::SizeOverflow {
+        operation: "matrix flag edge count",
+    })?;
+    if super::selection::prefer_sparse(input.len(), edges.len(), pairs) {
+        let mut graph_edges = Vec::new();
+        graph_edges
+            .try_reserve_exact(edges.len())
+            .map_err(|_| crate::Error::AllocationFailed {
+                context: "matrix flag graph edges",
+            })?;
+        for edge in &edges {
+            budget.step()?;
+            graph_edges.push(WeightedEdge {
+                vertices: access.edge_vertices(edge.id),
+                value: edge.value,
+            });
+        }
+        budget.check()?;
+        let graph = WeightedGraph::new(input.len(), graph_edges)?;
+        budget.check()?;
+        return reduce_graph_edges(&graph, stop, Some(edges), budget, clearing);
+    }
+    if super::selection::prefer_ordered(input.len(), &edges, pairs) {
+        return super::ordered::compute_with_clearing(input, stop, edges, budget, clearing);
+    }
+    cohomology::compute_prepared_edges(&access, edges, budget, clearing)
 }
 
 pub(in crate::persistence) fn compute_graph(
@@ -76,7 +131,7 @@ pub(in crate::persistence) fn compute_graph(
 ) -> Result<RawIntervals> {
     budget.check()?;
     if dimension == 0 {
-        h0::compute(
+        return h0::compute(
             graph.vertex_count(),
             graph
                 .edges()
@@ -84,169 +139,119 @@ pub(in crate::persistence) fn compute_graph(
                 .map(|e| (e.vertices[0], e.vertices[1], e.value)),
             cutoff,
             budget,
-        )
-    } else {
-        if field.characteristic() != 2 {
-            return simplicial::cohomology::compute(
-                &CliqueAccess::Sparse(graph, cutoff),
-                dimension,
-                field,
-                budget,
-            );
-        }
-        let access = match SparseFlag::new(graph, cutoff) {
-            Ok(access) => access,
-            Err(Error::SizeOverflow { .. }) if dimension > 1 => {
-                return simplicial::cohomology::compute(
-                    &CliqueAccess::Sparse(graph, cutoff),
-                    dimension,
-                    field,
-                    budget,
-                );
-            }
-            Err(error) => return Err(error),
-        };
-        budget.check()?;
-        #[cfg(cocycle_h2_bench)]
-        if dimension == 2 {
-            return cohomology::compute_h2(&access, &CliqueAccess::Sparse(graph, cutoff), budget);
-        }
-        if dimension == 1 {
-            cohomology::compute(&access, budget)
-        } else {
-            let (raw, cleared) = cohomology::compute_with_clearing(&access, budget)?;
-            simplicial::cohomology::continue_from_h1(
-                &CliqueAccess::Sparse(graph, cutoff),
-                dimension,
-                raw,
-                cleared,
-                budget,
-            )
-        }
+        );
     }
+    let access = CliqueAccess::Sparse(graph, cutoff);
+    if field.characteristic() != 2
+        || (dimension > 1 && !super::selection::supports_h1_indices(graph.vertex_count()))
+    {
+        return simplicial::cohomology::compute(&access, dimension, field, budget);
+    }
+    #[cfg(cocycle_h2_bench)]
+    if dimension == 2 {
+        return cohomology::compute_h2(&SparseFlag::new(graph, cutoff)?, &access, budget);
+    }
+    if dimension == 1 {
+        return graph_h1(graph, cutoff, budget, &mut IgnoreTriangles);
+    }
+    let mut clearing = TrianglePivots::default();
+    let intervals = graph_h1(graph, cutoff, budget, &mut clearing)?;
+    finish_higher(
+        &access,
+        graph.vertex_count(),
+        dimension,
+        field,
+        intervals,
+        clearing,
+        budget,
+    )
+}
+
+fn graph_h1(
+    graph: &WeightedGraph,
+    cutoff: f64,
+    budget: &mut WorkBudget<'_>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
+    if budget.is_unlimited() {
+        reduce_graph_edges(graph, cutoff, None, &mut WorkBudget::unlimited(), clearing)
+    } else {
+        reduce_graph_edges(graph, cutoff, None, budget, clearing)
+    }
+}
+/// Matrix adapters and supplied/threshold graphs share the exact cache policy.
+/// The memory gate belongs to BitsetFlag; missing graph edges remain absent.
+/// Prepared edges, when supplied by the matrix adapter, must describe exactly
+/// this access's retained set in forward order. Otherwise prepare them once
+/// through the chosen access, avoiding a second sparse index allocation.
+fn reduce_graph_edges<const CONTROLLED: bool>(
+    graph: &WeightedGraph,
+    cutoff: f64,
+    prepared_edges: Option<Vec<SimplexEntry>>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+    clearing: &mut impl TriangleClearing,
+) -> Result<RawIntervals> {
+    budget.check()?;
+    if let Some(bitset) = BitsetFlag::new_if_useful(graph, cutoff, &mut || budget.step())? {
+        #[cfg(test)]
+        GRAPH_ACCESS_SELECTIONS.with(|trace| trace.borrow_mut().push(true));
+        let edges = match prepared_edges {
+            Some(edges) => edges,
+            None => bitset.edges(&mut || budget.step())?,
+        };
+        return cohomology::compute_prepared_edges(&bitset, edges, budget, clearing);
+    }
+    #[cfg(test)]
+    GRAPH_ACCESS_SELECTIONS.with(|trace| trace.borrow_mut().push(false));
+    let sparse = SparseFlag::new(graph, cutoff)?;
+    let edges = match prepared_edges {
+        Some(edges) => edges,
+        None => sparse.edges(&mut || budget.step())?,
+    };
+    cohomology::compute_prepared_edges(&sparse, edges, budget, clearing)
+}
+
+fn finish_higher(
+    access: &CliqueAccess<'_>,
+    vertices: usize,
+    dimension: usize,
+    field: PrimeField,
+    intervals: RawIntervals,
+    clearing: TrianglePivots,
+    budget: &mut WorkBudget<'_>,
+) -> Result<RawIntervals> {
+    debug_assert_eq!(field.characteristic(), 2);
+    budget.check()?;
+    // Every triangle has a nonzero F2 boundary, so any retained triangle gives
+    // rank(delta_1) > 0. No H1 pivots therefore certify no triangles, hence no
+    // higher cliques. This avoids repeating O(n) preparation on isolated graphs.
+    if clearing.is_empty() {
+        return Ok(intervals);
+    }
+    let deaths = clearing.into_triangles(vertices, budget)?;
+    #[cfg(test)]
+    simplicial::cohomology::workspace_event(
+        "h1_released",
+        1,
+        &[
+            (
+                "intervals",
+                intervals.capacity() * std::mem::size_of::<(usize, f64, Option<f64>)>(),
+            ),
+            (
+                "handoff",
+                deaths.capacity() * std::mem::size_of::<[usize; 3]>(),
+            ),
+        ],
+        &[("deaths", deaths.len())],
+    )?;
+    simplicial::cohomology::continue_from_h1(access, dimension, intervals, deaths, budget)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::diagram::Coverage;
-    use crate::geometry::DissimilarityView;
-    use crate::persistence::assemble_diagram;
-
-    #[test]
-    fn sparse_continuation_and_odd_prime_fallback_keep_their_routes() {
-        let graph = WeightedGraph::new(
-            3,
-            vec![
-                crate::complex::WeightedEdge {
-                    vertices: [0, 1],
-                    value: 1.,
-                },
-                crate::complex::WeightedEdge {
-                    vertices: [0, 2],
-                    value: 1.,
-                },
-                crate::complex::WeightedEdge {
-                    vertices: [1, 2],
-                    value: 1.,
-                },
-            ],
-        )
-        .unwrap();
-        let execution = crate::execution::Execution::default();
-        for characteristic in [2, 3] {
-            simplicial::cohomology::take_counts();
-            let field = PrimeField::new(characteristic).unwrap();
-            let raw = compute_graph(
-                &graph,
-                2,
-                1.,
-                field,
-                &mut WorkBudget::new(&execution).unwrap(),
-            )
-            .unwrap();
-            let counts = simplicial::cohomology::take_counts();
-            if characteristic == 2 {
-                #[cfg(not(cocycle_h2_bench))]
-                {
-                    assert_eq!(counts[0], [0; 3]);
-                    assert_eq!(counts[1], [0; 3]);
-                    assert_eq!(counts[2], [1, 0, 1]);
-                }
-                #[cfg(cocycle_h2_bench)]
-                assert!(counts.is_empty());
-            } else {
-                assert_eq!(counts[0][1], 3);
-                assert_eq!(counts[1], [3, 1, 2]);
-                assert_eq!(counts[2], [1, 0, 1]);
-            }
-            let reference = simplicial::cohomology::compute(
-                &CliqueAccess::Sparse(&graph, 1.),
-                2,
-                field,
-                &mut WorkBudget::new(&execution).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(
-                assemble_diagram(2, Coverage::Complete, raw).unwrap(),
-                assemble_diagram(2, Coverage::Complete, reference).unwrap()
-            );
-            simplicial::cohomology::take_counts();
-        }
-    }
-
-    #[test]
-    fn continuation_clears_virtual_deaths_without_generic_h0_h1_work() {
-        // K3's only triangle dies in H1 at zero lifetime; H2 must be empty.
-        let input = DissimilarityView::new(&[1.; 3], 3).unwrap();
-        let execution = crate::execution::Execution::default();
-        let field = PrimeField::new(2).unwrap();
-        simplicial::cohomology::take_counts();
-        let raw = compute_dense(
-            input.into(),
-            2,
-            1.,
-            field,
-            &mut WorkBudget::new(&execution).unwrap(),
-        )
-        .unwrap();
-        let counts = simplicial::cohomology::take_counts();
-        #[cfg(not(cocycle_h2_bench))]
-        {
-            assert_eq!(counts[0], [0; 3]);
-            assert_eq!(counts[1], [0; 3]);
-            assert_eq!(counts[2], [1, 0, 1]);
-        }
-        #[cfg(cocycle_h2_bench)]
-        assert!(counts.is_empty());
-        let diagram = assemble_diagram(2, Coverage::Complete, raw.clone()).unwrap();
-        assert!(diagram.dimension(2).unwrap().is_empty());
-
-        let reference = simplicial::cohomology::compute(
-            &CliqueAccess::Dense(input.into(), 1.),
-            2,
-            field,
-            &mut WorkBudget::new(&execution).unwrap(),
-        )
-        .unwrap();
-        let counts = simplicial::cohomology::take_counts();
-        assert_eq!(counts[0][1], 3);
-        assert_eq!(counts[1], [3, 1, 2]);
-        assert_eq!(
-            assemble_diagram(2, Coverage::Complete, reference).unwrap(),
-            diagram
-        );
-
-        // The documented empty-clearing proposal would create a false H2 birth.
-        let wrong = simplicial::cohomology::continue_from_h1(
-            &CliqueAccess::Dense(input.into(), 1.),
-            2,
-            raw,
-            Vec::new(),
-            &mut WorkBudget::new(&execution).unwrap(),
-        )
-        .unwrap();
-        assert!(wrong.contains(&(2, 1., None)));
-        simplicial::cohomology::take_counts();
-    }
+std::thread_local! {
+    static GRAPH_ACCESS_SELECTIONS: std::cell::RefCell<Vec<bool>> = const { std::cell::RefCell::new(Vec::new()) };
 }
+
+#[cfg(test)]
+mod tests;

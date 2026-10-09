@@ -3,13 +3,14 @@ use super::SimplexEntry;
 use crate::Result;
 
 /// Exact flag access: edges in forward order, cofacets in decreasing ID order,
-/// latest facet in the same total order. All values are finite/canonical and all
+/// latest facet in the same total order. All values are finite/nonnegative/canonical and all
 /// triangle faces exist. Callers never assume a cone for arbitrary sparse input.
 pub(crate) trait FlagAccess {
     fn vertex_count(&self) -> usize;
     fn edges(&self, checkpoint: &mut impl FnMut() -> Result<()>) -> Result<Vec<SimplexEntry>>;
     fn edge_vertices(&self, id: usize) -> [usize; 2];
     /// Decode while the source index is live; returned vertices are owned IDs.
+    #[cfg(any(test, cocycle_h2_bench))]
     fn triangle_vertices(&self, id: usize) -> [usize; 3];
     fn latest_facet(&self, triangle: SimplexEntry) -> SimplexEntry;
     /// Check every candidate (including rejected ones). Visitor false stops early.
