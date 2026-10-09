@@ -16,6 +16,8 @@ proposed APIs and remaining acceptance gates.
 
 ## Use the library
 
+- [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
+  conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
   storage, the filtered-cell contract, signed scales and generic boundary reduction.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret
@@ -68,6 +70,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Rips acceptance audit](design/rips-acceptance.md) | R1-R10 evidence, resource boundaries and local/hosted validation distinction |
 | [Rips implementation scope](design/rips-implementation.md) | Stage-specific new directories, source moves, code/tooling changes and review units |
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
+| [Interface compatibility report](design/interface-compatibility.md) | Confirmed existing-interface reuse, runnable framework entries, conversion/control boundaries and dated compatibility acceptance |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
