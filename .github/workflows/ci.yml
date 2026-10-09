@@ -213,6 +213,9 @@ jobs:
             target/rips-pipeline-smoke/fixtures/
             target/rips-pipeline-smoke/build/build.log
             target/critical-set-smoke/
+            target/optimization-sources/oineus/license.txt
+            target/optimization-sources/oineus/legal.txt
+            target/optimization-sources/oineus/extern/taskflow/LICENSE
 
   distances:
     name: Native diagram-distance references

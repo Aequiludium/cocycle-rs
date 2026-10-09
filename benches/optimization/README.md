@@ -133,3 +133,7 @@ median/min/max. Mismatched outputs remain in the sample record; failures and
 timeouts invalidate that comparison cell. Raw data stays under ignored
 `target/`. See the [reporting rules](../reporting.md) for evidence retention and
 the [report index](../reports/README.md) for maintained summaries.
+
+Native CI artifacts retain the compiled Oineus worker together with the pinned
+upstream `license.txt`, `legal.txt`, and `extern/taskflow/LICENSE` notices under
+`optimization-sources/oineus/`.
