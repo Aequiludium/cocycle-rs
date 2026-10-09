@@ -7,6 +7,86 @@ pub(crate) enum CliqueAccess<'a> {
     Dense(DissimilarityMatrixView<'a>, f64),
     Sparse(&'a WeightedGraph, f64),
 }
+
+#[cfg(any(test, cocycle_h2_bench))]
+impl CliqueAccess<'_> {
+    /// Full triangle coboundary: dense candidates or a three-way reverse
+    /// adjacency intersection. Check and count rejected candidates as well.
+    pub(crate) fn visit_tetrahedra(
+        &self,
+        triangle: super::TupleEntry<3>,
+        checkpoint: &mut impl FnMut() -> Result<()>,
+        mut visitor: impl FnMut(super::TupleEntry<4>) -> Result<()>,
+    ) -> Result<()> {
+        let [a, b, c] = triangle.vertices;
+        let mut emit = |v: usize, value: f64| {
+            let mut vertices = [a, b, c, v];
+            vertices.sort_unstable();
+            #[cfg(test)]
+            count(2, 2);
+            visitor(super::TupleEntry { vertices, value })
+        };
+        match self {
+            Self::Dense(matrix, cutoff) => {
+                for v in (0..matrix.len()).rev() {
+                    checkpoint()?;
+                    #[cfg(test)]
+                    count(2, 0);
+                    if triangle.vertices.contains(&v) {
+                        continue;
+                    }
+                    let mut value = triangle.value;
+                    for u in triangle.vertices {
+                        checkpoint()?;
+                        #[cfg(test)]
+                        count(2, 1);
+                        value = value.max(matrix.get(u, v).unwrap());
+                        if value > *cutoff {
+                            break;
+                        }
+                    }
+                    if value <= *cutoff {
+                        emit(v, value)?;
+                    }
+                }
+            }
+            Self::Sparse(graph, cutoff) => {
+                // All three vertices belong to a validated triangle. These
+                // lists are sorted and omit self-neighbors, so a three-way
+                // match cannot be a vertex of the triangle itself.
+                let lists = [a, b, c].map(|v| graph.neighbors(v).unwrap());
+                let mut positions = lists.map(<[_]>::len);
+                while positions.iter().all(|&p| p > 0) {
+                    checkpoint()?;
+                    #[cfg(test)]
+                    count(2, 0);
+                    let entries = std::array::from_fn::<_, 3, _>(|i| lists[i][positions[i] - 1]);
+                    let minimum = entries.iter().map(|e| e.vertex).min().unwrap();
+                    let mut common = true;
+                    for i in 0..3 {
+                        checkpoint()?;
+                        #[cfg(test)]
+                        count(2, 1);
+                        if entries[i].vertex > minimum {
+                            positions[i] -= 1;
+                            common = false;
+                        }
+                    }
+                    if common {
+                        for p in &mut positions {
+                            *p -= 1;
+                        }
+                        let value = entries.iter().fold(triangle.value, |v, e| v.max(e.value));
+                        if value <= *cutoff {
+                            emit(minimum, value)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
 impl ZeroBornSimplicialAccess for CliqueAccess<'_> {
     fn vertex_count(&self) -> usize {
         match self {

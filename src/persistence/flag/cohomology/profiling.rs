@@ -5,6 +5,73 @@ use crate::diagram::{Coverage, IntervalEnd};
 use crate::persistence::rips::resolve_rips_range;
 use crate::persistence::{RipsOptions, assemble_diagram, reference};
 
+/// Dedicated counters and ownership landmarks. Ordinary latency uses the
+/// pipeline worker with --cfg cocycle_h2_bench, without test instrumentation.
+#[test]
+#[ignore = "explicit H2 prototype counters; one fixture per fresh process"]
+fn profile_h2_prototype() {
+    use crate::complex::{WeightedEdge, WeightedGraph};
+    use crate::filtration::flag::{CliqueAccess, SparseFlag};
+    use crate::geometry::{DissimilarityMatrixView, MatrixLayout};
+    let text = std::fs::read_to_string(std::env::var("COCYCLE_H2_FIXTURE").unwrap()).unwrap();
+    let mut words = text.split_whitespace();
+    let mode = words.next().unwrap();
+    let n = words.next().unwrap().parse().unwrap();
+    assert_eq!(words.next().unwrap(), "2");
+    let cutoff = words.next().unwrap();
+    let cutoff = if cutoff == "none" {
+        f64::INFINITY
+    } else {
+        cutoff.parse().unwrap()
+    };
+    let count: usize = words.next().unwrap().parse().unwrap();
+    assert_eq!(words.next().unwrap(), "2");
+    let execution = crate::execution::Execution::default();
+    let mut budget = WorkBudget::new(&execution).unwrap();
+    let mut stats = H2Stats::default();
+    crate::filtration::flag::cofacet_counts(true);
+    let raw = if mode == "dense" {
+        let values: Vec<f64> = words.map(|v| v.parse().unwrap()).collect();
+        assert_eq!(values.len(), count);
+        let matrix = DissimilarityMatrixView::new(&values, n, MatrixLayout::LowerTriangle).unwrap();
+        let stop = cutoff.min(cone_radius(matrix, &mut || budget.step()).unwrap());
+        run_h2(
+            &DenseFlag::new(matrix, stop).unwrap(),
+            &CliqueAccess::Dense(matrix, stop),
+            &mut budget,
+            &mut stats,
+        )
+        .unwrap()
+    } else {
+        assert_eq!(mode, "flag");
+        let edges = (0..count)
+            .map(|_| WeightedEdge {
+                vertices: [
+                    words.next().unwrap().parse().unwrap(),
+                    words.next().unwrap().parse().unwrap(),
+                ],
+                value: words.next().unwrap().parse().unwrap(),
+            })
+            .collect();
+        let graph = WeightedGraph::new(n, edges).unwrap();
+        run_h2(
+            &SparseFlag::new(&graph, cutoff).unwrap(),
+            &CliqueAccess::Sparse(&graph, cutoff),
+            &mut budget,
+            &mut stats,
+        )
+        .unwrap()
+    };
+    println!("h2-prototype {stats:?}");
+    println!(
+        "cofacet_counts[candidates,edge_queries_or_intersection_comparisons,emitted]={:?}",
+        crate::filtration::flag::cofacet_counts(false)
+    );
+    // Raw intervals permit independent comparison with the frozen pipeline
+    // result; do not accept diagnostics merely because the process exited zero.
+    println!("raw_intervals={raw:?}");
+}
+
 /// One fresh test process per stage/fixture; tools/profile_rips.py orchestrates.
 #[test]
 #[ignore = "explicit development profiling, no timing assertions"]
