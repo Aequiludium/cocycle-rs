@@ -1,6 +1,7 @@
 //! Explicit topology contracts and dimension-generic F2 persistence.
 use cocycle::{
     Error,
+    algebra::PrimeField,
     complex::{WeightedEdge, WeightedGraph},
     diagram::{Coverage, IntervalEnd, PersistenceDiagram},
     filtration::{FlagFiltration, threshold_rips_from_distances},
@@ -106,6 +107,71 @@ fn high_dimensional_spheres_die_when_opposite_edges_enter() {
                         .end(),
                     IntervalEnd::Essential
                 );
+            }
+        }
+    }
+}
+#[test]
+fn repeated_h3_spheres_preserve_multisets_and_prime_field_fallbacks() {
+    // Two disjoint boundaries of 4-cross-polytopes and one isolated vertex.
+    // Each sphere enters at 1 and is filled when its opposite edges enter at 2.
+    // Their integral homology is torsion-free, so the expected bars hold over
+    // every tested prime. This also checks multiplicity and H0-H3 together.
+    let input = FlagFiltration::new(
+        WeightedGraph::new(
+            17,
+            (0..16)
+                .flat_map(|b| {
+                    (0..b).filter_map(move |a| {
+                        (a / 8 == b / 8).then_some(WeightedEdge {
+                            vertices: [a, b],
+                            value: if a / 2 == b / 2 { 2. } else { 1. },
+                        })
+                    })
+                })
+                .collect(),
+        )
+        .unwrap(),
+    );
+    for prime in [2, 3, 5, 4294967291] {
+        for cutoff in [None, Some(1.)] {
+            let options = PersistenceOptions::new(3, cutoff)
+                .unwrap()
+                .with_field(PrimeField::new(prime).unwrap());
+            let result = compute_flag(&input, &options, &ExecutionLimits::default()).unwrap();
+            let mut expected = vec![(0, 0., Some(1.)); 14];
+            expected.extend([(0, 0., None); 3]);
+            expected.extend([(3, 1., cutoff.is_none().then_some(2.)); 2]);
+            assert_eq!(
+                bars(result.diagram()),
+                expected,
+                "prime={prime} cutoff={cutoff:?}"
+            );
+            assert_eq!(result.context().characteristic(), prime);
+            assert_eq!(
+                result.diagram().coverage(),
+                if cutoff.is_some() {
+                    Coverage::Through(1.)
+                } else {
+                    Coverage::Complete
+                }
+            );
+            for interval in result
+                .diagram()
+                .intervals()
+                .filter(|i| !matches!(i.end(), IntervalEnd::Finite(_)))
+            {
+                assert_eq!(
+                    interval.end(),
+                    if cutoff.is_some() {
+                        IntervalEnd::RightCensored { through: 1. }
+                    } else {
+                        IntervalEnd::Essential
+                    }
+                );
+            }
+            for dimension in [1, 2] {
+                assert!(result.diagram().dimension(dimension).unwrap().is_empty());
             }
         }
     }

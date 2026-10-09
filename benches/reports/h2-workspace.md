@@ -14,11 +14,21 @@ unstable. Within-H2 heap reuse reduces capacity-growth events and often time,
 but retains capacity and fails four H1 control screens in the first run.
 Both changes remain generated experimental ablations; neither is adopted into
 normal library dispatch. This resolves M1's lifetime prerequisite for T4;
-M2's later generic reuse audit remains dependent on T9 and is not completed here.
+M2's final no-go is recorded below; these measurements remain M1 evidence.
 
 The result establishes ownership on the inspected source and correctness on the
 tested finite domain. It does not establish allocator live-byte totals, a process
 memory bound, universal speedup or admission of T3's private kernel.
+
+## M2 final disposition
+
+The [serial transfer decision](f2-transfer.md#m2-compatibility-and-reset-contract)
+resolves M2 after T9: no optimized generic representation passes admission, so
+cross-dimension reuse is not introduced or claimed as measured. Its actual type,
+nested-ownership and clear-next/reset audit retains the existing serial fallback.
+H1/private-H2 heap element types differ; compatible outer generic storage alone
+does not establish resource benefit. The M1 measurements below retain their
+original identities and are not relabeled as M2 reuse measurements.
 
 ## Measured revision and environment
 
@@ -228,7 +238,7 @@ repeat also shifts unchanged control routes. Binary layout and uncontrolled
 frequency/load are not isolated. Preserve this contradictory evidence instead
 of claiming H1 improvement or clearing the failed first-run screen. Decision:
 **experimental, no default adoption** for both ablations. The verified existing
-H1 lifetime is the M1 no-change result; M2 remains a later task.
+H1 lifetime is the M1 no-change result; the M2 disposition is recorded above.
 
 ## Evidence and reproduction
 
