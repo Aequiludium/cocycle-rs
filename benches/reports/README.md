@@ -11,7 +11,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | Report | Scope |
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
-| [Cocycle, dense reproduction and Oineus: critical-set comparison](critical-sets.md) | Cold/warm critical queries, Partial/full U, existing persistence paths and local-only repeated measurements |
+| [Cocycle, dense reproduction and Oineus: critical-set comparison](critical-sets.md) | Complete U1/Q8/Q64 cold/warm costs, Partial/full U, repository paths, current-main rejected gates and selected integration |
 | [Exact F2 H2 foundation](h2-foundation.md) | Phase-3 baseline, counter schema and H1-to-H2 continuation evidence |
 | [H1-to-H2 lifetime and scratch evidence](h2-workspace.md) | M1 ownership contract, lifetime-only and same-type scratch ablations, retained regressions and experimental decision |
 | [Serial F2 transfer and high-dimensional decision](f2-transfer.md) | Frozen T4-T9 outcomes, M2 typed/reset no-go, fresh H0-H3/fallback validation and T11 no-follow-up |
