@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add borrowed `SimplicialStage` sublevel access and checked same-source
+  inclusions for supplied and certified explicit simplicial filtrations. Stage
+  persistence retains original context, coverage and skeleton sufficiency.
 - Retain specialized F2 H0/H1 for exact diagram-only Rips and supplied flag
   requests computing H2+, with complete ordinary/emergent/virtual death-triangle
   clearing passed to the generic continuation. Preserve full generic fallback

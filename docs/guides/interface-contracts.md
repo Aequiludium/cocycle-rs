@@ -10,7 +10,7 @@ the decisions and the remaining spectral/operator boundaries.
 
 ## Read a signed stage for a matrix consumer
 
-Borrow a frozen complex and select cells with value <= scale. Preserve its
+Borrow a frozen complex's `stage(scale)` with cells of value <= scale. Preserve its
 degree-specific basis order, owner-local IDs and increasing-vertex orientation.
 The explicit conversion below returns owned dense matrices only because the
 small external consumer needs them. It is tutorial code, not a new public API.
@@ -24,11 +24,11 @@ let complex = SimplicialComplex::new(vec![
     Simplex::new(vec![10, 30], 1.)?, Simplex::new(vec![20, 30], 1.)?,
     Simplex::new(vec![10, 20, 30], 2.)?,
 ])?;
-let source = &complex;
-let scale = 1.;
+let stage = complex.stage(1.)?;
+let source = &stage;
 let bases: [Vec<SimplexId>; 3] = std::array::from_fn(|degree| {
     source.simplices().iter()
-        .filter(|s| s.dimension() == degree && s.value() <= scale)
+        .filter(|s| s.dimension() == degree)
         .map(|s| source.find(s.vertices()).unwrap()).collect()
 });
 let keys: Vec<_> = bases[1].iter()
@@ -69,6 +69,11 @@ matrix coordinate and uses linear basis lookups; it is a deliberately small
 example, not a recommended large-complex representation. Sparse consumers can
 iterate signed incidence instead. The source is unchanged, and no persistence
 request is needed for this conversion.
+
+Stage selection itself allocates no storage. See the
+[stage guide](filtered-complexes.md#read-stages-and-their-inclusions) for checked
+inclusions and for the distinction between analyzing the original source through
+a stage and choosing its stored topology as a new complete supplied source.
 
 For an ordinary nonaugmented H0 consumer, the previous space is empty and its
 boundary has shape 0-by-n. Export that shape explicitly. Simplex IDs belong to

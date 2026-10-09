@@ -6,7 +6,7 @@ use crate::execution::WorkBudget;
 use crate::filtration::rips::builder::Input;
 use crate::filtration::{
     ApproximateRipsBuilder, FlagFiltration, RipsBuilder, RipsExpansion, SimplicialFiltration,
-    SparseRips, SparseRipsExpansion, ThresholdRips,
+    SimplicialStage, SparseRips, SparseRipsExpansion, ThresholdRips,
 };
 use crate::geometry::{DissimilarityMatrixView, MatrixLayout};
 use crate::{Error, Result};
@@ -75,6 +75,34 @@ impl Sealed for SimplicialComplex {}
 impl PersistenceExt for SimplicialComplex {
     fn persistence(&self) -> PersistenceBuilder<'_, 'static, Self> {
         PersistenceBuilder::new_filtered(self, supplied)
+    }
+}
+impl Sealed for SimplicialStage<'_> {}
+impl PersistenceExt for SimplicialStage<'_> {
+    fn persistence(&self) -> PersistenceBuilder<'_, 'static, Self> {
+        PersistenceBuilder::new_filtered(self, stage)
+    }
+}
+
+fn stage(
+    input: &SimplicialStage<'_>,
+    options: &PersistenceOptions,
+    requests: &[RepresentativeRequest],
+    budget: &mut WorkBudget<'_>,
+) -> Result<PersistenceResult> {
+    let cutoff = options.max_edge().unwrap_or(input.scale());
+    if cutoff > input.scale() {
+        return Err(Error::IncompleteFiltration {
+            requested: cutoff,
+            through: input.scale(),
+        });
+    }
+    let effective =
+        PersistenceOptions::for_filtration(options.max_homology_dimension(), Some(cutoff))?
+            .with_field(options.field());
+    match input.filtration {
+        Some(source) => explicit(source, &effective, requests, budget),
+        None => supplied(input.complex, &effective, requests, budget),
     }
 }
 

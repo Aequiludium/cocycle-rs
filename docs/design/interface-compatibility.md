@@ -8,6 +8,11 @@ decisions in [#60](https://github.com/Aequiludium/cocycle-rs/issues/60) and
 [#61](https://github.com/Aequiludium/cocycle-rs/issues/61). This report closes the
 interface preparation decision, not the later mathematical frameworks or release.
 
+Subsequent filtration work adds a narrow borrowed `SimplicialStage` and checked
+same-source inclusions. The original inventory and evidence below describe the
+interface preparation baseline; the [stage report](../research/filtration-stages.md)
+records this later capability and its separate validation.
+
 ## Result and scope
 
 The first consumers can use existing borrowed geometry, frozen signed incidence,

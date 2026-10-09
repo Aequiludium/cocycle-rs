@@ -27,6 +27,295 @@ fn alpha_triangle() -> SimplicialComplex {
     ])
     .unwrap()
 }
+
+#[test]
+fn stages_borrow_closed_prefixes_with_original_ids_and_incidence() -> Result<()> {
+    // Unsorted supplied input, gapped labels, signed births and tied edges.
+    let complex = SimplicialComplex::new(vec![
+        simplex(&[10, 30, 90], 2.),
+        simplex(&[10, 30], 1.),
+        simplex(&[10, 90], 1.),
+        simplex(&[30, 90], 1.),
+        simplex(&[90], 0.),
+        simplex(&[10], -2.),
+        simplex(&[30], -1.),
+    ])?;
+    let expected: &[(f64, &[&[usize]])] = &[
+        (-1., &[&[10], &[30]]),
+        (0., &[&[10], &[30], &[90]]),
+        (1., &[&[10], &[30], &[90], &[30, 90], &[10, 90], &[10, 30]]),
+        (
+            2.,
+            &[
+                &[10],
+                &[30],
+                &[90],
+                &[30, 90],
+                &[10, 90],
+                &[10, 30],
+                &[10, 30, 90],
+            ],
+        ),
+    ];
+    let triangle = complex.find(&[10, 30, 90]).unwrap();
+    for &(scale, keys) in expected {
+        let stage = complex.stage(scale)?;
+        assert_eq!(stage.scale(), scale);
+        assert_eq!(stage.len(), keys.len());
+        assert!(std::ptr::eq(stage.source_complex(), &complex));
+        assert!(stage.source_filtration().is_none());
+        assert_eq!(
+            stage
+                .simplices()
+                .iter()
+                .map(Simplex::vertices)
+                .collect::<Vec<_>>(),
+            keys
+        );
+        for id in stage.cells() {
+            assert_eq!(
+                stage.find(complex.simplex(id).unwrap().vertices()),
+                Some(id)
+            );
+            assert!(std::ptr::eq(
+                stage.simplex(id).unwrap(),
+                complex.simplex(id).unwrap()
+            ));
+            assert!(std::ptr::eq(
+                stage.boundary(id).unwrap(),
+                complex.boundary(id).unwrap()
+            ));
+            for term in stage.boundary(id).unwrap() {
+                assert!(term.face.index() < id.index());
+                assert!(stage.simplex(term.face).is_some());
+                assert_eq!(
+                    FilteredComplex::dimension(&stage, term.face) + 1,
+                    FilteredComplex::dimension(&stage, id)
+                );
+            }
+        }
+        assert_eq!(stage.simplex(triangle).is_some(), scale == 2.);
+        assert_eq!(stage.boundary(triangle).is_some(), scale == 2.);
+    }
+    assert!(complex.stage(-3.)?.is_empty());
+    assert_eq!(complex.stage(f64::MAX)?.len(), 7);
+    assert_eq!(complex.stage(-0.)?.scale().to_bits(), 0.0_f64.to_bits());
+    Ok(())
+}
+
+#[test]
+fn stage_inclusions_preserve_integer_boundaries_and_compose() -> Result<()> {
+    let complex = alpha_triangle();
+    let early = complex.stage(0.)?;
+    let ring = complex.stage(0.25)?;
+    let filled = complex.stage(1. / 3.)?;
+    assert_eq!(early.len(), 3);
+    assert_eq!(ring.len(), 6);
+    assert_eq!(filled.len(), 7);
+    for source in [early, ring, filled] {
+        for (id, image) in source.inclusion_into(&filled)? {
+            assert_eq!(id, image);
+            assert_eq!(source.boundary(id), filled.boundary(image));
+            // Identity transport commutes with boundary over the integers.
+            for term in source.boundary(id).unwrap() {
+                let face_image = source
+                    .inclusion_into(&filled)?
+                    .nth(term.face.index())
+                    .unwrap()
+                    .1;
+                assert_eq!(face_image, term.face);
+            }
+        }
+    }
+    let composed: Vec<_> = early
+        .inclusion_into(&ring)?
+        .map(|(id, middle)| {
+            (
+                id,
+                ring.inclusion_into(&filled)
+                    .unwrap()
+                    .nth(middle.index())
+                    .unwrap()
+                    .1,
+            )
+        })
+        .collect();
+    assert_eq!(composed, early.inclusion_into(&filled)?.collect::<Vec<_>>());
+    assert_eq!(ring.inclusion_into(&ring)?.len(), 6);
+    Ok(())
+}
+
+#[test]
+fn incompatible_stage_owners_and_reverse_scales_are_rejected() -> Result<()> {
+    let complex = alpha_triangle();
+    let clone = complex.clone();
+    let ring = complex.stage(0.25)?;
+    // Equal contents and equal numeric IDs still belong to different owners.
+    assert!(matches!(
+        ring.inclusion_into(&clone.stage(0.25)?),
+        Err(Error::InvalidParameter { .. })
+    ));
+    assert!(matches!(
+        complex.stage(0.3)?.inclusion_into(&ring),
+        Err(Error::InvalidParameter { .. })
+    ));
+    // Reject reversed scales even across an event-free gap, with equal cell counts.
+    assert!(matches!(
+        complex.stage(0.2)?.inclusion_into(&complex.stage(0.1)?),
+        Err(Error::InvalidParameter { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn stage_persistence_retains_later_events_and_signed_analysis_caps() -> Result<()> {
+    let complex = alpha_triangle();
+    let ring = complex.stage(0.25)?;
+    let result = ring.persistence().compute()?;
+    assert_eq!(result.diagram().coverage(), Coverage::Through(0.25));
+    assert_eq!(
+        result.diagram().dimension(1)?.iter().next().unwrap().end(),
+        IntervalEnd::RightCensored { through: 0.25 }
+    );
+    assert_eq!(result.context().requested_cutoff(), Some(0.25));
+    assert_eq!(
+        result.context().filtration().source(),
+        &FiltrationSource::SuppliedSimplicial
+    );
+    assert_eq!(
+        complex
+            .stage(1. / 3.)?
+            .persistence()
+            .compute()?
+            .diagram()
+            .coverage(),
+        Coverage::Complete
+    );
+    assert!(
+        complex
+            .stage(-1.)?
+            .persistence()
+            .compute()?
+            .diagram()
+            .is_empty()
+    );
+    assert_eq!(
+        ring.persistence()
+            .max_filtration_value(0.1)
+            .compute()?
+            .diagram()
+            .coverage(),
+        Coverage::Through(0.1)
+    );
+    assert!(matches!(
+        ring.persistence().max_filtration_value(0.3).compute(),
+        Err(Error::IncompleteFiltration { .. })
+    ));
+    // Explicitly choosing the prefix itself as topology changes essentiality.
+    let supplied = PersistenceBuilder::from_complex(&ring).compute()?;
+    assert_eq!(
+        supplied
+            .diagram()
+            .dimension(1)?
+            .iter()
+            .next()
+            .unwrap()
+            .end(),
+        IntervalEnd::Essential
+    );
+    let requests = [RepresentativeRequest::new(
+        1,
+        0.25,
+        RepresentativeSelection::Both,
+    )?];
+    let represented = ring
+        .persistence()
+        .field(PrimeField::new(3)?)
+        .representatives(&requests)
+        .compute()?;
+    assert_eq!(represented.diagram(), result.diagram());
+    assert_eq!(represented.representatives().unwrap().len(), 2);
+    assert!(matches!(
+        ring.persistence()
+            .compute_with(&Execution::default().max_work(0)),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn certified_stages_keep_scale_and_dimension_limits() -> Result<()> {
+    let coordinates = [0., 1., 2.];
+    let points = PointCloudView::new(&coordinates, 3, 1)?;
+    let source = RipsBuilder::from_points(points)
+        .max_edge_length(1.)
+        .build_complex(1)?;
+    let stage = source.stage(1.)?;
+    assert!(std::ptr::eq(stage.source_filtration().unwrap(), &source));
+    assert_eq!(
+        stage.source_filtration().unwrap().coverage(),
+        Coverage::Through(1.)
+    );
+    assert_eq!(
+        stage.source_filtration().unwrap().max_simplex_dimension(),
+        1
+    );
+    assert!(matches!(
+        source.stage(1.5),
+        Err(Error::IncompleteFiltration { .. })
+    ));
+    let result = stage.persistence().max_homology_dimension(0).compute()?;
+    assert_eq!(result.diagram().coverage(), Coverage::Through(1.));
+    assert_eq!(result.context().filtration(), source.context());
+    assert!(source.stage(-1.)?.is_empty());
+    assert!(matches!(
+        stage.inclusion_into(&source.complex().stage(1.)?),
+        Err(Error::InvalidParameter { .. })
+    ));
+
+    let insufficient = RipsBuilder::from_points(points).build_complex(1)?;
+    assert!(!insufficient.is_dimension_complete());
+    assert!(matches!(
+        insufficient.stage(2.)?.persistence().compute(),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
+    let complete = RipsBuilder::from_points(points).build_complex(2)?;
+    assert!(complete.is_dimension_complete());
+    assert!(
+        complete
+            .stage(2.)?
+            .persistence()
+            .compute()?
+            .diagram()
+            .dimension(1)?
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
+fn empty_stages_and_nonfinite_scales_have_explicit_behavior() -> Result<()> {
+    let complex = SimplicialComplex::new(vec![])?;
+    let a = complex.stage(-f64::MAX)?;
+    let b = complex.stage(f64::MAX)?;
+    assert!(a.is_empty());
+    assert!(a.cells().next().is_none());
+    assert_eq!(a.inclusion_into(&b)?.len(), 0);
+    assert_eq!(
+        a.persistence().compute()?.diagram().coverage(),
+        Coverage::Complete
+    );
+    for scale in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(matches!(
+            complex.stage(scale),
+            Err(Error::NonFiniteValue {
+                field: "stage scale",
+                ..
+            })
+        ));
+    }
+    Ok(())
+}
 #[test]
 fn delayed_triangle_uses_all_simplex_values_and_preserves_certified_ranges() -> Result<()> {
     let complex = alpha_triangle();

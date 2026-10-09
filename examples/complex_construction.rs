@@ -59,6 +59,25 @@ fn main() -> Result<()> {
     for simplex in complex.simplices() {
         println!("{:?} enters at {}", simplex.vertices(), simplex.value());
     }
+    // Four independently inspectable lower-star stages; no persistence is needed
+    // to construct them or read their identity inclusions.
+    let mut previous: Option<cocycle::filtration::SimplicialStage<'_>> = None;
+    for scale in [-2., -1., 0., 1.] {
+        let stage = complex.stage(scale)?;
+        let cells: Vec<_> = stage
+            .simplices()
+            .iter()
+            .map(|simplex| (simplex.vertices(), simplex.value()))
+            .collect();
+        println!("Stage {scale}: {cells:?}");
+        if let Some(earlier) = previous {
+            println!(
+                "Inclusion: {:?}",
+                earlier.inclusion_into(&stage)?.collect::<Vec<_>>()
+            );
+        }
+        previous = Some(stage);
+    }
     let edge = complex.find(&[0, 3]).expect("the supplied edge exists");
     for term in complex.boundary(edge).expect("valid simplex ID") {
         let face = complex.simplex(term.face).expect("a boundary face exists");
@@ -91,6 +110,9 @@ mod tests {
         )?;
         assert_eq!(complex.len(), 8);
         assert_eq!(complex.vertex_count(), 4);
+        for (scale, count) in [(-2., 1), (-1., 2), (0., 5), (1., 8)] {
+            assert_eq!(complex.stage(scale)?.len(), count);
+        }
         // Check the construction independently of any persistence diagram.
         let expected: &[(&[usize], f64)] = &[
             (&[0], -2.0),

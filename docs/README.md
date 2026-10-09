@@ -19,7 +19,7 @@ proposed APIs and remaining acceptance gates.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
-  storage, the filtered-cell contract, signed scales and generic boundary reduction.
+  storage, borrowed stages and inclusions, signed scales and boundary reduction.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret
   coverage and endpoints, and derive measurements.
 - [Rips construction guide](guides/rips-construction.md): matrix layouts, custom
@@ -72,6 +72,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
 | [Interface compatibility report](design/interface-compatibility.md) | Confirmed existing-interface reuse, runnable framework entries, conversion/control boundaries and dated compatibility acceptance |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
+| [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
