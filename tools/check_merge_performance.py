@@ -10,7 +10,6 @@ import json
 import math
 import os
 from pathlib import Path
-import random
 import resource
 import statistics
 import subprocess
@@ -37,6 +36,8 @@ def main():
     args = parser.parse_args()
     if args.samples < 12 or args.samples % 4 or args.cpu not in os.sched_getaffinity(0):
         parser.error('use >=12 samples in multiples of four and an allowed CPU')
+    if any(os.environ.get(k) for k in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS')):
+        parser.error('unset Rust flag overrides before measuring')
     if replay.git('status', '--porcelain').strip():
         parser.error('commit the harness before measuring')
     out = args.output.resolve()
@@ -51,7 +52,8 @@ def main():
             'inherited_affinity': sorted(os.sched_getaffinity(0)), 'seed': 20261009,
             'frequency_and_host_load': 'uncontrolled', 'status': 'building',
             'rustc': subprocess.check_output(['rustc', '-Vv'], text=True),
-            'start_utc': datetime.now(timezone.utc).isoformat(), 'commands': []}
+            'start_utc': datetime.now(timezone.utc).isoformat(), 'commands': [],
+            'source_inventories': {}}
     save(out / 'environment.json', meta)
     commands = {}
 
@@ -65,6 +67,7 @@ def main():
             source = out / (name + '-source')
             replay.extract_snapshot(replay.git('archive', revision, 'src', 'Cargo.toml',
                                                'Cargo.lock', 'benches'), source)
+            meta['source_inventories'][name] = replay.inventory(source)
             target = out / (name + '-build')
             run(['cargo', 'build', '--release', '--locked', '--offline', '--lib',
                  '--manifest-path', str(source / 'Cargo.toml'), '--target-dir', str(target)])
@@ -102,8 +105,16 @@ def main():
                                 resource.setrlimit(resource.RLIMIT_AS, (2048 * 1024**2,) * 2)
                                 os.sched_setaffinity(0, {args.cpu})
 
-                            result = subprocess.run(command, capture_output=True, text=True,
-                                                    timeout=30, preexec_fn=limits)
+                            try:
+                                result = subprocess.run(command, capture_output=True, text=True,
+                                                        timeout=30, preexec_fn=limits)
+                            except subprocess.TimeoutExpired as error:
+                                record['status'] = 'failed'
+                                record['samples'][name].append({**entry, 'status': 'timeout',
+                                    'stdout': (error.stdout or b'').decode(errors='replace'),
+                                    'stderr': (error.stderr or b'').decode(errors='replace')})
+                                save(out / 'results.json', [*records, record])
+                                raise
                             sample = {**entry, 'exit_code': result.returncode,
                                       'stdout': result.stdout, 'stderr': result.stderr}
                             record['samples'][name].append(sample)
