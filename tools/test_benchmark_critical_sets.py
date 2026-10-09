@@ -2,12 +2,20 @@
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
+from unittest.mock import patch
 
 from benchmark_critical_sets import canonical, dense_source, diagram, fixture_text, fixtures, pair_oracle, validate, workloads
 
 
 class CriticalSetBenchmarkTests(unittest.TestCase):
+    def test_fresh_clone_uses_the_pinned_benchmark_only_excerpt(self):
+        with patch('benchmark_critical_sets.git', side_effect=subprocess.CalledProcessError(128, 'git')):
+            data = dense_source()
+        self.assertIn(b'fn reduce(d: &Matrix, rows: usize)', data)
+        self.assertIn(b'fn critical(', data)
+
     def test_dense_source_rejects_a_changed_baseline(self):
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'big_steps.rs'

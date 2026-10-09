@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = 'critical-sets-native-v1'
 DENSE_SHA = '167026e7ee8dbaafe8abaf5e325149af6e93f660'
 DENSE_BLOB = '53bd137d16e122c2ad00a9859188ff317a362472'
+DENSE_CORE_SHA256 = '5978aa5a225d4840b76175643af0c824b80aeead7a3686e0c3254aedca55225d'
 OINEUS_SHA = 'e52814a1ffb5b8a81e71ff1e93b4c14194673f0f'
 
 
@@ -31,15 +32,21 @@ def git(*args, binary=False):
         if len(location)>2 and location[1]==':':
             location='/mnt/'+location[0].lower()+location[2:]
             command=['git',f'--git-dir={location}',f'--work-tree={ROOT}']
-    output = subprocess.check_output([*command,*args], text=not binary)
+    output = subprocess.check_output([*command,*args], text=not binary, stderr=subprocess.PIPE)
     return output if binary else output.strip()
 
 
 def dense_source(path=None):
-    data = Path(path).read_bytes() if path else git('show',f'{DENSE_SHA}:benches/optimization/big_steps.rs',binary=True)
+    if path:
+        data = Path(path).read_bytes()
+    else:
+        try:
+            data = git('show',f'{DENSE_SHA}:benches/optimization/big_steps.rs',binary=True)
+        except subprocess.CalledProcessError:
+            data = (ROOT/'benches/optimization/dense_core.rs').read_bytes()
     blob = hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()
-    if blob != DENSE_BLOB:
-        raise ValueError('dense baseline does not match the pinned Git blob')
+    if blob != DENSE_BLOB and hashlib.sha256(data).hexdigest() != DENSE_CORE_SHA256:
+        raise ValueError('dense baseline does not match the pinned Git blob or bundled excerpt')
     return data
 
 
@@ -236,8 +243,11 @@ def limits(cpu):
     resource.setrlimit(resource.RLIMIT_AS,(2*1024**3,2*1024**3))
 
 
-def invoke(native, mode, path, cpu, timeout):
+def invoke(native, mode, path, cpu, timeout, baseline_worker=None):
     executable = native/('oineus' if mode.startswith('oineus') else 'cocycle')
+    if mode == 'concrete_baseline':
+        executable = baseline_worker
+        mode = 'diagram'
     result = subprocess.run([str(executable),mode,str(path)],capture_output=True,text=True,
                             timeout=timeout,preexec_fn=lambda:limits(cpu))
     if result.returncode:
@@ -286,7 +296,8 @@ def main(argv=None):
     parser.add_argument('--rustc',type=Path,required=True)
     parser.add_argument('--oineus-source',type=Path,required=True)
     parser.add_argument('--boost-include',type=Path,required=True)
-    parser.add_argument('--dense-source',type=Path,help='unchanged pinned big_steps.rs; defaults to the local research Git object')
+    parser.add_argument('--dense-source',type=Path,help='pinned big_steps.rs or bundled dense_core.rs; defaults to Git with bundled fallback')
+    parser.add_argument('--baseline-build',type=Path,help='prior committed build directory; add its concrete diagram worker to context comparisons')
     parser.add_argument('--samples',type=int,default=12)
     parser.add_argument('--cpu',type=int,default=0)
     parser.add_argument('--timeout',type=float,default=60.)
@@ -297,16 +308,27 @@ def main(argv=None):
         parser.error('native timing requires Linux/WSL for all workers')
     if args.samples < 1:
         parser.error('--samples must be positive')
+    baseline_worker = None
+    baseline_metadata = None
+    if args.baseline_build:
+        baseline_metadata = json.loads((args.baseline_build/'metadata.json').read_text())
+        baseline_worker = (args.baseline_build/'workers/cocycle').resolve()
+        if baseline_metadata['protocol'] != PROTOCOL or digest(baseline_worker) != baseline_metadata['workers']['cocycle']:
+            parser.error('baseline worker must match its recorded protocol and binary hash')
+        if baseline_metadata['status']:
+            parser.error('baseline build must record a clean committed source')
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=False)
     native=build(args,output)
-    metadata={'protocol':PROTOCOL,'candidate_commit':git('rev-parse','HEAD'),'production_commit':'a380cba76d417c62be46d50495e4d7cce5fef2b3','dense_commit':DENSE_SHA,'oineus_commit':OINEUS_SHA,
+    metadata={'protocol':PROTOCOL,'candidate_commit':git('rev-parse','HEAD'),'production_commit':git('rev-parse','HEAD'),'dense_commit':DENSE_SHA,'oineus_commit':OINEUS_SHA,
               'status':git('status','--porcelain'),'start_utc':datetime.now(timezone.utc).isoformat(),'samples':args.samples,'warmups':1,'cpu':args.cpu,'inherited_affinity':sorted(os.sched_getaffinity(0)),
               'timeout_seconds':args.timeout,'address_space_bytes':2*1024**3,'frequency_control':'none','host_load_control':'none',
               'compiler':subprocess.check_output([str(args.rustc),'--version','--verbose'],text=True),'cpp_compiler':subprocess.check_output(['g++','--version'],text=True),
               'uname':subprocess.check_output(['uname','-a'],text=True),'cpu_info':subprocess.check_output(['lscpu'],text=True),
-              'sources':{str(p.relative_to(ROOT)):digest(p) for p in [ROOT/'tools/benchmark_critical_sets.py',ROOT/'benches/optimization/cocycle.rs',ROOT/'benches/optimization/oineus.cpp',ROOT/'src/optimization/mod.rs']},
+              'sources':{str(p.relative_to(ROOT)):digest(p) for p in [ROOT/'tools/benchmark_critical_sets.py',ROOT/'benches/optimization/cocycle.rs',ROOT/'benches/optimization/dense_core.rs',ROOT/'benches/optimization/oineus.cpp',ROOT/'src/optimization/mod.rs']},
               'workers':{str(p.relative_to(native)):digest(p) for p in native.rglob('*') if p.is_file()},
               'library_sources':{str(p.relative_to(ROOT)):digest(p) for p in (ROOT/'src').rglob('*.rs')}}
+    metadata['dense_source_sha256'] = digest(native/'dense-original.rs')
+    metadata['concrete_baseline'] = baseline_metadata
     dependencies=(native/'oineus.d').read_text().replace('\\\n',' ').split(':',1)[1].split()
     metadata['consumed_native_sources']={p:digest(p) for p in dependencies}
     (output/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
@@ -322,7 +344,7 @@ def main(argv=None):
             path=fixture_dir/f"{case['name']}-{workload}.txt";path.write_text(fixture_text(case,proposals,repeats))
             jobs.append((case,workload,path,['dense','critical','oineus_partial','oineus_full'],expected,pairs,essential))
         path=fixture_dir/f"{case['name']}-diagram.txt";path.write_text(fixture_text(case,[],1))
-        jobs.append((case,'persistence-context',path,['reference','diagram','filtered','representatives']+(['flag'] if case['flag'] else []),expected,None,None))
+        jobs.append((case,'persistence-context',path,['reference','diagram','filtered','representatives']+(['flag'] if case['flag'] else [])+(['concrete_baseline'] if baseline_worker else []),expected,None,None))
     plan={'jobs':[{'fixture':c['name'],'workload':w,'fixture_sha256':digest(p),'backends':b,'cells':len(c['cells']),'q':c['q']} for c,w,p,b,*_ in jobs],
           'sampling':f'one discarded warmup; {args.samples} seeded position-balanced fresh-process rounds; serial execution',
           'critical_time':'frozen input; D preparation + primal reduction, cold targets, workspace cleanup; normalized pairing transport excluded; owned targets retained',
@@ -346,7 +368,7 @@ def main(argv=None):
                 for position,backend in enumerate(rotated):
                     row={'fixture':case['name'],'workload':workload,'backend':backend,'round':round_index,'position':position,'warmup':round_index<0}
                     try:
-                        observed=invoke(native,backend,path,args.cpu,args.timeout)
+                        observed=invoke(native,backend,path,args.cpu,args.timeout,baseline_worker)
                         row['output']=observed
                         validate(observed,expected,baseline_targets,pairs,essential)
                         row.update(status='completed',output=observed)

@@ -35,6 +35,7 @@ jobs:
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+      - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -164,6 +165,22 @@ jobs:
       - run: python tools/compare_rips.py --output target/rips-reference
       - run: python tools/compare_sparse_rips.py --output target/sparse-rips-reference
       - run: python tools/benchmark_rips_pipeline.py --quick --samples 1 --output target/rips-pipeline-smoke
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: anigmetov/oineus
+          ref: e52814a1ffb5b8a81e71ff1e93b4c14194673f0f
+          path: target/optimization-sources/oineus
+          sparse-checkout: |
+            include
+            extern
+      - name: Check critical-set native adapters
+        shell: bash
+        run: |
+          cpu="$(python -c 'import os; print(min(os.sched_getaffinity(0)))')"
+          python tools/benchmark_critical_sets.py --quick --samples 1 \
+            --rustc "$(command -v rustc)" --cpu "$cpu" \
+            --oineus-source target/optimization-sources/oineus \
+            --boost-include /usr/include --output target/critical-set-smoke
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -195,6 +212,7 @@ jobs:
             target/rips-pipeline-smoke/measurements.json
             target/rips-pipeline-smoke/fixtures/
             target/rips-pipeline-smoke/build/build.log
+            target/critical-set-smoke/
 
   distances:
     name: Native diagram-distance references

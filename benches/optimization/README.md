@@ -19,13 +19,15 @@ The [C++ worker](oineus.cpp) uses Oineus 0.9.39 at
 and keep the extracted `include/` and vendored `extern/` tree together.
 This adapter does not benchmark the complete `TopologyOptimizer` or autograd.
 
-The dense baseline is the local research commit
+The dense baseline comes from the local research commit
 `167026e7ee8dbaafe8abaf5e325149af6e93f660`, file
 `benches/optimization/big_steps.rs`, Git blob
 `53bd137d16e122c2ad00a9859188ff317a362472`. It is not guaranteed to exist in a
-fresh public clone. Supply `--dense-source` with that unchanged file when its
-Git object is unavailable; the controller verifies the blob and saves the
-original in `workers/dense-original.rs`. Generated adaptations change the tie
+fresh public clone. The [benchmark-only core](dense_core.rs) bundles its
+reduction/critical-set formulas without the old command-line program or tests.
+The controller uses this hash-verified excerpt when the Git object is missing.
+Supply `--dense-source` with either pinned source to select it explicitly;
+the original input is saved in `workers/dense-original.rs`. Generated adaptations change the tie
 order to production decreasing colex and precompute the endpoint birth mask.
 The reduction and critical-set formulas remain the original dense implementation.
 
@@ -51,6 +53,13 @@ differ by at most one when the round count is not divisible by backend count.
 Each worker is pinned to `--cpu` (default 0), with a 60-second timeout and 2-GiB
 address-space cap. Frequency and host load are uncontrolled. Do not compile or
 test concurrently with timed workers.
+
+For a matched before/after concrete-diagram comparison, supply
+`--baseline-build /path/to/prior/build` with a clean committed build's
+`metadata.json` and `workers/cocycle`. Its protocol and binary hash are checked;
+the baseline metadata is retained with the candidate. The additional
+`concrete_baseline` rows run the old worker's `diagram` mode on the same inputs,
+with the same timing boundaries and independent output checks.
 
 ## Inputs and requested outputs
 
