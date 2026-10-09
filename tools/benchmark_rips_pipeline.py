@@ -123,6 +123,49 @@ def cases(quick):
                'points', coordinates=[x for point in points for x in point])
 
 
+def phase3_cases(quick):
+    """Frozen exact F2 diagram workloads; no approximate graphs or bases."""
+    import struct
+    rng = random.Random(20261004)
+    n = 16 if quick else 32
+    f32 = lambda v: struct.unpack('<f', struct.pack('<f', v))[0]
+    clouds = {
+        'uniform': [tuple(rng.random() for _ in range(3)) for _ in range(n)],
+        'circle': [(math.cos(2 * math.pi * i / n), math.sin(2 * math.pi * i / n), 0.) for i in range(n)],
+        'clusters': [tuple((i % 2) * 2 + rng.random() / 8 for _ in range(3)) for i in range(n)],
+        'duplicates': [(float(i // 4), float((i // 4) % 2), 0.) for i in range(n)],
+    }
+    sphere = []
+    for _ in range(n):
+        v = [rng.gauss(0, 1) for _ in range(3)]
+        norm = math.sqrt(sum(x * x for x in v))
+        sphere.append(tuple(x / norm for x in v))
+    clouds['sphere'] = sphere
+    clouds['noisy_sphere'] = [tuple(x + rng.gauss(0, .03) for x in v) for v in sphere]
+    for family, points in clouds.items():
+        fixture = Fixture(f'p3_{family}{n}', 'dense', n, 2, None, list(map(f32, distances(points))))
+        yield Case(fixture, 'dense')
+        yield Case(replace(fixture, name=fixture.name + '_h1', q=1), 'dense')
+    values = [rng.randrange(3) / 2 for _ in range(n * (n - 1) // 2)]
+    for family, data in [('nonmetric_ties', values), ('equal_clique', [1.] * len(values))]:
+        yield Case(Fixture(f'p3_{family}{n}', 'dense', n, 2, None, data), 'dense')
+    for family in ('low_degree', 'geometric', 'clique_heavy', 'high_fill'):
+        edges = []
+        for b in range(n):
+            for a in range(b):
+                include = {'low_degree': b - a <= 2,
+                           'geometric': math.dist(clouds['uniform'][a], clouds['uniform'][b]) <= .65,
+                           'clique_heavy': a // 8 == b // 8 or b == a + 1,
+                           'high_fill': rng.randrange(4) != 0}[family]
+                if include:
+                    edges.append([a, b, values[b * (b - 1) // 2 + a]])
+        fixture = Fixture(f'p3_{family}{n}', 'flag', n, 2, None, edges)
+        yield Case(fixture, 'flag')
+        yield Case(replace(fixture, name=fixture.name + '_h1', q=1), 'flag')
+    yield Case(Fixture('octahedron', 'dense', 6, 2, None,
+                      [2. if a // 2 == b // 2 else 1. for b in range(6) for a in range(b)]), 'dense')
+
+
 def source_hash():
     paths = [REPO / 'Cargo.toml', REPO / 'Cargo.lock', *sorted((REPO / 'src').rglob('*.rs')),
              *sorted(PIPELINE.glob('*')), REPO / 'tools/reference/rips_common.hpp',
@@ -394,7 +437,8 @@ def run(args):
     (output / 'environment.json').write_text(json.dumps(metadata, indent=2) + '\n')
     records = []
     rows = []
-    for case_index, case in enumerate(cases(args.quick)):
+    selected = phase3_cases(args.quick) if args.phase3 else cases(args.quick)
+    for case_index, case in enumerate(selected):
         path = fixture_dir / f'{case.name}.txt'
         case.fixture.write(path)
         if case.coordinates is not None:
@@ -438,6 +482,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--phase3', action='store_true', help='exact F2 H2 workloads and H1 controls')
     parser.add_argument('--samples', type=int, default=12)
     parser.add_argument('--order-seed', type=int, default=0)
     parser.add_argument('--cpu', type=int, help='pin every worker to this allowed Linux CPU')

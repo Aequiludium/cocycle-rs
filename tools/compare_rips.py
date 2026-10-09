@@ -105,6 +105,14 @@ def fixtures():
                  if rng.randrange(4) != 0]
         cases.append(Fixture(f'higher_dense_{sample}', 'dense', n, q, cutoff, values))
         cases.append(Fixture(f'higher_flag_{sample}', 'flag', n, q, cutoff, edges))
+    # H3 multiplicity, actual 4-simplex deaths, odd-prime fallback and censoring.
+    # Missing cross-component edges remain absent; vertex 16 is isolated.
+    edges = [[a, b, 2. if a // 2 == b // 2 else 1.]
+             for b in range(16) for a in range(b) if a // 8 == b // 8]
+    for p in (2, 3, 5):
+        for cutoff in (None, 1.):
+            cases.append(Fixture(f'repeated_h3_spheres_{cutoff}_p{p}', 'flag', 17, 3,
+                                 cutoff, edges, characteristic=p))
     base = [case for case in cases if case.n <= 9 and case.precision == 'float32-exact']
     for p in (3, 5):
         cases += [replace(case, name=f'{case.name}_p{p}', characteristic=p) for case in base]

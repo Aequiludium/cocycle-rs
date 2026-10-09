@@ -3,6 +3,8 @@ mod access;
 mod cliques;
 mod expansion;
 pub(crate) use cliques::CliqueAccess;
+#[cfg(test)]
+pub(crate) use cliques::cofacet_counts;
 pub(crate) use expansion::{expand, expand_access, expand_access_with};
 mod dense;
 mod index;
@@ -13,6 +15,8 @@ use crate::complex::WeightedGraph;
 pub(crate) use access::FlagAccess;
 pub(crate) use dense::DenseFlag;
 pub(crate) use order::SimplexEntry;
+#[cfg(any(test, cocycle_h2_bench))]
+pub(crate) use order::TupleEntry;
 pub(crate) use sparse::SparseFlag;
 
 /// The complete clique filtration of a supplied weighted graph.

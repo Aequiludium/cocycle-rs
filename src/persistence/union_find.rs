@@ -40,6 +40,11 @@ impl UnionFind {
         self.components
     }
 
+    #[cfg(test)]
+    pub(in crate::persistence) fn capacity_bytes(&self) -> usize {
+        (self.parents.capacity() + self.sizes.capacity()) * std::mem::size_of::<usize>()
+    }
+
     pub(in crate::persistence) fn merge(&mut self, a: usize, b: usize) -> bool {
         let (mut a, mut b) = (root(&mut self.parents, a), root(&mut self.parents, b));
         if a == b {

@@ -271,7 +271,7 @@ imply continuity of thresholded interval counts.
 
 ## 9. Implicit Rips persistent cohomology
 
-This section specifies the production H1 path. The explicit boundary oracle
+This section specifies the production H1 path and exact F2 H2+ handoff. The explicit boundary oracle
 remains independent. Cohomology, clearing, implicit columns, and shortcut pairs
 have separate conditions; see [B21 §§3.2–3.5 and §4](bibliography.md#b21).
 
@@ -309,6 +309,55 @@ Clearing skips H0 merge edges: the adjacent-dimension pairing guarantees their
 coboundaries reduce to zero. Tests disabling clearing still reduce them, verify
 that result, and never mistake them for H1 births. Collect edges even after the
 graph becomes connected.
+
+### H1-to-H2 clearing handoff
+
+For exact diagram-only F2 H2+ requests, specialized H0/H1 supplies owned intervals
+and every H1 death triangle to the generic continuation starting at dimension 2.
+Ordinary and emergent pivots and omitted zero apparent pairs all belong to this
+clearing set; neither stored owners nor positive-lifetime intervals alone are
+complete. Triangle keys are decoded to original vertex triples before H1 reducer
+storage is released. The continuation enumerates complete topology, including
+cleared triangles, without rerunning generic H0 or H1. An equal-weight K3 has
+empty H2; failing to clear its virtual death triangle would invent an H2 birth.
+Odd-prime, explicit/blocked sources and representatives retain their established
+paths. If H1 combinatorial indexing overflows on an H2+ request, use the full
+tuple-based generic path. One WorkBudget includes handoff extraction, conversion,
+topology generation and continuation; allocation or interruption returns no result.
+
+### Experimental fixed-tuple H2 baseline
+
+The private T3 prototype is available in tests and builds explicitly using
+`--cfg cocycle_h2_bench`. Normal builds keep the generic H2 continuation. The
+benchmark configuration selects only exact F2 diagram-only H2 requests; H3+,
+odd primes, representatives and blocked approximate sources keep their routes.
+It has no apparent, emergent or virtual H2 shortcuts.
+
+Triangles and tetrahedra use `[usize; 3]` and `[usize; 4]`, without narrowed
+vertices or tetrahedron binomial indexing. The shared total order compares
+maximum edge value, then decreasing colex vertices. Enumerate the complete
+triangle level, including H1 death triangles; clearing skips their reduction
+only. Sparse tetrahedra use a three-way sorted adjacency intersection. Dense
+visits test all candidate vertices against the three triangle vertices. Both
+charge failed candidates/comparisons to the same WorkBudget.
+
+Process triangles in reverse order and pivot on the earliest forward tetrahedron.
+Store every pivot owner, including zero-length pairs, and a parity-normalized
+list of triangle positions for V, including its diagonal. Reconstruct C V on
+each owner addition and cancel both rows and transformation positions by parity.
+Source positions in V precede the active column in reverse computation order;
+each elimination advances the pivot in forward order. Independent explicit
+boundary matrices and all-edge tetrahedron enumeration check intervals, order,
+triangularity and R = C V. This is a finite validation baseline for further
+experiments, not production admission or an arbitrary-dimensional proof.
+
+Test-only ownership landmarks record the H1 return with already-owned death
+tuples, clearing-set extraction, triangle-level construction after edge release,
+and H2 reduction start. H1 death extraction occurs during H1 pairing, before its
+return; it is not a separate late decoding pass. Vector capacities and elapsed
+offsets describe those objects, not total live allocations or process RSS. The
+prototype deliberately retains its triangle clearing set and allocates fresh
+per-column scratch; lifetime and capacity-reuse experiments belong to M1.
 
 ### Implicit reconstruction invariant
 

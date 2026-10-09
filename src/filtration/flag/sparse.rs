@@ -49,6 +49,9 @@ impl FlagAccess for SparseFlag<'_> {
     fn edge_vertices(&self, id: usize) -> [usize; 2] {
         self.index.edge_vertices(id)
     }
+    fn triangle_vertices(&self, id: usize) -> [usize; 3] {
+        self.index.triangle_vertices(id)
+    }
     fn latest_facet(&self, triangle: SimplexEntry) -> SimplexEntry {
         let [a, b, c] = self.index.triangle_vertices(triangle.id);
         self.edge(a, b).max(self.edge(a, c)).max(self.edge(b, c))

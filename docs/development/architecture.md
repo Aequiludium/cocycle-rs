@@ -222,6 +222,14 @@ merges and candidate H1 births; triangle cofacets are generated during reverse
 coboundary reduction. Stored change-of-basis columns and virtual zero-lifetime
 apparent pairs supply later eliminations.
 
+Exact F2 diagram-only H2+ requests reuse this specialized H0/H1 work. The owned
+intervals and complete death-triangle keys, including omitted virtual pairs,
+feed generic cohomology starting at dimension 2. H1-only calls compile out key
+collection. The H1 workspace is released before continuation; retained graph
+access and complete triangle topology still support higher-level generation.
+Odd primes, representatives and blocked approximation retain their existing
+routes. Index overflow on a higher-dimensional request keeps full generic fallback.
+
 Within `src/persistence/flag/cohomology/mod.rs`, `run_access` classifies edges in
 forward order and reduces their coboundaries in reverse order.
 `initialize_coboundary` scans each original column once, combining initialization
