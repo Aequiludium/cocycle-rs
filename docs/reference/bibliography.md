@@ -6,6 +6,23 @@ These sources identify definitions, theorems, and algorithmic ideas. They are no
 runtime dependencies. Cocycle's engineering conventions are stated separately in
 the [mathematical specification](mathematics.md).
 
+## NM22
+
+Arnur Nigmetov and Dmitriy Morozov. **Topological Optimization with Big Steps**.
+[arXiv:2203.16748v2](https://arxiv.org/abs/2203.16748v2).
+Theorems 9-11 and Algorithms 1-3 motivate the singleton critical sets and
+maximum-displacement surrogate. The
+[specification](mathematics.md#19-big-steps-critical-sets-over-f2) records
+Cocycle's F2 source and lazy-reduction assumptions.
+
+[Oineus source](https://github.com/anigmetov/oineus/tree/e52814a1ffb5b8a81e71ff1e93b4c14194673f0f)
+at revision `e52814a1ffb5b8a81e71ff1e93b4c14194673f0f` provides the
+implementation reference for bounded partial U rows (`decomposition.h`) and
+the `Max` rule (`top_optimizer.h`). Cocycle independently implements the
+algorithm using its existing sparse reducer; it does not import Oineus code
+or add it as a runtime dependency. Runtime comparisons and mathematical
+theorems are distinct evidence.
+
 ## ZC05
 
 Afra Zomorodian and Gunnar Carlsson. **Computing Persistent Homology**.

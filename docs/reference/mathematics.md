@@ -711,3 +711,43 @@ H0 intervals [-2, infinity), [-1, 0) and H1 interval [1, infinity) over every
 prime field. At cutoff -0.5 both components are right-censored. A filled triangle
 with every vertex value 2 enters with all faces at 2 and has only the essential
 H0 interval [2, infinity); it has no positive-lifetime H1 interval.
+
+## 19. Big-steps critical sets over F2
+
+Let D be the square boundary matrix in a frozen simplex order, R = DV its
+serial lazy reduction, and U = V inverse, over F2. V is unit upper triangular.
+Lazy reduction adds a negative column only to cancel the current low. Thus
+an off-diagonal V[i,j] can be nonzero only when column i is negative and
+low(R_i) > low(R_j), with low(0) = -1. Critical-set formulas require this
+support condition, not merely R = DV. See [NM22](bibliography.md#nm22),
+Theorems 9, 10 and 11 and Algorithms 1-3.
+
+For a negative endpoint j with current value f_j, moving its death to t > f_j
+uses the support of row U[j,*] within f_j <= f_i <= t. Moving it to t < f_j
+uses column V[*,j] within t <= f_i <= f_j. Finite birth moves use the same
+negative-column rules in the dual decomposition of J D transpose J, where J
+reverses order and dual values are -f. Reverse the returned indices to recover
+original source IDs. Essential birth decreases instead use primal V columns;
+increases use dual V columns. All sets contain only the endpoint's dimension.
+Closed value windows include ties. Cocycle defines zero displacement as the
+empty proposal; it leaves both data and lazy preparation unchanged.
+
+A requested U row solves u V = e_j transpose. Start with residual e_j and
+repeatedly cancel its smallest pivot p with row p of V. Its diagonal is one and
+other entries have larger indices, so pivots strictly increase. Record p in u
+and stop when f_p exceeds t (or the original dual value falls below t).
+Unprocessed larger pivots cannot affect the retained prefix. Only the queried
+dimension of V needs transposing; neither the other U rows nor the full inverse
+are required. This is the bounded partial-row strategy of
+[Oineus](https://github.com/anigmetov/oineus/blob/e52814a1ffb5b8a81e71ff1e93b4c14194673f0f/include/oineus/decomposition.h#L5456).
+Parallel or cleared reductions require appropriate ELZ restoration before
+critical-set use. The present workspace constructs serial state directly.
+
+For overlapping endpoint proposals, select for each simplex the target t
+maximizing abs(t-f), keeping the first proposal at equal distance. This is
+maximum displacement, including competing directions, rather than a numerical
+maximum target. With these targets frozen, the squared surrogate sum(f-t)^2
+has gradient 2(f-t). Chain rules, tie subgradients, face/coface closure and data
+updates are caller responsibilities; this heuristic is not a general descent
+or convergence theorem. Independent full inverses, pairing-only block swaps
+and hand-derived lower-star intervals test these discrete formulas.

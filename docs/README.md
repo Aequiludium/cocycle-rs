@@ -16,6 +16,8 @@ proposed APIs and remaining acceptance gates.
 
 ## Use the library
 
+- [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
+  bounded partial U and a lower-star simplification step.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
   storage, the filtered-cell contract, signed scales and generic boundary reduction.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret

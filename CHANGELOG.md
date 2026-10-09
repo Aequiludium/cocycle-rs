@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
+  frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
+  dimension-specific V transposes and bounded partial U rows. Endpoint proposals
+  combine by maximum absolute displacement with first-proposal ties. Includes
+  a lower-star simplification example; updates and differentiation remain caller-owned.
+
 ## 0.1.1
 
 Maintenance release for documentation discovery and release tooling.

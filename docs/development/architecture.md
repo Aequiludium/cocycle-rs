@@ -22,6 +22,8 @@ src/
   error.rs                       shared structured errors
   execution/
     mod.rs                       shared controls and private per-operation budget
+  optimization/
+    mod.rs                       borrowed-source F2 critical sets; lazy dual and bounded U
   algebra/
     field/mod.rs                 validated PrimeField and modular arithmetic
     column/mod.rs                private ordered sparse coefficient columns
@@ -139,6 +141,15 @@ files. Public paths are re-exported from domains, not every private directory.
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
 | `descriptors` | Read diagrams without recomputing persistence | Diagram, error utilities |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
+| `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
+
+`CriticalSetWorkspace` is opt-in and reuses the serial F2 lazy reducer without
+changing persistence dispatch. It retains primal R/V, constructs dual R/V only
+on demand, transposes V only for queried dimensions and solves bounded U rows
+without retaining the inverse. The [usage guide](../guides/critical-sets.md)
+defines source identity, update validity and execution boundaries. Parallel
+ELZ recovery and general optimizer or differentiation interfaces remain outside
+this concrete capability.
 
 Geometry and diagram code do not call persistence. Filtration code does not call
 persistence. Descriptors do not inspect source coordinates or algorithm state.
