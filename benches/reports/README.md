@@ -11,6 +11,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | Report | Scope |
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
+| [Cocycle, dense reproduction and Oineus: critical-set comparison](critical-sets.md) | Cold/warm critical queries, Partial/full U, existing persistence paths and local-only repeated measurements |
 
 Do not create a report per date, commit, PR or rerun. Related suites share a report
 with separate timing contracts and tables. Keep concise conclusions and selected
