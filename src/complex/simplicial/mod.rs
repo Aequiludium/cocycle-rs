@@ -22,6 +22,7 @@ pub struct SimplicialComplex {
     cofacets: Vec<Vec<SimplexId>>,
     vertex_count: usize,
     dimension: Option<usize>,
+    zero_born: bool,
 }
 impl SimplicialComplex {
     /// Validate and own a face-closed collection of filtered simplices.
@@ -50,6 +51,9 @@ impl SimplicialComplex {
     pub fn vertex_count(&self) -> usize {
         self.vertex_count
     }
+    pub(crate) fn has_zero_born_vertices(&self) -> bool {
+        self.zero_born
+    }
 
     pub(crate) fn from_simplices(
         mut simplices: Vec<Simplex>,
@@ -71,11 +75,13 @@ impl SimplicialComplex {
             .map_err(|_| allocation())?;
         let mut vertex_count = 0;
         let mut dimension = None;
+        let mut zero_born = true;
         for (position, simplex) in simplices.iter().enumerate() {
             checkpoint()?;
             dimension = dimension.max(Some(simplex.dimension()));
             if simplex.dimension() == 0 {
                 vertex_count += 1;
+                zero_born &= simplex.value() == 0.;
             }
             let id = SimplexId(position);
             let mut boundary = Vec::new();
@@ -115,6 +121,7 @@ impl SimplicialComplex {
             cofacets,
             vertex_count,
             dimension,
+            zero_born,
         })
     }
     /// Simplices in filtration order. The slice position equals the simplex ID.

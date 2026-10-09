@@ -9,8 +9,8 @@ Both paths compute ordinary persistence over a selected prime field. They suppor
 signed scales and unequal vertex birth times. Alpha geometry and a production
 cubical container are not implemented by these interfaces.
 
-Diagram-only supplied simplicial and generic filtered-cell requests use the same
-boundary reduction core. The concrete adapter reads constructor-validated stored
+General supplied simplicial filtrations, H2+ diagram requests and generic
+filtered-cell requests use the same boundary reduction core. The concrete adapter reads constructor-validated stored
 incidence; the generic adapter validates the external cell contract. Concrete
 source metadata and construction coverage remain attached to the result. Cycle
 and cocycle requests retain the separate representative computation. Implicit
@@ -159,10 +159,10 @@ complex cannot manufacture those certificates.
 
 Rips implicit coface algorithms retain a private, explicitly zero-born contract.
 They are distinct from the public boundary contract. Diagram-only explicit
-simplicial analysis reuses H0 union-find and coface clearing when all vertices
+simplicial H0/H1 analysis reuses union-find and coface clearing when all vertices
 are born at zero and the query cutoff is nonnegative or absent. The decision
 checks actual simplex values; it also supports non-flag topology and delayed
-higher-simplex values through stored cofaces. Other inputs use boundary reduction,
+higher-simplex values through stored cofaces. H2+ and other inputs use boundary reduction,
 and representative requests retain their separate transformation work. Generic
 `PersistenceBuilder::from_complex` always uses the boundary contract. Native
 workers preserve their protocol; performance claims require measurements bound

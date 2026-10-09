@@ -5,9 +5,10 @@
 - Avoid repeated sparse-column map lookups and identity coefficient scaling in
   shared boundary reduction, including optional basis transformations. Preserve
   the selected prime field, lazy reduction order and normalized pivots.
-- Route supplied simplicial diagram-only requests through the shared filtered-cell
-  boundary reducer. Preserve concrete source metadata and certified coverage;
-  representatives remain opt-in and implicit flag/Rips dispatch stays specialized.
+- Route supplied simplicial H2+ diagram-only requests through the shared
+  filtered-cell boundary reducer. Preserve the existing zero-born H0/H1 coface
+  route, concrete source metadata and certified coverage; representatives remain
+  opt-in and implicit flag/Rips dispatch stays specialized.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

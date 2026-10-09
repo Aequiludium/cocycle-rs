@@ -163,17 +163,20 @@ No backend registry or Alpha/cubical construction is implied. See the
 
 | Capability | Implemented owner and selection |
 | --- | --- |
-| Supplied diagrams | `persistence::boundary::diagram` and `algebra::reduction::reduce_pairs`; generic cells validate their contract and concrete simplices read validated incidence |
+| Supplied diagrams | Shared `boundary::diagram` / `algebra::reduction::reduce_pairs` for general filtrations and H2+; zero-born concrete H0/H1 retains shared coface reduction |
 | Implicit flag/Rips | Existing specialized dispatch, including the admitted F2 H0/H1-to-H2+ continuation and generic fallbacks |
 | Representatives | Separate requested output; basis transformations are retained only when needed |
 | Critical sets | Opt-in sparse `CriticalSetWorkspace` with lazy dual and bounded Partial U |
 | Independent F2 reducer | Test/reference benchmark only; no public engine selection |
 
-Supplied zero-born simplicial diagrams use the same boundary core as signed
-filtrations rather than a separate coface reduction route. This preserves source
-interfaces, prime fields, coverage and result ownership. The coface kernel is
-still required for implicit flag/Rips continuation and fallback. There is no
-dense production critical-set backend or automatic sparse/dense threshold.
+Supplied simplicial diagram requests computing H2+ use the same boundary core
+as signed filtrations. Zero-born H0/H1 requests retain the existing shared coface
+kernel with a nonnegative or absent cutoff; implicit flag/Rips uses that kernel
+for continuation and fallback as well. The [integration report](../../benches/reports/critical-sets.md)
+records why uniform boundary routing was rejected on current main. Selection
+follows requested dimension and source invariants, without a size threshold or
+public backend option. Source interfaces, prime fields, coverage and result
+ownership are preserved. There is no dense production critical-set backend.
 
 Shared sparse columns update a coefficient through one ordered-map entry lookup.
 Unit factors avoid field multiplication, and already-unit pivots avoid inverse
@@ -299,8 +302,9 @@ the compact H1 entry order use the comparison authority in `complex/simplicial`.
 `SimplicialFiltration` retains construction dimension and scale provenance
 separately for exact Rips, approximation and supplied flags. The old expansion
 types remain available during migration.
-Explicit builder computation uses `simplicial/input.rs` to convert selected
-stored boundaries to field columns; representative requests additionally retain
+Explicit H0/H1 zero-born computation retains union-find and coface clearing.
+Other diagram inputs use `simplicial/input.rs` to convert selected stored
+boundaries to field columns; representative requests additionally retain
 basis transformations. The immutable concrete type supplies face closure, ordered unique IDs
 and oriented incidence, so this reader does not recheck them or compute the
 boundary square. Its ID map covers only selected simplices, and ordered traversal

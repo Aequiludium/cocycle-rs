@@ -303,7 +303,7 @@ fn low_degree_selection_reuses_frozen_incidence_and_range() -> Result<()> {
 }
 
 #[test]
-fn zero_born_non_flag_cofaces_agree_with_boundary_reduction() -> Result<()> {
+fn zero_born_non_flag_paths_agree_with_boundary_reduction() -> Result<()> {
     // A tetrahedron boundary, with edges at 1, three faces at 2 and the last
     // face at 3. H1 has three [1, 2) bars; H2 has one [3, infinity) bar.
     // No tetrahedron exists, despite its complete graph. Labels are not indices.
@@ -326,30 +326,34 @@ fn zero_born_non_flag_cofaces_agree_with_boundary_reduction() -> Result<()> {
         .collect();
     let complex = SimplicialComplex::new(simplices)?;
     for prime in [2, 3, 65537] {
-        for cutoff in [-1., 0., 1., 2., 3.] {
-            let field = PrimeField::new(prime)?;
-            let actual = complex
-                .persistence()
-                .max_homology_dimension(2)
-                .max_filtration_value(cutoff)
-                .field(field)
-                .compute()?;
-            let boundary = PersistenceBuilder::from_complex(&complex)
-                .max_homology_dimension(2)
-                .max_filtration_value(cutoff)
-                .field(field)
-                .compute()?;
-            assert_eq!(actual.diagram(), boundary.diagram());
-            if cutoff == 3. {
-                let h1: Vec<_> = actual.diagram().dimension(1)?.iter().collect();
-                assert_eq!(h1.len(), 3);
-                assert!(
-                    h1.iter()
-                        .all(|i| i.birth() == 1. && i.end() == IntervalEnd::Finite(2.))
-                );
-                let h2: Vec<_> = actual.diagram().dimension(2)?.iter().collect();
-                assert_eq!(h2.len(), 1);
-                assert_eq!((h2[0].birth(), h2[0].end()), (3., IntervalEnd::Essential));
+        for dimension in [1, 2] {
+            for cutoff in [-1., 0., 1., 2., 3.] {
+                let field = PrimeField::new(prime)?;
+                let actual = complex
+                    .persistence()
+                    .max_homology_dimension(dimension)
+                    .max_filtration_value(cutoff)
+                    .field(field)
+                    .compute()?;
+                let boundary = PersistenceBuilder::from_complex(&complex)
+                    .max_homology_dimension(dimension)
+                    .max_filtration_value(cutoff)
+                    .field(field)
+                    .compute()?;
+                assert_eq!(actual.diagram(), boundary.diagram());
+                if cutoff == 3. {
+                    let h1: Vec<_> = actual.diagram().dimension(1)?.iter().collect();
+                    assert_eq!(h1.len(), 3);
+                    assert!(
+                        h1.iter()
+                            .all(|i| i.birth() == 1. && i.end() == IntervalEnd::Finite(2.))
+                    );
+                    if dimension == 2 {
+                        let h2: Vec<_> = actual.diagram().dimension(2)?.iter().collect();
+                        assert_eq!(h2.len(), 1);
+                        assert_eq!((h2[0].birth(), h2[0].end()), (3., IntervalEnd::Essential));
+                    }
+                }
             }
         }
     }
