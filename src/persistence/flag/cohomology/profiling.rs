@@ -5,6 +5,109 @@ use crate::diagram::{Coverage, IntervalEnd};
 use crate::persistence::rips::resolve_rips_range;
 use crate::persistence::{RipsOptions, assemble_diagram, reference};
 
+#[test]
+fn h2_workspace_failures_discard_scratch_and_retry_repeated_intervals() {
+    use crate::complex::{WeightedEdge, WeightedGraph};
+    use crate::filtration::flag::{CliqueAccess, SparseFlag};
+    use crate::persistence::simplicial::cohomology::workspace_force_failure;
+    // Two disjoint octahedral spheres and one isolate: H2 has multiplicity two.
+    let graph = WeightedGraph::new(
+        13,
+        (0..12)
+            .flat_map(|b| {
+                (0..b).filter_map(move |a| {
+                    (a / 6 == b / 6 && a / 2 != b / 2).then_some(WeightedEdge {
+                        vertices: [a, b],
+                        value: 1.,
+                    })
+                })
+            })
+            .collect(),
+    )
+    .unwrap();
+    let compute = || {
+        let execution = crate::execution::Execution::default();
+        compute_h2(
+            &SparseFlag::new(&graph, 1.).unwrap(),
+            &CliqueAccess::Sparse(&graph, 1.),
+            &mut WorkBudget::new(&execution).unwrap(),
+        )
+    };
+    let expected = assemble_diagram(2, Coverage::Complete, compute().unwrap()).unwrap();
+    assert_eq!(expected.dimension(2).unwrap().len(), 2);
+    for at in [
+        "h2_handoff_conversion_overlap",
+        "h2_handoff_converted",
+        "h2_triangle_assembly",
+        "h2_reduction_start",
+        "h2_column_complete",
+        "h2_reduction_end",
+    ] {
+        for error in [
+            Error::Cancelled,
+            Error::AllocationFailed {
+                context: "H2 workspace test",
+            },
+        ] {
+            workspace_force_failure(Some((at, error.clone())));
+            let interrupted = compute();
+            workspace_force_failure(None);
+            assert_eq!(interrupted, Err(error), "{at}");
+            assert_eq!(
+                assemble_diagram(2, Coverage::Complete, compute().unwrap()).unwrap(),
+                expected,
+                "{at}"
+            );
+        }
+    }
+}
+
+pub(super) fn h2_workspace_event(
+    event: &str,
+    raw: &RawIntervals,
+    triangles: &Vec<crate::filtration::flag::TupleEntry<3>>,
+    cleared: &std::collections::HashSet<[usize; 3]>,
+    owners: &HashMap<[usize; 4], usize>,
+    columns: &Vec<Vec<usize>>,
+    scratch: (usize, usize),
+) -> Result<()> {
+    crate::persistence::simplicial::cohomology::workspace_event(
+        event,
+        2,
+        &[
+            (
+                "intervals",
+                raw.capacity() * std::mem::size_of::<(usize, f64, Option<f64>)>(),
+            ),
+            (
+                "triangles",
+                triangles.capacity()
+                    * std::mem::size_of::<crate::filtration::flag::TupleEntry<3>>(),
+            ),
+            (
+                "columns",
+                columns.capacity() * std::mem::size_of::<Vec<usize>>(),
+            ),
+            (
+                "transform_payload",
+                columns
+                    .iter()
+                    .map(|column| column.capacity() * std::mem::size_of::<usize>())
+                    .sum(),
+            ),
+            ("working", scratch.0),
+            ("transform_scratch", scratch.1),
+        ],
+        &[
+            ("cleared", cleared.len()),
+            ("clearing_slots", cleared.capacity()),
+            ("owners", owners.len()),
+            ("owner_slots", owners.capacity()),
+            ("stored_columns", columns.len()),
+        ],
+    )
+}
+
 /// Dedicated counters and ownership landmarks. Ordinary latency uses the
 /// pipeline worker with --cfg cocycle_h2_bench, without test instrumentation.
 #[test]

@@ -64,15 +64,60 @@ pub(in crate::persistence) fn continue_from_h1(
     cleared
         .try_reserve(deaths.len())
         .map_err(|_| allocation())?;
+    #[cfg(test)]
+    let handoff_capacity_bytes = deaths.capacity() * std::mem::size_of::<[usize; 3]>();
+    #[cfg(test)]
+    let handoff_len = deaths.len();
     for triangle in deaths {
         budget.step()?;
         let mut key = Vec::new();
         key.try_reserve_exact(3).map_err(|_| allocation())?;
         key.extend(triangle);
         cleared.insert(key);
+        #[cfg(test)]
+        if cleared.len() == handoff_len {
+            profiling::workspace_event(
+                "handoff_conversion_overlap",
+                2,
+                &[
+                    ("handoff", handoff_capacity_bytes),
+                    (
+                        "clearing_keys",
+                        cleared
+                            .iter()
+                            .map(|key| key.capacity() * std::mem::size_of::<usize>())
+                            .sum(),
+                    ),
+                ],
+                &[
+                    ("cleared", cleared.len()),
+                    ("clearing_slots", cleared.capacity()),
+                ],
+            )?;
+        }
     }
+    #[cfg(test)]
+    profiling::workspace_level(
+        "handoff_converted",
+        2,
+        &[],
+        &cleared,
+        &Vec::new(),
+        &HashMap::new(),
+        &raw,
+    )?;
     let edges = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
     let triangles = next_dimension(access, &edges, &mut || budget.step())?;
+    #[cfg(test)]
+    profiling::workspace_level(
+        "triangle_assembly",
+        2,
+        &[("edges", &edges), ("triangles", &triangles)],
+        &cleared,
+        &Vec::new(),
+        &HashMap::new(),
+        &raw,
+    )?;
     drop(edges);
     reduce_dimensions(
         access,
@@ -101,6 +146,16 @@ fn reduce_dimensions(
         }
         let mut owners: HashMap<Vec<usize>, usize> = HashMap::new();
         let mut columns: Vec<Column<usize>> = Vec::new();
+        #[cfg(test)]
+        profiling::workspace_level(
+            "reduction_start",
+            dimension,
+            &[("level", &level)],
+            &cleared,
+            &columns,
+            &owners,
+            &raw,
+        )?;
         #[cfg(test)]
         profiling::record(dimension, |s| s.simplices = level.len());
         for position in (0..level.len()).rev() {
@@ -160,6 +215,16 @@ fn reduce_dimensions(
                 }
             }
         }
+        #[cfg(test)]
+        profiling::workspace_level(
+            "reduction_end",
+            dimension,
+            &[("level", &level)],
+            &cleared,
+            &columns,
+            &owners,
+            &raw,
+        )?;
         budget.check()?;
         if dimension == max_dimension {
             break;
@@ -169,9 +234,30 @@ fn reduce_dimensions(
             .try_reserve(owners.len())
             .map_err(|_| allocation())?;
         cleared.extend(owners.into_keys());
+        #[cfg(test)]
+        profiling::workspace_level(
+            "clear_next_extracted",
+            dimension,
+            &[("level", &level)],
+            &cleared,
+            &columns,
+            &HashMap::new(),
+            &raw,
+        )?;
         // Cleared simplices still participate in clique enumeration: clearing
         // removes reduction columns, never topology needed by the next level.
-        level = next_dimension(access, &level, &mut || budget.step())?;
+        let next_level = next_dimension(access, &level, &mut || budget.step())?;
+        #[cfg(test)]
+        profiling::workspace_level(
+            "next_level_assembled",
+            dimension,
+            &[("old_level", &level), ("next_level", &next_level)],
+            &cleared,
+            &columns,
+            &HashMap::new(),
+            &raw,
+        )?;
+        level = next_level;
     }
     budget.check()?;
     Ok(raw)
@@ -205,6 +291,10 @@ fn append(
 mod profiling;
 #[cfg(test)]
 pub(in crate::persistence) use profiling::take_counts;
+#[cfg(test)]
+pub(in crate::persistence) use profiling::{
+    workspace_event, workspace_force_failure, workspace_heap_growth,
+};
 fn push_interval(raw: &mut RawIntervals, interval: (usize, f64, Option<f64>)) -> Result<()> {
     raw.try_reserve(1).map_err(|_| allocation())?;
     raw.push(interval);
