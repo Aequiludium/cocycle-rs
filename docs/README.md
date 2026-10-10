@@ -16,6 +16,8 @@ proposed APIs and remaining acceptance gates.
 
 ## Use the library
 
+- [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
+  bounded partial U and a lower-star simplification step.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
@@ -73,6 +75,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Interface compatibility report](design/interface-compatibility.md) | Confirmed existing-interface reuse, runnable framework entries, conversion/control boundaries and dated compatibility acceptance |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
+| [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
 | [Performance reporting rules](../benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
