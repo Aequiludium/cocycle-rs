@@ -29,7 +29,7 @@ pub(super) fn restore_scale(value: f64, scale: f64) -> Result<f64> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Point {
+pub(in crate::diagram_distances) struct Point {
     pub(super) coordinates: [f64; 2],
     pub(super) midpoint: f64,
     pub(super) half: f64,
@@ -133,7 +133,6 @@ fn normalize<const CONTROLLED: bool>(
     Ok(())
 }
 
-#[cfg(any(test, cocycle_distance_bench))]
 pub(super) fn prepare<const CONTROLLED: bool>(
     input: impl Iterator<Item = (f64, IntervalEnd)>,
     count: usize,
@@ -145,7 +144,6 @@ pub(super) fn prepare<const CONTROLLED: bool>(
     Ok(result)
 }
 
-#[cfg(any(test, cocycle_distance_bench))]
 pub(super) fn power_scale<const CONTROLLED: bool>(
     input: impl Iterator<Item = (f64, IntervalEnd)>,
     budget: &mut WorkBudget<'_, CONTROLLED>,

@@ -24,9 +24,7 @@
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //! SOFTWARE.
 
-use crate::diagram::DiagramDimension;
-#[cfg(any(test, cocycle_distance_bench))]
-use crate::diagram::IntervalEnd;
+use crate::diagram::{DiagramDimension, IntervalEnd};
 use crate::execution::WorkBudget;
 use crate::{Error, Result};
 
@@ -53,7 +51,6 @@ use numeric::{
     Point, cross_power, diagonal_power, finite, from_flows, from_matching, numerical,
     prepare_dimensions, restore_scale, saving,
 };
-#[cfg(any(test, cocycle_distance_bench))]
 use numeric::{power_scale, prepare};
 mod sparse;
 #[cfg(test)]
@@ -317,10 +314,22 @@ fn solve_prepared<const CONTROLLED: bool>(
         _stats.preparation_bytes = capacity_bytes(&first).saturating_add(capacity_bytes(&second));
         _stats.preparation_buffers = usize::from(!first.is_empty()) + usize::from(!second.is_empty());
     }
+    solve_points(&first, &second, scale, metric, _options, _stats, budget)
+}
+
+fn solve_points<const CONTROLLED: bool>(
+    first: &[Point],
+    second: &[Point],
+    scale: f64,
+    metric: Metric,
+    _options: Options,
+    _stats: &mut Stats,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
     let original_pairs = product(first.len(), second.len())?;
     if !experiment!(_options.force_sparse, false) {
-        let (first_groups, rows) = groups(&first, budget)?;
-        let (second_groups, columns) = groups(&second, budget)?;
+        let (first_groups, rows) = groups(first, budget)?;
+        let (second_groups, columns) = groups(second, budget)?;
         record! { _stats.duplicate_groups = sum_size(first_groups.len(), second_groups.len())?; }
         let removed = first_groups.len() != first.len() || second_groups.len() != second.len();
         if removed && product(first_groups.len(), second_groups.len())? <= original_pairs / 16 {
@@ -345,9 +354,9 @@ fn solve_prepared<const CONTROLLED: bool>(
                 }
             }
             if direct_cost_required {
-                let matching = direct::matching(&first, &second, metric, _stats, budget)?;
+                let matching = direct::matching(first, second, metric, _stats, budget)?;
                 return restore_scale(
-                    from_matching(&first, &second, matching, metric, budget)?,
+                    from_matching(first, second, matching, metric, budget)?,
                     scale,
                 );
             }
@@ -374,10 +383,10 @@ fn solve_prepared<const CONTROLLED: bool>(
             );
         }
     }
-    let graph = generate(&first, &second, metric, _stats, budget)?;
+    let graph = generate(first, second, metric, _stats, budget)?;
     record! { graph.record_capacity(_stats); }
     let matching = if graph.direct_cost_required {
-        direct::matching(&first, &second, metric, _stats, budget)?
+        direct::matching(first, second, metric, _stats, budget)?
     } else if experiment!(_options.force_sparse, false) {
         solve_graph(&graph, Some(false), false, metric, _options, _stats, budget)?
     } else if graph.density() >= 0.15 {
@@ -386,7 +395,60 @@ fn solve_prepared<const CONTROLLED: bool>(
         solve_components(&graph, metric, _options, _stats, budget)?
     };
     restore_scale(
-        from_matching(&first, &second, matching, metric, budget)?,
+        from_matching(first, second, matching, metric, budget)?,
         scale,
     )
+}
+
+pub(super) use numeric::Point as PreparedPoint;
+
+pub(super) fn prepare_operand<const CONTROLLED: bool>(
+    points: &[[f64; 2]],
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<Option<Vec<PreparedPoint>>> {
+    // A unit-scale failure does not rule out a representable normalized pair.
+    match prepare(
+        points.iter().map(|p| (p[0], IntervalEnd::Finite(p[1]))),
+        points.len(),
+        1.0,
+        budget,
+    ) {
+        Ok(points) => Ok(Some(points)),
+        Err(Error::NumericalFailure { .. }) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+pub(super) fn distance_prepared<const CONTROLLED: bool>(
+    first: (&[[f64; 2]], Option<&[PreparedPoint]>),
+    second: (&[[f64; 2]], Option<&[PreparedPoint]>),
+    metric: Metric,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
+    // Scale remains pair-dependent. Never reuse normalized data from an earlier
+    // comparison, including one that happened to use the same operand.
+    let intervals = |p: &[f64; 2]| (p[0], IntervalEnd::Finite(p[1]));
+    let scale = power_scale(first.0.iter().chain(second.0).map(intervals), budget)?;
+    let options = Options::default();
+    let stats = &mut Stats::default();
+    if scale == 1.0 {
+        solve_points(
+            first.1.ok_or_else(numerical)?,
+            second.1.ok_or_else(numerical)?,
+            scale,
+            metric,
+            options,
+            stats,
+            budget,
+        )
+    } else {
+        let first = prepare(first.0.iter().map(intervals), first.0.len(), scale, budget)?;
+        let second = prepare(
+            second.0.iter().map(intervals),
+            second.0.len(),
+            scale,
+            budget,
+        )?;
+        solve_points(&first, &second, scale, metric, options, stats, budget)
+    }
 }

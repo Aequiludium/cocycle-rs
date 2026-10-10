@@ -325,6 +325,48 @@ assert_eq!(bottleneck_distance_with(&diagram, &diagram, 0, &Execution::default()
 # Ok::<(), cocycle::Error>(())
 ```
 
+For a finite loop comparing the same operands many times, explicitly retain
+`PreparedDiagram` values. Choose `bottleneck_with`, `wasserstein_1_infinity_with`
+or `wasserstein_2_euclidean_with` to bind a raw diagram, dimension and metric;
+the corresponding `*_results_with` constructors borrow existing common data
+through `AsRef<PersistenceData>`. Each query takes fresh controls:
+
+```rust
+use cocycle::diagram::{Coverage, IntervalEnd, PersistenceDiagram, PersistenceInterval};
+use cocycle::diagram_distances::PreparedDiagram;
+use cocycle::execution::Execution;
+let first = PersistenceDiagram::new(0, Coverage::Complete, vec![
+    PersistenceInterval::new(0, 0.0, IntervalEnd::Finite(2.0))?,
+])?;
+let empty = PersistenceDiagram::new(0, Coverage::Complete, vec![])?;
+let execution = Execution::default();
+{
+    let a = PreparedDiagram::bottleneck_with(&first, 0, &execution)?;
+    let b = PreparedDiagram::bottleneck_with(&empty, 0, &execution)?;
+    for _ in 0..64 {
+        assert_eq!(a.distance_with(&b, &execution)?, 1.0);
+    }
+} // Drop releases all retained preparation.
+# Ok::<(), cocycle::Error>(())
+```
+
+This tiny example demonstrates scope, not a speedup. Preparation retains owned
+arrays while borrowing the immutable source. It can amortize preparation in
+high-reuse work; ordinary scalar calls remain preferable for single, low-reuse,
+solve-heavy or distinct-operand batch comparisons. There is no implicit cache
+or reuse-frequency threshold. Callers choose the scope and include construction,
+retention and destruction costs when measuring their workload.
+
+Prepared queries require equal metrics, dimensions and raw/results modes. They
+repeat field and scale checks for results; mixing raw and contextual preparation
+is an error. Coverage and computed-dimension checks happen at construction and
+remain bound to the source. Query work counts skip cached preparation and need
+not equal scalar counts. Zero budgets and cancellation still apply on every
+query; failures leave the operands reusable. Essential-count infinity takes
+precedence over deferred operand numerical failures. Wasserstein recomputes
+pair scale, using normalized copies for non-unit scale. Matching, graphs and
+scratch remain pair-local; no solver state or outputs are retained.
+
 Long-running matching algorithms must cooperate with execution control. Pass the
 same private budget through preparation, matching and accumulation, including
 fallbacks and components; never restart it at a phase boundary. Charge batches

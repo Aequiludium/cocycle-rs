@@ -157,7 +157,7 @@ impl<'a, 'p, 'q> Oracle<'a, 'p, 'q> {
     ) -> Result<Self> {
         let mut result = Self {
             pair,
-            tree: KdIndex::new(pair.second.points, budget)?,
+            tree: KdIndex::new(&pair.second.points, budget)?,
             left: filled(pair.size, NONE)?,
             right: filled(pair.size, NONE)?,
             levels: Vec::new(),
@@ -203,7 +203,7 @@ impl<'a, 'p, 'q> Oracle<'a, 'p, 'q> {
         let m = self.pair.second.points.len();
         if left < n {
             if let Some((point, _)) = self.tree.next(
-                self.pair.second.points,
+                &self.pair.second.points,
                 self.pair.first.points[left],
                 radius,
                 &mut cursor.node,
@@ -265,7 +265,7 @@ impl<'a, 'p, 'q> Oracle<'a, 'p, 'q> {
             let mut cursor = 0;
             let mut found = NONE;
             while let Some((point, mut node)) = self.tree.next(
-                self.pair.second.points,
+                &self.pair.second.points,
                 self.pair.first.points[left],
                 radius,
                 &mut cursor,

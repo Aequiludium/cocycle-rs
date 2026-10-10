@@ -104,22 +104,22 @@ def instrument(source, template, growth):
     adapter, growth_adapter = template.split(
         "// Growth diagnostics: inserted only for the separately timed growth mode.")
     text = replace_once(text, original, adapter + (growth_adapter if growth else ""))
-    text = replace_once(text, "fn solve_prepared<const CONTROLLED: bool>(",
-                        "#[inline(never)]\nfn solve_prepared<const CONTROLLED: bool>(")
+    text = replace_once(text, "fn solve_points<const CONTROLLED: bool>(",
+                        "#[inline(never)]\nfn solve_points<const CONTROLLED: bool>(")
     text = replace_once(text, "    let original_pairs = product(first.len(), second.len())?;",
                         "    let grouping_started = std::time::Instant::now();\n"
                         "    let original_pairs = product(first.len(), second.len())?;")
-    text = replace_once(text, "    let graph = generate(&first, &second, metric, _stats, budget)?;",
+    text = replace_once(text, "    let graph = generate(first, second, metric, _stats, budget)?;",
                         "    PHASES[6].fetch_add(grouping_started.elapsed().as_nanos() as u64, Ordering::Relaxed);\n"
                         "    let graph_started = std::time::Instant::now();\n"
-                        "    let graph = generate(&first, &second, metric, _stats, budget)?;\n"
+                        "    let graph = generate(first, second, metric, _stats, budget)?;\n"
                         "    PHASES[4].fetch_add(graph_started.elapsed().as_nanos() as u64, Ordering::Relaxed);\n"
                         "    let matching_started = std::time::Instant::now();")
     text = replace_once(text, "    restore_scale(\n"
-                        "        from_matching(&first, &second, matching, metric, budget)?,\n"
+                        "        from_matching(first, second, matching, metric, budget)?,\n"
                         "        scale,\n    )\n}",
                         "    let answer = restore_scale(\n"
-                        "        from_matching(&first, &second, matching, metric, budget)?, scale,\n    );\n"
+                        "        from_matching(first, second, matching, metric, budget)?, scale,\n    );\n"
                         "    PHASES[5].fetch_add(matching_started.elapsed().as_nanos() as u64, Ordering::Relaxed);\n"
                         "    answer\n}")
     path.write_text(text, encoding="utf-8")

@@ -49,7 +49,7 @@ class PreparationReproducerTests(unittest.TestCase):
                 repro.extract_snapshot(archive, snapshot)
                 repro.instrument(snapshot, template, growth)
                 text = (snapshot / "src/diagram_distances/wasserstein.rs").read_text()
-                self.assertIn("#[inline(never)]\nfn solve_prepared", text)
+                self.assertIn("#[inline(never)]\nfn solve_points", text)
                 self.assertEqual("fn trace_edge_push" in text, growth)
                 with self.assertRaises(ValueError):
                     repro.instrument(snapshot, template, growth)
