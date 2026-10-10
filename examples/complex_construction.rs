@@ -1,6 +1,6 @@
-//! Lower-star filtration on supplied simplicial topology, using only public APIs.
+//! Construct one complex for persistence and direct signed-boundary reads.
 
-use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::complex::{FilteredComplex, Simplex, SimplexId, SimplicialComplex};
 use cocycle::persistence::PersistenceExt;
 use cocycle::{Error, Result};
 
@@ -50,6 +50,36 @@ fn lower_star_complex(
     SimplicialComplex::new(simplices)
 }
 
+/// Borrow one adjacent-degree boundary, exporting IDs with a small dense matrix.
+///
+/// This tutorial scans stored cells and allocates only the two bases and matrix.
+/// Matrix rows/columns follow source traversal restricted to their degree; their
+/// counts retain zero-row and zero-column shapes. No PH computation, topology
+/// expansion or filtration-value interpretation is needed. Large consumers
+/// should read sparse boundary terms instead of exporting a dense matrix.
+fn signed_boundary(
+    source: &SimplicialComplex,
+    degree: usize,
+) -> (Vec<SimplexId>, Vec<SimplexId>, Vec<Vec<i32>>) {
+    let rows: Vec<_> = source
+        .cells()
+        .filter(|&id| Some(source.simplex(id).unwrap().dimension()) == degree.checked_sub(1))
+        .collect();
+    let columns: Vec<_> = source
+        .cells()
+        .filter(|&id| source.simplex(id).unwrap().dimension() == degree)
+        .collect();
+    let mut matrix = vec![vec![0; columns.len()]; rows.len()];
+    for (column, &id) in columns.iter().enumerate() {
+        // IDs come from this frozen owner; face closure proves each row exists.
+        for term in source.boundary(id).unwrap() {
+            let row = rows.iter().position(|&id| id == term.face).unwrap();
+            matrix[row][column] = i32::from(term.coefficient);
+        }
+    }
+    (rows, columns, matrix)
+}
+
 fn main() -> Result<()> {
     // A circle with two local minima. These four edges are the entire topology.
     let complex = lower_star_complex(
@@ -68,6 +98,26 @@ fn main() -> Result<()> {
             face.vertices()
         );
     }
+    // Reader 1 uses all stored topology at one scale, with standard real inner
+    // products. This circle has no faces, so its edge Hodge matrix is B1^T B1.
+    // Stored lower-star values are not used as conductances or Gram entries.
+    let (vertices, edges, boundary) = signed_boundary(&complex, 1);
+    let edge_laplacian: Vec<Vec<i32>> = (0..edges.len())
+        .map(|a| {
+            (0..edges.len())
+                .map(|b| boundary.iter().map(|row| row[a] * row[b]).sum())
+                .collect()
+        })
+        .collect();
+    println!(
+        "Direct boundary shape: {} by {}",
+        vertices.len(),
+        edges.len()
+    );
+    println!("Edge basis (owner-local IDs): {edges:?}");
+    println!("Single-scale edge Hodge matrix: {edge_laplacian:?}");
+
+    // Reader 2 borrows the very same complex, IDs, orientation and entry values.
     // The engine reads actual vertex births; no Rips-specific assumptions apply.
     let result = complex.persistence().max_homology_dimension(1).compute()?;
     println!("Intervals:");
@@ -223,5 +273,73 @@ mod tests {
                 Err(Error::InvalidComplex { .. })
             ));
         }
+    }
+
+    #[test]
+    fn direct_reader_retains_labels_orientation_and_filtration_identity() -> Result<()> {
+        let complex = SimplicialComplex::new(vec![
+            Simplex::new(vec![10, 20, 30], 2.)?,
+            Simplex::new(vec![10, 20], 1.)?,
+            Simplex::new(vec![10, 30], 1.)?,
+            Simplex::new(vec![20, 30], 1.)?,
+            Simplex::new(vec![10], 0.)?,
+            Simplex::new(vec![20], 0.)?,
+            Simplex::new(vec![30], 0.)?,
+        ])?;
+        let ids_before: Vec<_> = complex.cells().collect();
+        let storage = complex.simplices().as_ptr();
+        let (vertices, edges, a) = signed_boundary(&complex, 1);
+        let (face_rows, faces, d) = signed_boundary(&complex, 2);
+        assert_eq!(edges, face_rows);
+        let labels = |basis: &[SimplexId]| -> Vec<Vec<usize>> {
+            basis
+                .iter()
+                .map(|&id| complex.simplex(id).unwrap().vertices().to_vec())
+                .collect()
+        };
+        assert_eq!(labels(&vertices), [vec![30], vec![20], vec![10]]);
+        assert_eq!(labels(&edges), [vec![20, 30], vec![10, 30], vec![10, 20]]);
+        assert_eq!(labels(&faces), [vec![10, 20, 30]]);
+        assert_eq!(a, [[1, 1, 0], [-1, 0, 1], [0, -1, -1]]);
+        assert_eq!(d, [[1], [-1], [1]]);
+        for row in &a {
+            assert_eq!(row.iter().zip(&d).map(|(x, y)| x * y[0]).sum::<i32>(), 0);
+        }
+        // A reversed orientation would change these integer signs even over F2.
+        assert_eq!(complex.simplex(faces[0]).unwrap().value(), 2.);
+        for prime in [2, 3] {
+            let result = complex
+                .persistence()
+                .field(PrimeField::new(prime)?)
+                .compute()?;
+            let h1 = result.diagram().dimension(1)?.iter().next().unwrap();
+            assert_eq!((h1.birth(), h1.end()), (1., IntervalEnd::Finite(2.)));
+        }
+        assert_eq!(complex.cells().collect::<Vec<_>>(), ids_before);
+        assert_eq!(complex.simplices().as_ptr(), storage);
+        Ok(())
+    }
+
+    #[test]
+    fn direct_reader_keeps_empty_shapes_and_invalid_ids_distinct() -> Result<()> {
+        let empty = lower_star_complex(&[], &[])?;
+        for degree in [0, 1, 2, usize::MAX] {
+            let (rows, columns, matrix) = signed_boundary(&empty, degree);
+            assert!(rows.is_empty() && columns.is_empty() && matrix.is_empty());
+        }
+        let isolates = lower_star_complex(&[-3., 4.], &[])?;
+        let (rows, columns, matrix) = signed_boundary(&isolates, 0);
+        assert!(rows.is_empty() && matrix.is_empty());
+        assert_eq!(columns.len(), 2); // Ordinary H0 boundary: 0 by 2.
+        let (rows, columns, matrix) = signed_boundary(&isolates, 1);
+        assert_eq!(rows.len(), 2);
+        assert!(columns.is_empty());
+        assert_eq!(matrix, [Vec::<i32>::new(), Vec::new()]); // 2 by 0.
+        let other = lower_star_complex(&[0.; 3], &[&[0, 1], &[1, 2]])?;
+        let out_of_range = other.cells().last().unwrap();
+        assert_eq!(isolates.simplex(out_of_range), None);
+        assert_eq!(isolates.boundary(out_of_range), None);
+        // An in-range ID from another owner cannot be detected: never reuse it.
+        Ok(())
     }
 }
