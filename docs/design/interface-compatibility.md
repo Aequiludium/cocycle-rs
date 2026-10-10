@@ -2,11 +2,19 @@
 
 [Documentation](../README.md) / Design
 
-Technical report, 2026-10-09, for [#62](https://github.com/Aequiludium/cocycle-rs/issues/62)
-and [#63](https://github.com/Aequiludium/cocycle-rs/issues/63), following input/result
-decisions in [#60](https://github.com/Aequiludium/cocycle-rs/issues/60) and
-[#61](https://github.com/Aequiludium/cocycle-rs/issues/61). This report closes the
-interface preparation decision, not the later mathematical frameworks or release.
+Technical report, 2026-10-09, connecting the full #59–#63 interface preparation
+delivery. This page records the #62 reuse decision and #63 compatibility gate;
+the linked research reports supply the inventory and complete input/result
+reasoning. This closes interface preparation, not the later mathematical
+frameworks or release.
+
+| Task | Full report and evidence |
+| --- | --- |
+| [#59](https://github.com/Aequiludium/cocycle-rs/issues/59) | [Interface inventory](../research/interface-inventory.md): six frameworks, ownership costs, all eight historical PRs, publication delta and follow-up validation sources |
+| [#60](https://github.com/Aequiludium/cocycle-rs/issues/60) | [Input contracts](../research/input-contracts.md): bases/orientation, coefficients, costs/Grams, identities, chain maps, finite examples and rejected alternatives |
+| [#61](https://github.com/Aequiludium/cocycle-rs/issues/61) | [Result contracts](../research/result-contracts.md): four result families, availability, exactness/certificates, compatibility, moves/import losses and fixed-source counterexamples |
+| [#62](https://github.com/Aequiludium/cocycle-rs/issues/62) | Existing-API reuse decision below and [executable guide](../guides/interface-contracts.md) |
+| [#63](https://github.com/Aequiludium/cocycle-rs/issues/63) | Dated compatibility verification below; later consumers retain their own mathematics/acceptance |
 
 Subsequent filtration work adds a narrow borrowed `SimplicialStage` and checked
 same-source inclusions. The original inventory and evidence below describe the
@@ -35,17 +43,27 @@ specialized persistence dispatch and ordinary result guarantees are preserved.
 Public behavior belongs to rustdoc and the [kernel design](kernel.md); this report
 records the bounded decision and verification rather than redefining those APIs.
 
-## Baseline and pending work
+## Original compatibility baseline and historical pending work
 
-The production baseline is main
+The original production baseline is main
 [`9e6715f4c2e0118ab738486bd747ec3e361397de`](https://github.com/Aequiludium/cocycle-rs/commit/9e6715f4c2e0118ab738486bd747ec3e361397de).
-The candidate's `src/`, tests, examples, Cargo manifest/lock and native
-workers are unchanged from that commit. The documentation revision is the PR
-head; local checks and hosted runs must be identified by that exact revision.
-For a later main, rerun the guide and compatibility checks instead of assuming
-this dated decision certifies the newer implementation.
+The original candidate
+[`ec97ebba2d69619330b1fbc436a420480a01946a`](https://github.com/Aequiludium/cocycle-rs/commit/ec97ebba2d69619330b1fbc436a420480a01946a)
+left `src/`, tests, examples, Cargo manifest/lock and native workers unchanged
+from that commit. Its local checks and hosted runs belong to that exact revision.
+For a later main, rerun affected guide checks instead of assuming this dated
+decision certifies the newer implementation.
 
-The open PR stacks were rechecked before this change:
+[#98](https://github.com/Aequiludium/cocycle-rs/pull/98) subsequently merged as
+`03e896da106c3a90b8585e98a23bf28e013ac428`, after a synchronization commit.
+The full #59–#61 reports are published from main
+`cedf5965b774855614b761a1ad311d9dc7992c49`, which also contains #32 and #50–#53.
+The [inventory publication delta](../research/interface-inventory.md#publication-delta-on-main-cedf596)
+separates those changes from the original research. This docs supplement changes
+no production implementation; its verification does not relabel the old
+196-test or finite-probe counts as new-main results.
+
+The then-open PR stacks were rechecked before the original compatibility change:
 
 | PR | Observed head | Dependency and interpretation |
 | --- | --- | --- |
@@ -55,12 +73,13 @@ The open PR stacks were rechecked before this change:
 | [#51](https://github.com/Aequiludium/cocycle-rs/pull/51) | `c5441935250145d0a37874689a0dbe3f4bb13d0e` | H2 experiment, based on #50; production adoption is separate |
 | [#52](https://github.com/Aequiludium/cocycle-rs/pull/52) | `231ffbed0fea0dc4467bd9412a9ddf1a2a10c5f9` | Workspace audit, based on #51; retained no-go decisions |
 | [#53](https://github.com/Aequiludium/cocycle-rs/pull/53) | `c3fee147ca50673d2221d961397fa6c281056da2` | Research closeout, based on #52; no automatic merge authority |
-| [#56](https://github.com/Aequiludium/cocycle-rs/pull/56) | `2dcd5e3d8a306f3cb4c4f23e486cdfc5add78db1` | Draft adaptive-kernel proposal, based on #53; failed performance gates remain |
+| [#56](https://github.com/Aequiludium/cocycle-rs/pull/56) | `2dcd5e3d8a306f3cb4c4f23e486cdfc5add78db1` | Draft adaptive-kernel proposal, based on #53; the [corrected report](https://github.com/Aequiludium/cocycle-rs/blob/b08144d717e2de42b02088433b0887bd3a6b1d1f/benches/reports/f2-h1-adaptive.md) withdraws the regression claims. Both retained studies show lower candidate medians on all 11 matrix H1 cases in both repeats; direct-graph and H2/H3 performance gates remain unmeasured |
 
-Report-only [#32](https://github.com/Aequiludium/cocycle-rs/pull/32) remains separately
-based on main. This documentation PR neither updates nor replaces these PRs.
-The guide runs against main without borrowing pending preparation APIs or
-describing an experimental path as production. It makes no performance claim.
+At that snapshot, report-only [#32](https://github.com/Aequiludium/cocycle-rs/pull/32)
+was separately based on main. Preserve this historical table rather than treating
+it as today's open-PR list. The guide uses existing APIs without borrowing pending
+preparation calls or describing experimental paths as production. It makes no
+performance claim.
 
 ## Confirmed requirements and minimal action
 
@@ -159,7 +178,7 @@ the merger of pending experimental implementations.
 
 ## Verification and evidence limits
 
-Local acceptance uses Windows, Rust 1.98.1 and Python 3.10.11. The code/manifest
+Original local acceptance used Windows, Rust 1.98.1 and Python 3.10.11. The code/manifest
 identity comparison against the fixed main confirms no production/runtime
 resource change, new dependency or retained buffer. There is no new performance
 measurement: byte-identical production source is an identity observation, not
@@ -186,9 +205,10 @@ run retained two existing failures: `benchmark_rips_pipeline.worker` imports
 the POSIX-only `resource` module, and one documentation test expects forward
 slashes in a Windows-path diagnostic. That run had one error, one failed test
 and three skips; it is not a Windows tool-suite pass. No unrelated tooling fix
-was adopted. The primary checkout's local collaboration checker also retains its five historical
-missing links to the report files still pending in #32; they are outside the
-submitted documentation and unchanged by this update.
+was adopted. At original validation, the primary checkout's local collaboration
+checker retained five historical missing links to then-pending #32 reports.
+That older checkout's local links were outside the submitted documentation;
+#32 has since merged on main as recorded in the inventory publication delta.
 
 Earlier A1/A2 local research used fixed
 [homology-operator](https://github.com/proffitteoy/homology-operator/tree/a8d03d1699307ce1997b3c7e81a1946bb83f5408),
