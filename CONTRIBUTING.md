@@ -79,6 +79,7 @@ quality, test, and MSRV jobs:
 ```sh
 cargo fmt --all -- --check
 rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-features
 cargo test --locked --release --all-features
@@ -93,10 +94,14 @@ cargo run --locked --example complex_construction
 cargo test --locked --example complex_construction
 cargo test --locked --release --example complex_construction
 cargo run --locked --example diagram_distances
+cargo run --locked --example critical_sets
+cargo test --locked --example critical_sets
+cargo test --locked --release --example critical_sets
 RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
 cargo +1.91.0 test --locked --all-features
 cargo +1.91.0 check --locked --all-targets --all-features
 cargo +1.91.0 test --locked --example complex_construction
+cargo +1.91.0 test --locked --example critical_sets
 python3 tools/check_source.py
 python3 tools/check_artifacts.py
 python3 tools/check_docs.py
@@ -108,6 +113,7 @@ rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=
 rustdoc --edition 2024 --test docs/guides/rips-representatives.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/development/diagram-analysis.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/development/complex-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps

@@ -29,6 +29,29 @@ the stated observations, not Oineus runtime correctness or feature parity.
 The GUDHI runtime probe below uses Python GUDHI 3.12.0, separately from the pinned
 C++ source inspection and the repository's native GUDHI/Ripser comparisons.
 
+## Research acceptance and implementation handoff
+
+The research exit for #68 is distinct from the implementation gate for #69.
+On 2026-10-10, prerequisite #60 was accepted through merged
+[PR #99](https://github.com/Aequiludium/cocycle-rs/pull/99). The following decisions
+cover the research acceptance criteria and define the bounded implementation.
+
+| Research requirement | Decision and evidence in this report |
+| --- | --- |
+| Scale, order, truncation and completeness | Inclusive scalar sublevels; original units and IDs; face-before-coface ties; separate scale and skeleton coverage; three hand-derived finite families |
+| Valid and invalid stage maps | Same-owner identity inclusions commute with integer boundaries and compose; foreign owners, reverse scales and mixed certificates fail; an oriented-edge swap explains the signed chain-map requirement |
+| Multi-parameter scope | Incomparable parameter vectors need a partial order and a separately defined invariant; a total-order projection does not inherit an ordinary barcode guarantee |
+
+The decision is to deliver borrowed finite simplicial stages and same-source
+inclusions. General chain maps, generic-cell stage owners, relabeling,
+multi-parameter invariants and persistent spectral operators remain separate
+research work. #69's implementation and runnable examples are in
+[PR #100](https://github.com/Aequiludium/cocycle-rs/pull/100); its declared #66
+modeling prerequisite has a runnable delivery in
+[PR #102](https://github.com/Aequiludium/cocycle-rs/pull/102), independently awaiting
+review and merge. Research acceptance does not merge either implementation or
+publish a release.
+
 ## Scales, ties and what is complete
 
 | Finite example | Value convention | Four stages and independently derived sizes |

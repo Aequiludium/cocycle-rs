@@ -16,6 +16,8 @@ proposed APIs and remaining acceptance gates.
 
 ## Use the library
 
+- [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
+  bounded partial U and a lower-star simplification step.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
@@ -70,10 +72,14 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Rips acceptance audit](design/rips-acceptance.md) | R1-R10 evidence, resource boundaries and local/hosted validation distinction |
 | [Rips implementation scope](design/rips-implementation.md) | Stage-specific new directories, source moves, code/tooling changes and review units |
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
-| [Interface compatibility report](design/interface-compatibility.md) | Confirmed existing-interface reuse, runnable framework entries, conversion/control boundaries and dated compatibility acceptance |
+| [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
+| [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
+| [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
+| [Result interpretation and comparison](research/result-contracts.md) | Four result families, availability, units, certificates, ownership/import losses and fixed-source spectral/distance discrepancies |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
+| [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
 | [Performance reporting rules](../benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
