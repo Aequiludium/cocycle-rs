@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Prepare diagram distances directly from borrowed logical dimension views.
+  Remove the facade's finite/essential point arrays; Wasserstein builds its
+  scaled points directly and Bottleneck owns its coordinate preparation.
+  Essential matching streams in birth order. Public signatures, numeric rules
+  and context checks are unchanged; repeated scans count toward execution work.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

@@ -19,6 +19,11 @@
 //! approximations describe the two supplied diagrams, not the unknown original
 //! diagrams and not an approximation error certificate.
 //!
+//! The facade borrows logical dimension views and streams essential matching.
+//! Each finite kernel owns its preparation: Bottleneck keeps private coordinates
+//! and indexes, while Wasserstein constructs scaled points directly from the view.
+//! No shared owned point representation is constructed between these layers.
+//!
 //! # Execution controls
 //!
 //! Each raw and context-aware function has a `_with` variant accepting
@@ -50,7 +55,10 @@
 //! # Ok::<(), cocycle::Error>(())
 //! ```
 
-use crate::diagram::{Coverage, IntervalEnd, PersistenceData, PersistenceDiagram};
+use crate::diagram::{
+    Coverage, DiagramDimension, IntervalEnd, PersistenceData, PersistenceDiagram,
+    PersistenceInterval,
+};
 use crate::execution::{Execution, WorkBudget};
 use crate::{Error, Result};
 
@@ -281,10 +289,17 @@ where
 }
 
 #[derive(Clone, Copy)]
-enum Kind {
+pub(crate) enum Kind {
     Bottleneck,
     W1,
     W2,
+}
+
+// Empty in ordinary builds. Capacity diagnostics belong to tests and workers.
+#[derive(Default)]
+pub(crate) struct Diagnostics {
+    pub(crate) bottleneck: bottleneck::Diagnostics,
+    pub(crate) wasserstein: wasserstein::Stats,
 }
 
 fn distance_with(
@@ -295,7 +310,14 @@ fn distance_with(
     execution: &Execution<'_>,
 ) -> Result<f64> {
     if execution.is_unlimited() {
-        distance(first, second, dimension, kind, &mut WorkBudget::unlimited())
+        distance(
+            first,
+            second,
+            dimension,
+            kind,
+            &mut WorkBudget::unlimited(),
+            &mut Diagnostics::default(),
+        )
     } else {
         distance(
             first,
@@ -303,6 +325,7 @@ fn distance_with(
             dimension,
             kind,
             &mut WorkBudget::new(execution)?,
+            &mut Diagnostics::default(),
         )
     }
 }
@@ -339,48 +362,43 @@ where
     }
 }
 
-struct Points {
-    finite: Vec<[f64; 2]>,
-    essential: Vec<f64>,
-}
-
-fn points<const CONTROLLED: bool>(
-    diagram: &PersistenceDiagram,
+fn dimension_view<'a, const CONTROLLED: bool>(
+    diagram: &'a PersistenceDiagram,
     dimension: usize,
     budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<Points> {
+) -> Result<(DiagramDimension<'a>, usize)> {
     budget.step()?;
     let view = diagram.dimension(dimension)?;
     if let Coverage::Through(through) = diagram.coverage() {
         return Err(Error::IncompleteDiagram { through });
     }
-    let mut finite = Vec::new();
-    let mut essential = Vec::new();
+    let mut finite = 0;
     for interval in view.iter() {
         budget.step()?;
         match interval.end() {
-            IntervalEnd::Finite(death) => {
-                finite.try_reserve(1).map_err(|_| Error::AllocationFailed {
-                    context: "finite distance points",
-                })?;
-                finite.push([interval.birth(), death]);
-            }
-            IntervalEnd::Essential => {
-                essential
-                    .try_reserve(1)
-                    .map_err(|_| Error::AllocationFailed {
-                        context: "essential distance points",
-                    })?;
-                essential.push(interval.birth());
-            }
+            IntervalEnd::Finite(_) => finite += 1,
+            IntervalEnd::Essential => {}
             IntervalEnd::RightCensored { through } => {
                 return Err(Error::IncompleteDiagram { through });
             }
         }
     }
-    // The owning diagram sorts by dimension and then birth, so this subsequence
-    // already has the monotone order required by one-dimensional matching.
-    Ok(Points { finite, essential })
+    Ok((view, finite))
+}
+
+fn next_essential<const CONTROLLED: bool>(
+    intervals: &mut impl Iterator<Item = PersistenceInterval>,
+    budget: &mut WorkBudget<'_, CONTROLLED>,
+) -> Result<f64> {
+    for interval in intervals {
+        budget.step()?;
+        if interval.end() == IntervalEnd::Essential {
+            return Ok(interval.birth());
+        }
+    }
+    Err(Error::InternalInvariant {
+        reason: "essential count changed during distance computation",
+    })
 }
 
 fn distance<const CONTROLLED: bool>(
@@ -389,54 +407,69 @@ fn distance<const CONTROLLED: bool>(
     dimension: usize,
     kind: Kind,
     budget: &mut WorkBudget<'_, CONTROLLED>,
+    stats: &mut Diagnostics,
 ) -> Result<f64> {
-    let first = points(first, dimension, budget)?;
-    let second = points(second, dimension, budget)?;
+    let (first, first_finite) = dimension_view(first, dimension, budget)?;
+    let (second, second_finite) = dimension_view(second, dimension, budget)?;
+    let essential = first.len() - first_finite;
     budget.check()?;
-    if first.essential.len() != second.essential.len() {
+    if essential != second.len() - second_finite {
         return Ok(f64::INFINITY);
     }
-    let finite = match kind {
-        Kind::Bottleneck => bottleneck::distance(&first.finite, &second.finite, budget)?,
-        Kind::W1 => wasserstein::distance(
-            &first.finite,
-            &second.finite,
-            wasserstein::Metric::W1,
-            budget,
-        )?,
-        Kind::W2 => wasserstein::distance(
-            &first.finite,
-            &second.finite,
-            wasserstein::Metric::W2,
-            budget,
-        )?,
+    let finite = if first_finite == 0 && second_finite == 0 {
+        0.0
+    } else {
+        match kind {
+            Kind::Bottleneck => bottleneck::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                &mut stats.bottleneck,
+                budget,
+            )?,
+            Kind::W1 => wasserstein::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                wasserstein::Metric::W1,
+                &mut stats.wasserstein,
+                budget,
+            )?,
+            Kind::W2 => wasserstein::from_dimensions(
+                &first,
+                &second,
+                (first_finite, second_finite),
+                wasserstein::Metric::W2,
+                &mut stats.wasserstein,
+                budget,
+            )?,
+        }
     };
     let mut value = finite;
     let mut compensation = 0.0;
-    for (left, right) in first
-        .essential
-        .chunks(256)
-        .zip(second.essential.chunks(256))
-    {
-        budget.step_by(left.len())?;
-        for (&left, &right) in left.iter().zip(right) {
-            let cost = (left - right).abs();
-            if !cost.is_finite() {
-                return Err(Error::NumericalFailure {
-                    context: "essential point distance",
-                });
-            }
-            value = match kind {
-                Kind::Bottleneck => value.max(cost),
-                Kind::W1 => {
-                    let corrected = cost - compensation;
-                    let sum = value + corrected;
-                    compensation = (sum - value) - corrected;
-                    sum
-                }
-                Kind::W2 => value.hypot(cost),
-            };
+    // Canonical birth order permits streaming essential matching. Charge every
+    // visited interval, including finite intervals skipped on this second pass.
+    let mut left = first.iter();
+    let mut right = second.iter();
+    for _ in 0..essential {
+        let left = next_essential(&mut left, budget)?;
+        let right = next_essential(&mut right, budget)?;
+        let cost = (left - right).abs();
+        if !cost.is_finite() {
+            return Err(Error::NumericalFailure {
+                context: "essential point distance",
+            });
         }
+        value = match kind {
+            Kind::Bottleneck => value.max(cost),
+            Kind::W1 => {
+                let corrected = cost - compensation;
+                let sum = value + corrected;
+                compensation = (sum - value) - corrected;
+                sum
+            }
+            Kind::W2 => value.hypot(cost),
+        };
     }
     budget.check()?;
     if !value.is_finite() {
@@ -456,7 +489,33 @@ fn distance_results<const CONTROLLED: bool>(
 ) -> Result<f64> {
     budget.step()?;
     check_context(first, second)?;
-    distance(first.diagram(), second.diagram(), dimension, kind, budget)
+    distance(
+        first.diagram(),
+        second.diagram(),
+        dimension,
+        kind,
+        budget,
+        &mut Diagnostics::default(),
+    )
+}
+
+#[cfg(any(test, cocycle_distance_bench))]
+pub(crate) fn distance_with_diagnostics(
+    first: &PersistenceDiagram,
+    second: &PersistenceDiagram,
+    dimension: usize,
+    kind: Kind,
+    stats: &mut Diagnostics,
+) -> Result<f64> {
+    *stats = Diagnostics::default();
+    distance(
+        first,
+        second,
+        dimension,
+        kind,
+        &mut WorkBudget::unlimited(),
+        stats,
+    )
 }
 
 fn check_context(first: &PersistenceData, second: &PersistenceData) -> Result<()> {
@@ -488,6 +547,113 @@ mod tests {
     use super::*;
     use std::fmt::Debug;
     use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn logical_preparation_preserves_mixed_values_and_essential_shortcuts() {
+        let make = |finite: &[[f64; 2]], births: &[f64]| {
+            PersistenceDiagram::new(
+                0,
+                Coverage::Complete,
+                finite
+                    .iter()
+                    .map(|p| PersistenceInterval::new(0, p[0], IntervalEnd::Finite(p[1])).unwrap())
+                    .chain(
+                        births.iter().map(|&b| {
+                            PersistenceInterval::new(0, b, IntervalEnd::Essential).unwrap()
+                        }),
+                    )
+                    .collect(),
+            )
+            .unwrap()
+        };
+        // Repeated finite points and essential births interleave in canonical order.
+        let a = make(&[[-4., -2.], [-4., -2.]], &[-5., -3., -3., 2.]);
+        let b = make(&[], &[3., -2., -4., -2.]);
+        for (kind, expected) in [
+            (Kind::Bottleneck, 1.),
+            (Kind::W1, 6.),
+            (Kind::W2, 8.0_f64.sqrt()),
+        ] {
+            let mut stats = Diagnostics::default();
+            assert_eq!(
+                distance_with_diagnostics(&a, &b, 0, kind, &mut stats).unwrap(),
+                expected
+            );
+            match kind {
+                Kind::Bottleneck => {
+                    assert_eq!(stats.bottleneck.preparation_buffers, 5);
+                    assert!(
+                        stats.bottleneck.preparation_bytes
+                            >= 2 * (16 + 8 + 3 * std::mem::size_of::<usize>())
+                    );
+                }
+                Kind::W1 | Kind::W2 => {
+                    assert_eq!(stats.wasserstein.preparation_buffers, 1);
+                    assert_eq!(stats.wasserstein.preparation_bytes, 2 * 32);
+                }
+            }
+            let essential = make(&[], &[-5., -3., -3., 2.]);
+            let mut stats = Diagnostics::default();
+            distance_with_diagnostics(&essential, &b, 0, kind, &mut stats).unwrap();
+            assert_eq!(
+                stats.bottleneck.preparation_bytes + stats.wasserstein.preparation_bytes,
+                0
+            );
+            let mismatch = make(&[], &[0.]);
+            assert_eq!(
+                distance_with_diagnostics(&a, &mismatch, 0, kind, &mut stats).unwrap(),
+                f64::INFINITY
+            );
+            assert_eq!(
+                stats.bottleneck.preparation_buffers + stats.wasserstein.preparation_buffers,
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_dimension_scans_and_essential_accumulation_share_controls() {
+        let make = |offset| {
+            PersistenceDiagram::new(
+                0,
+                Coverage::Complete,
+                (0..600)
+                    .map(|i| {
+                        let birth = i as f64 + offset;
+                        PersistenceInterval::new(
+                            0,
+                            birth,
+                            if i % 2 == 0 {
+                                IntervalEnd::Finite(birth + 0.5)
+                            } else {
+                                IntervalEnd::Essential
+                            },
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+            )
+            .unwrap()
+        };
+        let a = make(0.);
+        let b = make(0.25);
+        for kind in [Kind::Bottleneck, Kind::W1, Kind::W2] {
+            check_control(|budget| distance(&a, &b, 0, kind, budget, &mut Diagnostics::default()));
+            // Interruption at the last charged scan must also be seen by the
+            // final check, after finite matching has already completed.
+            let execution = Execution::default().max_work(u64::MAX);
+            let mut full = WorkBudget::new(&execution).unwrap();
+            distance(&a, &b, 0, kind, &mut full, &mut Diagnostics::default()).unwrap();
+            let flag = AtomicBool::new(false);
+            let execution = Execution::new(Some(u64::MAX), Some(&flag));
+            let mut stopped = WorkBudget::new(&execution).unwrap();
+            stopped.cancel_at_work(full.used() - 1);
+            assert_eq!(
+                distance(&a, &b, 0, kind, &mut stopped, &mut Diagnostics::default()),
+                Err(Error::Cancelled)
+            );
+        }
+    }
 
     // Exercise an actual kernel/stage rather than stopping at the public facade.
     // Discover work dynamically; no algorithm's incidental count is frozen.
@@ -554,32 +720,43 @@ mod tests {
         for kind in [Kind::Bottleneck, Kind::W1, Kind::W2] {
             let mut preparation =
                 WorkBudget::new(&Execution::default().max_work(u64::MAX)).unwrap();
-            let left = points(&a, 0, &mut preparation).unwrap();
-            let right = points(&b, 0, &mut preparation).unwrap();
+            let (left, left_count) = dimension_view(&a, 0, &mut preparation).unwrap();
+            let (right, right_count) = dimension_view(&b, 0, &mut preparation).unwrap();
             let mut kernel = WorkBudget::new(&Execution::default().max_work(u64::MAX)).unwrap();
+            let mut stats = Diagnostics::default();
             match kind {
-                Kind::Bottleneck => bottleneck::distance(&left.finite, &right.finite, &mut kernel),
-                Kind::W1 => wasserstein::distance(
-                    &left.finite,
-                    &right.finite,
-                    wasserstein::Metric::W1,
+                Kind::Bottleneck => bottleneck::from_dimensions(
+                    &left,
+                    &right,
+                    (left_count, right_count),
+                    &mut stats.bottleneck,
                     &mut kernel,
                 ),
-                Kind::W2 => wasserstein::distance(
-                    &left.finite,
-                    &right.finite,
+                Kind::W1 => wasserstein::from_dimensions(
+                    &left,
+                    &right,
+                    (left_count, right_count),
+                    wasserstein::Metric::W1,
+                    &mut stats.wasserstein,
+                    &mut kernel,
+                ),
+                Kind::W2 => wasserstein::from_dimensions(
+                    &left,
+                    &right,
+                    (left_count, right_count),
                     wasserstein::Metric::W2,
+                    &mut stats.wasserstein,
                     &mut kernel,
                 ),
             }
             .unwrap();
             let mut whole = WorkBudget::new(&Execution::default().max_work(u64::MAX)).unwrap();
-            distance(&a, &b, 0, kind, &mut whole).unwrap();
+            distance(&a, &b, 0, kind, &mut whole, &mut Diagnostics::default()).unwrap();
             assert_eq!(whole.used(), preparation.used() + kernel.used());
             let limit = preparation.used().max(kernel.used());
             let mut limited = WorkBudget::new(&Execution::default().max_work(limit)).unwrap();
             assert_eq!(
-                distance(&a, &b, 0, kind, &mut limited),
+                distance(&a, &b, 0, kind, &mut limited, &mut Diagnostics::default()),
                 Err(Error::WorkLimitExceeded { limit })
             );
         }

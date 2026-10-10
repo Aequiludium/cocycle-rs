@@ -29,6 +29,12 @@ owns baseline availability, setup, deterministic fixtures, timing and validation
 
 ## Diagram-distance correctness and ablations
 
+[reproduce_distance_preparation.py](reproduce_distance_preparation.py) exports
+committed snapshots and replays the finite W1 preparation counterexample, with
+ordinary API and isolated allocation controls. See the
+[investigation report](../benches/reports/distance-preparation.md) for commands,
+the deterministic fixture and limitations. No external Python packages are needed.
+
 [compare_distances.py](compare_distances.py) checks bottleneck/L-infinity,
 W1/L-infinity and W2/Euclidean against independent rational small-diagram
 matching, pinned Topp, repaired native GUDHI bottleneck and isolated GUDHI/POT
