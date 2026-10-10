@@ -9,6 +9,14 @@ Both paths compute ordinary persistence over a selected prime field. They suppor
 signed scales and unequal vertex birth times. Alpha geometry and a production
 cubical container are not implemented by these interfaces.
 
+General supplied simplicial filtrations and generic filtered-cell requests use
+the same boundary reduction core. Zero-born concrete simplices retain the
+existing coface path, as described below. The concrete adapter reads constructor-validated stored
+incidence; the generic adapter validates the external cell contract. Concrete
+source metadata and construction coverage remain attached to the result. Cycle
+and cocycle requests retain the separate representative computation. Implicit
+flag/Rips requests continue to use their specialized dispatch.
+
 Algorithm authors can follow the [construction walkthrough](../development/complex-construction.md)
 for a tested lower-star constructor example and its focused development command.
 
@@ -152,14 +160,15 @@ complex cannot manufacture those certificates.
 
 Rips implicit coface algorithms retain a private, explicitly zero-born contract.
 They are distinct from the public boundary contract. Diagram-only explicit
-simplicial analysis reuses H0 union-find and coface clearing when all vertices
+simplicial analysis reuses union-find and coface clearing when all vertices
 are born at zero and the query cutoff is nonnegative or absent. The decision
 checks actual simplex values; it also supports non-flag topology and delayed
 higher-simplex values through stored cofaces. Other inputs use boundary reduction,
 and representative requests retain their separate transformation work. Generic
 `PersistenceBuilder::from_complex` always uses the boundary contract. Native
 workers preserve their protocol; performance claims require measurements bound
-to the measured source commit.
+to the measured source commit. The [integration report](../../benches/reports/critical-sets.md)
+records the current-main gate that rejected automatic boundary rerouting.
 
 [g-complex]: https://gudhi.inria.fr/doc/latest/group__simplex__tree.html
 [g-contract]: https://gudhi.inria.fr/doc/latest/struct_filtered_complex.html
