@@ -492,6 +492,13 @@ typed source keeps Rips approximation metadata local to the Rips variant. Stored
 simplex values determine the maximum filtration value; maximum edge value is not
 a generic completeness certificate. Source units are explicit or unspecified.
 
+`SimplicialStage` borrows a source's scale-selected prefix and its optional
+construction wrapper, preserving IDs and signed incidence without allocating
+stage storage. `complex/filtered.rs` exposes its cells through `FilteredComplex`;
+`persistence/source.rs` composes its contextual analysis with the existing
+supplied/certified paths, retaining coverage and skeleton checks. Stage inclusion
+access only accepts increasing scales of the same owner and certificates.
+
 Supplied signed filtrations and non-simplicial cell adapters are covered by
 `tests/filtered_complex.rs`. Alpha geometric predicates and triangulation remain
 future geometry work; no empty directories or placeholder constructors exist.

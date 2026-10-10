@@ -137,6 +137,80 @@ an error. For simplicial representatives use `complex.persistence()` instead.
 Iteration/validation/reduction share the execution budget; controls cannot
 interrupt the interior of a custom accessor or iterator call.
 
+## Read stages and their inclusions
+
+`SimplicialComplex::stage(scale)` and `SimplicialFiltration::stage(scale)` borrow
+the closed sublevel set of stored simplices with value <= scale. Every tie is
+included. Selection uses a binary search and retains the source's simplex IDs,
+vertex orientation and signed boundaries; it allocates no simplex or map storage.
+Finite negative scales are valid, including empty stages before any cell enters.
+
+```rust
+use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
+use cocycle::diagram::{Coverage, IntervalEnd};
+use cocycle::persistence::PersistenceExt;
+use cocycle::Error;
+
+let complex = SimplicialComplex::new(vec![
+    Simplex::new(vec![10], -2.)?, Simplex::new(vec![20], -1.)?,
+    Simplex::new(vec![30], 0.)?, Simplex::new(vec![10, 20], 1.)?,
+    Simplex::new(vec![10, 30], 1.)?, Simplex::new(vec![20, 30], 1.)?,
+    Simplex::new(vec![10, 20, 30], 2.)?,
+])?;
+let stages = [-1., 0., 1., 2.].map(|scale| complex.stage(scale).unwrap());
+assert_eq!(stages.map(|stage| stage.len()), [2, 3, 6, 7]);
+let ring = stages[2];
+let filled = stages[3];
+for (id, image) in ring.inclusion_into(&filled)? {
+    assert_eq!(id, image);
+    assert_eq!(ring.boundary(id), filled.boundary(image));
+}
+let edges: Vec<_> = ring.cells()
+    .filter(|id| FilteredComplex::dimension(&ring, *id) == 1).collect();
+assert_eq!(edges.len(), 3);
+let result = ring.persistence().compute()?;
+assert_eq!(result.diagram().coverage(), Coverage::Through(1.));
+assert_eq!(result.diagram().dimension(1)?.iter().next().unwrap().end(),
+    IntervalEnd::RightCensored { through: 1. });
+assert!(matches!(filled.inclusion_into(&ring), Err(Error::InvalidParameter { .. })));
+let another = complex.clone();
+assert!(matches!(ring.inclusion_into(&another.stage(2.)?),
+    Err(Error::InvalidParameter { .. })));
+# Ok::<(), cocycle::Error>(())
+```
+
+The [construction example](../../examples/complex_construction.rs) prints four
+lower-star stages and their inclusions before any persistence computation.
+Consumers can independently traverse `cells()` and signed boundaries, or borrow
+`simplices()` and `simplex(id)`. Degree-specific bases and external matrices are
+explicit consumer-owned conversions. Absent cells return `None`; bare IDs still
+require the caller to use the correct owner.
+
+A certified stage exposes its original `SimplicialFiltration` through
+`source_filtration()`, retaining context, approximation, scale coverage and
+construction-dimension sufficiency. Selecting above `Coverage::Through(t)` is an
+error. A stage may be read from an insufficient skeleton, but its contextual
+`.persistence()` still rejects an unsupported homology dimension. It never
+completes the skeleton or changes sparse blockers. An analysis cutoff must be
+finite and no greater than the stage scale; omitting it selects that scale.
+Analysis and representative computation retain the existing execution controls.
+
+`stage.persistence()` analyzes the original filtration through the stage scale;
+later unobserved deaths remain censored. Explicitly using
+`PersistenceBuilder::from_complex(&stage)` or `stage.source_complex()` selects
+stored topology as a new supplied source, discarding the relation to later events
+and construction certificates. A ring can then have an essential H1 class even
+if the original filtration later fills it. This is an explicit change of source.
+
+`inclusion_into` checks that both stages borrow the same source and certificate
+interpretation and that their scales do not decrease. It yields identity pairs
+without copying or renumbering; its coefficients are +1 over the integers.
+Cloned owners, reverse scales and certified/bare interpretation mixtures are
+rejected, even if the integer IDs or cell sets happen to agree. General chain
+maps and multi-parameter filtrations are outside this first capability. The
+[source comparison and decisions](../research/filtration-stages.md) explain those
+limits, units, ordering and independent validation.
+
 ## Supplied topology versus certified construction
 
 A supplied complex is the mathematical source in its entirety. A triangle's

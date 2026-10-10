@@ -16,6 +16,11 @@ frameworks or release.
 | [#62](https://github.com/Aequiludium/cocycle-rs/issues/62) | Existing-API reuse decision below and [executable guide](../guides/interface-contracts.md) |
 | [#63](https://github.com/Aequiludium/cocycle-rs/issues/63) | Dated compatibility verification below; later consumers retain their own mathematics/acceptance |
 
+Subsequent filtration work adds a narrow borrowed `SimplicialStage` and checked
+same-source inclusions. The original inventory and evidence below describe the
+interface preparation baseline; the [stage report](../research/filtration-stages.md)
+records this later capability and its separate validation.
+
 ## Result and scope
 
 The first consumers can use existing borrowed geometry, frozen signed incidence,

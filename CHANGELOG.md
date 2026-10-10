@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add borrowed `SimplicialStage` sublevel access and checked same-source
+  inclusions for supplied and certified explicit simplicial filtrations. Stage
+  persistence retains original context, coverage and skeleton sufficiency.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals
