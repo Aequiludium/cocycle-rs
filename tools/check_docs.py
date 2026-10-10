@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 PATTERNS = ("*.md", "docs/**/*.md", "benches/*.md", "benches/native/**/*.md",
             "benches/reports/**/*.md", "benches/pipeline/**/*.md", "benches/distances/**/*.md",
+            "benches/optimization/**/*.md",
             "tools/*.md", "assets/*.md", ".github/**/*.md")
 DESTINATION = r'(<[^>\n]+>|[^\s)]+)(?:\s+"[^"\n]*")?'
 LINK = re.compile(r"!?\[[^\]\n]*\]\(" + DESTINATION + r"\)")

@@ -13,6 +13,15 @@
   execution controls per construction/query. Matching scratch and Wasserstein
   pair normalization remain local to each query. Ordinary scalar APIs are
   unchanged and remain the default for single or low-reuse comparisons.
+- Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
+  frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
+  dimension-specific V transposes and bounded partial U rows. Endpoint proposals
+  combine by maximum absolute displacement with first-proposal ties. Includes
+  a lower-star simplification example; updates and differentiation remain caller-owned.
+- Retain specialized F2 H0/H1 for exact diagram-only Rips and supplied flag
+  requests computing H2+, with complete ordinary/emergent/virtual death-triangle
+  clearing passed to the generic continuation. Preserve full generic fallback
+  for indexing overflow, odd primes, representatives and blocked approximation.
 
 ## 0.1.1
 
