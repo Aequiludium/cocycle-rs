@@ -68,7 +68,7 @@ The then-open PR stacks were rechecked before the original compatibility change:
 | [#51](https://github.com/Aequiludium/cocycle-rs/pull/51) | `c5441935250145d0a37874689a0dbe3f4bb13d0e` | H2 experiment, based on #50; production adoption is separate |
 | [#52](https://github.com/Aequiludium/cocycle-rs/pull/52) | `231ffbed0fea0dc4467bd9412a9ddf1a2a10c5f9` | Workspace audit, based on #51; retained no-go decisions |
 | [#53](https://github.com/Aequiludium/cocycle-rs/pull/53) | `c3fee147ca50673d2221d961397fa6c281056da2` | Research closeout, based on #52; no automatic merge authority |
-| [#56](https://github.com/Aequiludium/cocycle-rs/pull/56) | `2dcd5e3d8a306f3cb4c4f23e486cdfc5add78db1` | Draft adaptive-kernel proposal, based on #53; failed performance gates remain |
+| [#56](https://github.com/Aequiludium/cocycle-rs/pull/56) | `2dcd5e3d8a306f3cb4c4f23e486cdfc5add78db1` | Draft adaptive-kernel proposal, based on #53; the [corrected report](https://github.com/Aequiludium/cocycle-rs/blob/b08144d717e2de42b02088433b0887bd3a6b1d1f/benches/reports/f2-h1-adaptive.md) withdraws the regression claims. Both retained studies show lower candidate medians on all 11 matrix H1 cases in both repeats; direct-graph and H2/H3 performance gates remain unmeasured |
 
 At that snapshot, report-only [#32](https://github.com/Aequiludium/cocycle-rs/pull/32)
 was separately based on main. Preserve this historical table rather than treating

@@ -125,7 +125,7 @@ Hermitian positive-definite Grams and numerical validation are spectral
 responsibilities. A weighted L need not be Euclidean-symmetric; Gcur L is
 Hermitian. Do not pass it to a Euclidean-symmetric solver without the appropriate
 coordinate transformation. Floating residual/tolerance/eigen-solver policies
-remain in #72; the probe uses exact rational calculations and no eigen-solver.
+remain in #73; the probe uses exact rational calculations and no eigen-solver.
 
 F2 costs accept the consumer's documented arithmetic: exact integer/rational or
 explicit floating positive finite values. They need one value per current basis
@@ -246,7 +246,9 @@ as an approved public interchange schema.
 The #60 research decision is complete. Result interpretation is supplied by
 [#61](result-contracts.md), and #62/#63 reused the existing API with an executable
 guide. General stage access/maps continue under #68/#69 and consumer mathematics
-under #72/#73/#74. Those algorithms are not completed by this report.
+under #73 (Laplacian/spectra), #74 (Dirac), #75 (F2 homology) and #76
+(generalized topology). #72 adapts existing PH interfaces; #96 owns adoption
+decisions. Those algorithms are not completed by this report.
 
 The original 47-condition probe and raw logs were local research artifacts,
 not a hosted acceptance suite. Their results are reported above without claiming
