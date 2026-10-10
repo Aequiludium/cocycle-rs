@@ -22,6 +22,8 @@ src/
   error.rs                       shared structured errors
   execution/
     mod.rs                       shared controls and private per-operation budget
+  optimization/
+    mod.rs                       borrowed-source F2 critical sets; lazy dual and bounded U
   algebra/
     field/mod.rs                 validated PrimeField and modular arithmetic
     column/mod.rs                private ordered sparse coefficient columns
@@ -139,6 +141,15 @@ files. Public paths are re-exported from domains, not every private directory.
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
 | `descriptors` | Read diagrams without recomputing persistence | Diagram, error utilities |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
+| `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
+
+`CriticalSetWorkspace` is opt-in and reuses the serial F2 lazy reducer. It retains
+primal R/V, constructs dual R/V only
+on demand, transposes V only for queried dimensions and solves bounded U rows
+without retaining the inverse. The [usage guide](../guides/critical-sets.md)
+defines source identity, update validity and execution boundaries. Parallel
+ELZ recovery and general optimizer or differentiation interfaces remain outside
+this concrete capability.
 
 Geometry and diagram code do not call persistence. Filtration code does not call
 persistence. Descriptors do not inspect source coordinates or algorithm state.
@@ -147,6 +158,25 @@ The public `FilteredComplex` contract drives generic boundary reduction. It does
 not require simplex vertex lists, construction methods or mutable algorithm keys.
 No backend registry or Alpha/cubical construction is implied. See the
 [filtered-complex guide](../guides/filtered-complexes.md) for source semantics.
+
+### Integrated computation paths
+
+| Capability | Implemented owner and selection |
+| --- | --- |
+| Supplied diagrams | Generic filtered cells and general simplicial filtrations share `boundary::diagram` / `reduce_pairs`; zero-born concrete simplices retain the existing shared coface route |
+| Implicit flag/Rips | Existing specialized dispatch, including the admitted F2 H0/H1-to-H2+ continuation and generic fallbacks |
+| Representatives | Separate requested output; basis transformations are retained only when needed |
+| Critical sets | Opt-in sparse `CriticalSetWorkspace` with lazy dual and bounded Partial U |
+| Independent F2 reducer | Test/reference benchmark only; no public engine selection |
+
+The generic filtered-cell path is the common boundary-reduction optimization
+owner. Existing zero-born concrete requests retain the shared coface kernel,
+which also serves implicit flag/Rips continuation and fallback. The
+[integration report](../../benches/reports/critical-sets.md) records why both
+uniform boundary routing and an H2+-only change were rejected on current main.
+The public interfaces, prime fields, coverage and result ownership are preserved.
+No dense production critical-set backend, engine option or adaptive size threshold
+is introduced; high-dimensional dense ideas remain follow-up work.
 
 Each implemented domain has a directory, even while its implementation is small.
 The domain's `mod.rs` documents its scope and exports its public API; named child
@@ -211,6 +241,14 @@ merges and candidate H1 births; triangle cofacets are generated during reverse
 coboundary reduction. Stored change-of-basis columns and virtual zero-lifetime
 apparent pairs supply later eliminations.
 
+Exact F2 diagram-only H2+ requests reuse this specialized H0/H1 work. The owned
+intervals and complete death-triangle keys, including omitted virtual pairs,
+feed generic cohomology starting at dimension 2. H1-only calls compile out key
+collection. The H1 workspace is released before continuation; retained graph
+access and complete triangle topology still support higher-level generation.
+Odd primes, representatives and blocked approximation retain their existing
+routes. Index overflow on a higher-dimensional request keeps full generic fallback.
+
 Within `src/persistence/flag/cohomology/mod.rs`, `run_access` classifies edges in
 forward order and reduces their coboundaries in reverse order.
 `initialize_coboundary` scans each original column once, combining initialization
@@ -257,10 +295,9 @@ the compact H1 entry order use the comparison authority in `complex/simplicial`.
 `SimplicialFiltration` retains construction dimension and scale provenance
 separately for exact Rips, approximation and supplied flags. The old expansion
 types remain available during migration.
-Explicit builder computation reads stored incidence, retaining H0 union-find
-and dimension-wise clearing for zero-born inputs. Other inputs and representative
-requests use `simplicial/input.rs` to convert selected stored boundaries to field
-columns. The immutable concrete type supplies face closure, ordered unique IDs
+Explicit zero-born computation retains union-find and coface clearing. Other
+diagram inputs use `simplicial/input.rs` to convert selected stored boundaries
+to field columns; representative requests additionally retain basis transformations. The immutable concrete type supplies face closure, ordered unique IDs
 and oriented incidence, so this reader does not recheck them or compute the
 boundary square. Its ID map covers only selected simplices, and ordered traversal
 stops at the analysis cutoff. It still visits preceding higher-dimensional cells

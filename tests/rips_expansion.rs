@@ -1,6 +1,7 @@
 //! Explicit topology contracts and dimension-generic F2 persistence.
 use cocycle::{
     Error,
+    algebra::PrimeField,
     complex::{WeightedEdge, WeightedGraph},
     diagram::{Coverage, IntervalEnd, PersistenceDiagram},
     filtration::{FlagFiltration, threshold_rips_from_distances},
@@ -106,6 +107,71 @@ fn high_dimensional_spheres_die_when_opposite_edges_enter() {
                         .end(),
                     IntervalEnd::Essential
                 );
+            }
+        }
+    }
+}
+#[test]
+fn repeated_h3_spheres_preserve_multisets_and_prime_field_fallbacks() {
+    // Two disjoint boundaries of 4-cross-polytopes and one isolated vertex.
+    // Each sphere enters at 1 and is filled when its opposite edges enter at 2.
+    // Their integral homology is torsion-free, so the expected bars hold over
+    // every tested prime. This also checks multiplicity and H0-H3 together.
+    let input = FlagFiltration::new(
+        WeightedGraph::new(
+            17,
+            (0..16)
+                .flat_map(|b| {
+                    (0..b).filter_map(move |a| {
+                        (a / 8 == b / 8).then_some(WeightedEdge {
+                            vertices: [a, b],
+                            value: if a / 2 == b / 2 { 2. } else { 1. },
+                        })
+                    })
+                })
+                .collect(),
+        )
+        .unwrap(),
+    );
+    for prime in [2, 3, 5, 4294967291] {
+        for cutoff in [None, Some(1.)] {
+            let options = PersistenceOptions::new(3, cutoff)
+                .unwrap()
+                .with_field(PrimeField::new(prime).unwrap());
+            let result = compute_flag(&input, &options, &ExecutionLimits::default()).unwrap();
+            let mut expected = vec![(0, 0., Some(1.)); 14];
+            expected.extend([(0, 0., None); 3]);
+            expected.extend([(3, 1., cutoff.is_none().then_some(2.)); 2]);
+            assert_eq!(
+                bars(result.diagram()),
+                expected,
+                "prime={prime} cutoff={cutoff:?}"
+            );
+            assert_eq!(result.context().characteristic(), prime);
+            assert_eq!(
+                result.diagram().coverage(),
+                if cutoff.is_some() {
+                    Coverage::Through(1.)
+                } else {
+                    Coverage::Complete
+                }
+            );
+            for interval in result
+                .diagram()
+                .intervals()
+                .filter(|i| !matches!(i.end(), IntervalEnd::Finite(_)))
+            {
+                assert_eq!(
+                    interval.end(),
+                    if cutoff.is_some() {
+                        IntervalEnd::RightCensored { through: 1. }
+                    } else {
+                        IntervalEnd::Essential
+                    }
+                );
+            }
+            for dimension in [1, 2] {
+                assert!(result.diagram().dimension(dimension).unwrap().is_empty());
             }
         }
     }
@@ -366,6 +432,85 @@ fn high_dimensions_match_independent_boundary_reduction() {
                 expected,
                 "sample={sample} n={n} q={q} values={values:?}"
             );
+        }
+    }
+}
+
+#[test]
+fn exhaustive_small_h2_and_seeded_missing_edge_filtrations_match_boundary_oracle() {
+    // n<=4: all {0,1,2,missing} edge assignments, not a claim about 4^15 n=6.
+    // Missing is represented by value 3 in the dense input with cutoff <=2.
+    let mut seed = 20261004_u64;
+    for n in 0_usize..=6 {
+        let count = n * n.saturating_sub(1) / 2;
+        let samples = if n <= 4 {
+            4_usize.pow(count as u32)
+        } else {
+            128
+        };
+        for sample in 0..samples {
+            let mut code = sample;
+            let values: Vec<_> = (0..count)
+                .map(|_| {
+                    let value = if n <= 4 {
+                        let v = code % 4;
+                        code /= 4;
+                        v
+                    } else {
+                        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                        ((seed >> 32) % 4) as usize
+                    };
+                    value as f64
+                })
+                .collect();
+            for cutoff in [0., 1., 2.] {
+                let edges: Vec<_> = (0..n)
+                    .flat_map(|b| (0..b).map(move |a| (a, b)))
+                    .filter_map(|(a, b)| {
+                        let value = values[b * (b - 1) / 2 + a];
+                        (value <= cutoff).then_some((a, b, value))
+                    })
+                    .collect();
+                let graph = FlagFiltration::new(
+                    WeightedGraph::new(
+                        n,
+                        edges
+                            .iter()
+                            .map(|&(a, b, value)| WeightedEdge {
+                                vertices: [a, b],
+                                value,
+                            })
+                            .collect(),
+                    )
+                    .unwrap(),
+                );
+                let expected = boundary_oracle(n, &edges, 2);
+                let options = PersistenceOptions::new(2, Some(cutoff)).unwrap();
+                let dense = compute_rips_from_distances(
+                    matrix(&values, n),
+                    &options,
+                    &ExecutionLimits::default(),
+                )
+                .unwrap();
+                let sparse = compute_flag(&graph, &options, &ExecutionLimits::default()).unwrap();
+                assert_eq!(
+                    bars(dense.diagram()),
+                    expected,
+                    "dense n={n} sample={sample} cutoff={cutoff}"
+                );
+                assert_eq!(
+                    bars(sparse.diagram()),
+                    expected,
+                    "sparse n={n} sample={sample} cutoff={cutoff}"
+                );
+                assert_eq!(sparse.diagram().coverage(), Coverage::Complete);
+                let coverage = if values.iter().any(|&v| v > cutoff) {
+                    Coverage::Through(cutoff)
+                } else {
+                    Coverage::Complete
+                };
+                assert_eq!(dense.diagram().coverage(), coverage);
+            }
         }
     }
 }

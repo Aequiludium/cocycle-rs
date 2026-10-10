@@ -20,6 +20,7 @@ warmup, export and memory boundaries; their samples must not be pooled.
 | Do bottleneck/W1/W2 agree, and which distance optimizations help? | [Distance protocol](distances/README.md); `tools/compare_distances.py` and `tools/benchmark_distances.py` | Independent matching checks, Rust/Topp timing and memory ablations |
 | Do exact construction, fields and higher dimensions agree? | [Exact correctness](../tools/README.md#native-rips-correctness-checks); `tools/compare_rips.py` | Topology and persistence validation, not performance |
 | Do sparse sampling, blockers and persistence agree? | [Sparse correctness](../tools/README.md#native-sparse-rips-checks); `tools/compare_sparse_rips.py` | Approximation validation, not performance |
+| What do critical sets and existing persistence paths cost? | [Critical-set protocol](optimization/README.md); `tools/benchmark_critical_sets.py` | Sparse/dense/Oineus cold and warm targets; separate persistence context |
 | What does the Rust API cost without external comparisons? | [rips.rs](rips.rs), `cargo bench --locked --bench rips` | Rust-only timings, not a cross-library baseline |
 
 The pipeline covers matrix/graph/point construction, explicit complexes, prime
@@ -38,6 +39,7 @@ comparison scopes and the reporting rules for stronger comparative studies.
 | [protocol.md](protocol.md) | `cocycle-native-v1` H0/H1 execution contract |
 | [pipeline/](pipeline/README.md) | Complete-workflow workers and their execution contract |
 | [distances/](distances/README.md) | `cocycle-distance-v1` workers, reference pins and controlled ablations |
+| [optimization/](optimization/README.md) | `critical-sets-native-v1` workers, local dense baseline and Oineus comparisons |
 | [reports/](reports/README.md) | Stable comparison pages; measured commits and evidence status in each report |
 | `target/` (repository root) | Ignored local run outputs; CI uploads selected results as artifacts |
 

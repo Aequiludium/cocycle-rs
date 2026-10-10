@@ -18,8 +18,10 @@ use crate::filtration::{FlagFiltration, flag::CliqueAccess};
 /// largest edge), unpaired classes are essential for this supplied graph. A lower
 /// cutoff conservatively censors surviving classes. Input is borrowed and never
 /// densified. Work/storage include O(n+m) input access plus reduction fill-in.
-/// The specialized F2 H1 combinatorial IDs must fit `usize`, even for sparse
-/// graphs. Odd-prime and higher-dimensional paths use ordered vertex tuples.
+/// F2 diagram-only requests retain specialized H0/H1 and continue H2+ using
+/// complete owned death-triangle clearing keys. H1-only combinatorial IDs must
+/// fit `usize`, even for sparse graphs. Higher-dimensional requests fall back
+/// to full tuple-based cohomology if that index overflows; odd primes use it directly.
 ///
 /// # Errors
 /// Returns size/allocation errors, cancellation, work-limit exhaustion, or an
