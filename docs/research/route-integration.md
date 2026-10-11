@@ -347,3 +347,68 @@ once #75 supplies validated results, independently replay legality and boundary
 transport witnesses, check query/source associations and arithmetic errors, and
 separate feasible/optimal evidence and extraction/solve/action costs. The local
 Rust experiment or Python reference is not adopted into this production stack.
+
+## Direct comparison and consumption handoff: #91
+
+Use #81's [existing comparison contract](result-contracts.md#existing-distance-boundaries-and-migration-decision-on-main-a7ee9e9).
+Concrete raw/contextual diagram metrics remain callable; geometry, filtration,
+spectral and projection comparisons need a separately selected mathematical
+definition and #110's actual implementation. This stage adds no generic distance
+entry, pairwise-matrix scheduler, invented numeric value or second matcher.
+
+| Comparable object | Information at the boundary | Current availability / future decision |
+| --- | --- | --- |
+| Geometry | Point/set/matrix interpretation, sample IDs/order, ambient metric, coordinate dimension, units, normalization and missing/empty policy | Borrowed inputs exist. No non-diagram set comparison is adopted; #110 must choose metric versus directed similarity and its actual premises. |
+| Filtered topology | Source snapshot, stage/scale or whole filtration, ordered keys/maps, field, coverage, units and topology interpretation | Stage reads exist. Comparing equal-shaped incidence arrays is undefined until a basis-invariant or explicitly aligned definition is selected. |
+| Ordinary diagrams | Requested computed degree, multiplicity, complete coverage, endpoint semantics; field and declared scale for contextual calls | Existing bottleneck-L-infinity, W1-L-infinity and W2-Euclidean calls. Raw calls leave context/physical-unit checks to the caller. |
+| Spectrum / projection | Actual producer identity and result availability, degree/basis/Gram/domain, eigenproblem or legal P/cost/certificate; meaningful coordinate identification if needed | Contract information only. Do not compare arrays solely by size or require an arbitrary choice of eigenvector signs/repeated-eigenspace bases. |
+| Scalar-to-analysis | Operand/sample association, operation/metric/order, units, finite/infinity success versus error | Existing application code can consume successful scalars directly. Scalars retain none of those associations by themselves. |
+
+The following runnable route compares supplied logical diagrams and consumes
+the scalar without constructing geometry, calling PH or requiring a new analysis
+algorithm. Application keys remain attached outside the borrowed diagram calls:
+
+```rust
+use cocycle::diagram::{ComputedDimensions, Coverage, IntervalEnd,
+                       PersistenceDiagram, PersistenceInterval};
+use cocycle::diagram_distances::{bottleneck_distance, bottleneck_distance_with,
+                               wasserstein_1_infinity, wasserstein_2_euclidean};
+use cocycle::execution::Execution;
+let bar = PersistenceInterval::new(1, -2., IntervalEnd::Finite(0.))?;
+let first = PersistenceDiagram::with_dimensions(
+    ComputedDimensions::new(vec![1, 3])?, Coverage::Complete, vec![bar, bar])?;
+let second = PersistenceDiagram::with_dimensions(
+    ComputedDimensions::new(vec![1, 3])?, Coverage::Complete, vec![])?;
+let distance = bottleneck_distance(&first, &second, 1)?;
+let associated_value = ("sample-a", "sample-b", "bottleneck/L-infinity/H1", distance);
+assert_eq!(associated_value.3, 1.);
+assert!(associated_value.3 <= 1.); // Direct application consumption.
+assert_eq!(wasserstein_1_infinity(&first, &second, 1)?, 2.);
+assert!((wasserstein_2_euclidean(&first, &second, 1)? - 2.).abs() < 1e-14);
+assert_eq!(bottleneck_distance(&first, &second, 3)?, 0.); // Computed empty.
+assert!(bottleneck_distance(&first, &second, 2).is_err()); // Missing degree.
+assert!(bottleneck_distance_with(&first, &second, 1,
+    &Execution::default().max_work(0)).is_err());
+# Ok::<(), cocycle::Error>(())
+```
+
+Every requested operand is validated; an invalid second operand is not hidden
+by a valid first one. Unknown fields/units/bases, a missing producer, an
+unsupported operation or mathematically undefined similarity must remain
+explicitly unavailable or erroneous in the eventual concrete interface, never
+silently zero/NaN. No new error variant is proposed here. Existing matching
+rejects censored/incomplete input and missing degrees; unequal essential counts
+give mathematical positive infinity. Overflow, cancellation and budget
+exhaustion are errors. A computed-empty complete degree can validly give zero.
+
+Borrowed diagram calls retain their existing point-buffer/matching costs and
+fresh terminal budgets. Direct analysis of the successful scalar does not rerun
+PH. Exporting a requested representation can allocate and discard provenance;
+that loss must be named. Existing result/descriptor implementations and pending
+#26/#49 preparation stay in their original owners.
+
+Stage B remains open for actual data-to-comparison, result-to-comparison and
+comparison-to-analysis examples after #110's selected implementation. It must
+test the selected mathematical properties, every operand's identity/units,
+undefined/unsupported cases, independent expected values and comparable costs.
+The executable diagram route validates current behavior only.
