@@ -104,6 +104,7 @@ impl<'a> DissimilarityMatrixView<'a> {
         self.diameter
     }
     /// Symmetric value, canonicalizing signed zero; `None` for invalid indices.
+    #[inline]
     pub fn get(&self, i: usize, j: usize) -> Option<f64> {
         if i >= self.n || j >= self.n {
             return None;

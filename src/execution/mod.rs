@@ -48,8 +48,9 @@ impl<'a> Execution<'a> {
     }
 }
 
-// Distance kernels specialize the unlimited case so their inner loops carry no
-// runtime polling branches. Construction keeps the existing controlled default.
+// Distance and exact F2 H1 kernels specialize unlimited operations so their
+// inner loops carry no runtime polling branches. Other construction paths keep
+// the existing controlled default.
 // Callers also guard count-only lookups: an unused charge argument can otherwise
 // retain indexing checks or duplicate a search even when step_by is a no-op.
 pub(crate) struct WorkBudget<'a, const CONTROLLED: bool = true> {
@@ -59,6 +60,10 @@ pub(crate) struct WorkBudget<'a, const CONTROLLED: bool = true> {
     cancel_at: Option<u64>,
 }
 impl<'a> WorkBudget<'a> {
+    pub(crate) fn is_unlimited(&self) -> bool {
+        self.limits.is_unlimited()
+    }
+
     pub(crate) fn new(limits: &Execution<'a>) -> Result<Self> {
         let result = Self {
             limits: *limits,

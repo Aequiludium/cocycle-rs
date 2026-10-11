@@ -16,6 +16,8 @@ are reusable implementation tools, not a stable external reducer API.
 | Ordinary intervals from selected boundaries | [persistence/boundary](../../src/persistence/boundary/mod.rs) | Selected ordered columns with dimensions/values to a diagram |
 | Zero-born H0 | [flag/h0.rs](../../src/persistence/flag/h0.rs) | Vertex count and weighted edges to merge intervals |
 | Specialized implicit F2 H1 | [flag/cohomology](../../src/persistence/flag/cohomology/mod.rs) | Ordered edge/triangle access to ordinary intervals |
+| Ordered-cursor F2 H1 | [flag/ordered.rs](../../src/persistence/flag/ordered.rs) | Dense matrix and prepared edges to ordinary intervals |
+| Empty coboundary rejection | [filtration/flag/bitset.rs](../../src/filtration/flag/bitset.rs) | Bounded neighbor bitsets over retained weighted edges |
 | Prime-field implicit cohomology | [simplicial/cohomology.rs](../../src/persistence/simplicial/cohomology.rs) | Zero-born coface access to ordinary intervals |
 
 The [mathematical specification](../reference/mathematics.md#4-persistence-and-reference-boundary-reduction)
@@ -23,6 +25,91 @@ defines orientation and persistence pairing. Verify the applicable assumptions
 before sharing an implementation: zero-born union-find pairing does not implement
 arbitrary vertex-birth persistence, and a sparse Rips blocker cannot be replaced
 by ordinary clique enumeration.
+
+The exact matrix F2 H1 adapter prepares sorted edges once. For at least 64
+vertices, it selects adjacency access when no more than approximately two thirds
+of the possible edges remain at the internal stopping scale; otherwise it keeps
+borrowed matrix access. This private heuristic includes graph preparation in the
+operation budget and does not change original-input coverage. Both paths reuse
+the prepared edge array. Sparse intersections reject disjoint sorted vertex
+ranges before scanning their neighbors. Its reverse neighbor iterators preserve
+descending cofacet order and one checkpoint per intersection step. Dense visits
+select the matrix layout outside the vertex loop and use checked simplex index
+prefixes for safe slice access.
+
+The matrix adjacency adapter and supplied/threshold graph adapters share the
+same neighbor-bitset selection. They can attach neighbor bitsets when bounded probes
+find many empty intersections that sorted-range rejection cannot detect. The
+cache has at most one u64 word per graph edge, and is considered only for 64 to
+4096 vertices. A zero bitwise intersection certifies an empty retained
+coboundary. Nonempty intersections use the original sorted traversal, preserving
+cofacet order and weights. Probe and cache work share the caller's budget;
+the heuristic selects an exact strategy and never approximates topology.
+
+For at least 64 vertices, approximately 90% retained edges and at least three
+distinct retained edge weights, the matrix adapter selects ordered coboundary
+cursors. Sorted neighbor tables let each source column produce its triangles in
+the existing value/colex order. The working heap holds one head per live cursor;
+equal heads cancel by F2 parity. Stored owners can seek past prefixes whose XOR
+is zero. See the [cursor invariants](../reference/mathematics.md#ordered-coboundary-cursors).
+Table preparation shares the operation budget. This is also a private heuristic;
+it does not change f64 values or coverage, and preparation must be included in
+performance measurements.
+
+The cost rules have named private constants in
+[flag/selection.rs](../../src/persistence/flag/selection.rs) and
+[flag/bitset.rs](../../src/filtration/flag/bitset.rs). The matrix gates retain the
+run-003/run-004 local native experiments' policy; the bitset probe avoided a
+measured regression from always building the cache. These are empirical choices,
+not geometry classifications or correctness assumptions. They do not recognize
+dataset names, and no single threshold is claimed optimal on every machine.
+
+| Cost rule | Current policy | Purpose |
+| --- | --- | --- |
+| Adaptive matrix access | At least 64 vertices | Amortize representation preparation |
+| Sparse matrix access | m <= P - floor(P/3), P = n(n-1)/2 | Limit adjacency overhead on dense inputs |
+| Ordered matrix access | m >= P - floor(P/10), at least three retained weights | Amortize sorted cursor tables and avoid degenerate filtrations |
+| Neighbor cache | 64 <= n <= 4096, n ceil(n/64) <= graph edge count | Bound auxiliary words by O(n+m) |
+| Cache probe | At most 32 strided edges; at least half have costly empty intersections | Avoid caches on cheap scans or overlapping neighborhoods |
+| Costly scan | Minimum endpoint degree at least twice the row word count, overlapping vertex ranges | Compare bitset work to sorted scan work |
+
+All m counts above use the internal retained scale, not the original matrix's
+nominal completeness. Cutoff and coverage remain separate. Changing this policy
+requires correctness checks and comparable before/after measurements under the
+[native protocol](../../benches/protocol.md) and
+[reporting rules](../../benches/reporting.md), including unfavorable workloads.
+
+Both F2 H1 engines use [flag/edges.rs](../../src/persistence/flag/edges.rs) for
+forward H0 classification and typed edge/column positions. Engine-specific heaps
+and traversal remain separate. Cursor positions and their single-row sentinel
+are local to the ordered engine.
+
+For F2 requests above H1, dispatch runs the selected H0/H1 engine and continues
+with generic cohomology only from H2. [flag/clearing.rs](../../src/persistence/flag/clearing.rs)
+retains every H1 death triangle, including zero-lifetime and omitted apparent
+pairs. The handoff decodes IDs into ordered vertex tuples for the same access,
+cutoff and filtration order. Starting H2 with an empty clearing set when H1 has
+nonzero rank would create false H2 births. No H1 pivots certify the absence of
+triangles and allow the higher part to return empty without repeating preparation.
+Higher dimensions retain ordinary clearing. Odd primes keep the generic path;
+high-dimensional requests also retain the tuple-based fallback if compact H1
+triangle IDs cannot fit usize. Composition and handoff share one controlled
+budget, and failures never return the already computed lower-dimensional part.
+No public backend or tuning option is added.
+
+Exact F2 H1 reducers specialize the operation budget with a const generic.
+An operation with neither a limit nor a cancellation flag uses the no-op
+specialization. Any real control keeps the original shared budget, including
+preparation, probes and reduction. Ordered cursors also reuse the checked simplex
+index prefixes for safe reads in all three matrix layouts, preserving canonical
+f64 values without repeated fallible pair-count calculations.
+
+The ordinary F2 H1 working heap stores canonical finite nonnegative values as their exact
+f64 bits. Its equality test preserves F2 multiplicity, and its boolean comparisons
+use a finite-value projection of the shared filtration order. Reconstructed
+cofacets are collected in a reusable fallibly allocated buffer and extended into
+the heap in batches, with cancellation checks around heap maintenance. Stored
+transformations and mathematical reduction order are unchanged.
 
 ## Work directly on boundary columns
 

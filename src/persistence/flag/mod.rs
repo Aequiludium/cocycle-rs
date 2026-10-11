@@ -1,7 +1,11 @@
 //! Shared exact flag engines and supplied-graph computation.
+mod clearing;
 mod cohomology;
 mod dispatch;
+mod edges;
 mod h0;
+mod ordered;
+mod selection;
 use super::RepresentativeRequest;
 use super::simplicial::finish_zero_born;
 pub(super) use dispatch::{compute_dense, compute_graph};

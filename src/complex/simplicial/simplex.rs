@@ -91,3 +91,52 @@ pub(crate) fn compare_filtration(
         .then(dimensions)
         .then(decreasing_colex)
 }
+
+/// Boolean projection of the shared filtration order for finite, canonical values.
+/// `tie_le` compares dimension then decreasing colex when the values agree.
+/// Callers establish finite values and canonical positive zero before using this.
+pub(crate) fn finite_filtration_le(left: f64, right: f64, tie_le: bool) -> bool {
+    left < right || (left == right && tie_le)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finite_boolean_order_agrees_with_total_order_at_extreme_and_adjacent_scales() {
+        let values = [
+            -f64::MAX,
+            -1.0e300,
+            -1.0,
+            -f64::MIN_POSITIVE,
+            -f64::from_bits(1),
+            0.0,
+            f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            1.0,
+            f64::from_bits(1.0_f64.to_bits() + 1),
+            1.0e300,
+            f64::MAX,
+        ];
+        for left in values {
+            for right in values {
+                for dimension in [Ordering::Less, Ordering::Equal, Ordering::Greater] {
+                    for colex in [Ordering::Less, Ordering::Equal, Ordering::Greater] {
+                        let expected = left.total_cmp(&right).then(dimension).then(colex);
+                        assert_eq!(compare_filtration(left, right, dimension, colex), expected);
+                        assert_eq!(
+                            finite_filtration_le(left, right, dimension.then(colex).is_le()),
+                            expected.is_le(),
+                        );
+                        // Strict comparison is the same projection with a strict tie predicate.
+                        assert_eq!(
+                            finite_filtration_le(left, right, dimension.then(colex).is_lt()),
+                            expected.is_lt(),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

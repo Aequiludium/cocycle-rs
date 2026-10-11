@@ -19,6 +19,8 @@ pub(in crate::persistence) fn compute(
     budget: &mut WorkBudget<'_>,
 ) -> Result<RawIntervals> {
     budget.check()?;
+    #[cfg(test)]
+    record_dimension(0);
     let level = next_dimension(access, &access.vertices()?, &mut || budget.step())?;
     let mut forest = UnionFind::new(access.vertex_count())?;
     let mut cleared = HashSet::new();
@@ -73,7 +75,11 @@ pub(in crate::persistence) fn continue_from_h1(
         let mut key = Vec::new();
         key.try_reserve_exact(3).map_err(|_| allocation())?;
         key.extend(triangle);
-        cleared.insert(key);
+        if !cleared.insert(key) {
+            return Err(Error::InternalInvariant {
+                reason: "H1 clearing pivots must be unique",
+            });
+        }
         #[cfg(test)]
         if cleared.len() == handoff_len {
             profiling::workspace_event(
@@ -144,6 +150,8 @@ fn reduce_dimensions(
         if level.is_empty() {
             break;
         }
+        #[cfg(test)]
+        record_dimension(dimension);
         let mut owners: HashMap<Vec<usize>, usize> = HashMap::new();
         let mut columns: Vec<Column<usize>> = Vec::new();
         #[cfg(test)]
@@ -304,4 +312,18 @@ fn allocation() -> Error {
     Error::AllocationFailed {
         context: "dimension-generic cohomology",
     }
+}
+
+// Per-thread diagnostics verify backend selection without production counters.
+#[cfg(test)]
+std::thread_local! {
+    static REDUCED_DIMENSIONS: std::cell::RefCell<Vec<usize>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+#[cfg(test)]
+fn record_dimension(dimension: usize) {
+    REDUCED_DIMENSIONS.with(|trace| trace.borrow_mut().push(dimension));
+}
+#[cfg(test)]
+pub(in crate::persistence) fn take_reduced_dimensions() -> Vec<usize> {
+    REDUCED_DIMENSIONS.with(|trace| std::mem::take(&mut *trace.borrow_mut()))
 }

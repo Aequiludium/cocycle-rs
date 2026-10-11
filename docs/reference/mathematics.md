@@ -371,6 +371,12 @@ Repeated triangles and transformation indices cancel by F2 parity. Cancel all
 copies of the candidate pivot before using it; ordinary set deduplication is
 incorrect. Each elimination strictly lowers the pivot in reversed row order.
 Stored transformations are internal machinery, not public representative cocycles.
+The working heap may encode canonical finite nonnegative values by their exact
+f64 bits and use the equivalent finite-value boolean comparison. This preserves
+both forward value/ID order and equality for F2 parity; it introduces no rounding.
+Batch insertion uses the same cofacet multiset, with execution checks around heap
+maintenance and reusable storage only after the batch has been consumed.
+
 
 ### Clearing and shortcut pairs
 
@@ -382,7 +388,7 @@ The kernel omits stored zero-lifetime apparent pairs and reconstructs them when
 later columns need their pivots. Other shortcut pairs retain their pivot owners
 and transformation columns.
 
-Initialize the column and inspect shortcut candidates in one traversal, before
+In the ordinary heap kernel, initialize the column and inspect shortcut candidates in one traversal, before
 any column addition. Cofacets are enumerated by descending ID,
 and their values are at least the edge value. The first equal-valued triangle is
 therefore the original column's earliest cofacet. Retain preceding cofacets in a
@@ -421,6 +427,47 @@ and right-censored intervals retain their multiplicities. Test ordinary,
 apparent, emergent, and combined configurations against the independent oracle.
 Independent two-pass tests also check storage omission independently of
 single-pass caching, including the invariant $R=CV$ on dense and sparse inputs.
+
+### Ordered coboundary cursors
+
+The matrix adjacency adapter may reject empty coboundaries using bitsets of
+neighbors joined by edges at or below the internal stop. For edge $(a,b)$, a zero
+intersection of these neighbor sets proves that no retained triangle contains
+the edge. A nonzero intersection falls back to the original weighted traversal;
+bitsets do not assign triangle weights or change cofacet order. Bounded probes
+only choose whether to build this auxiliary cache. They do not decide which
+simplices exist and do not change coverage.
+
+The dense cursor kernel uses an implicit working column inspired by
+[AP21](bibliography.md#ap21), while retaining Cocycle's existing filtration/colex
+order. For an edge $(a,b)$ with value w, a cofacet $(a,b,v)$ has value
+$\max(w,\delta(a,v),\delta(b,v))$. First enumerate the cofacets of value w in
+decreasing third-vertex order. Then merge the two endpoint neighbor lists,
+ordered by increasing edge value and decreasing neighbor ID. Emit a triangle
+when its later incident edge appears; for equal incident values only one list
+emits it. For a fixed edge, decreasing third-vertex ID is decreasing triangle
+colex ID. Each cursor therefore emits exactly the original ordered coboundary,
+without materializing or sorting its complete triangle list.
+
+The working heap contains one current row per live cursor. Advancing all heads
+with the same row and retaining odd multiplicity computes the F2 sum of the
+remaining source columns. Stored transformation columns have the same parity
+and triangularity requirements as the ordinary kernel. Apparent pairs remain
+virtual owners; other accepted pivots retain their transformations.
+
+If an owner's reduced column has pivot p, the XOR of all its source-column
+prefixes before p is zero. Its source cursors may therefore all seek to p before
+being added to the active column. Individual prefixes need not be zero: this
+optimization is justified by their collective XOR, not by dropping arbitrary
+rows. A virtual apparent owner's first row is already p. These operations
+preserve $R=CV$ and the original pivot sequence. Cursor suffixes, tie handling,
+all matrix layouts and resulting diagrams are checked against independent
+triangle enumeration and explicit reduction.
+
+Sorted neighbor tables use original canonical f64 weights, include events at the
+internal stop, and share the caller's operation budget. Table construction and
+reduction belong to one measured computation. Their selection does not alter
+original-input coverage or the cone stopping proof below.
 
 ### Cone stopping bound
 
@@ -520,6 +567,18 @@ records an unpaired class unless the simplex was cleared. Pivot simplices become
 cleared columns in the next dimension. Cleared simplices still participate in
 clique generation: clearing skips algebra, not topology. This is the dimensional
 extension of the reversed-transpose duality in section 9 and [B21](bibliography.md#b21).
+
+For a continuation starting at H2, the initial clearing set must contain all
+triangle pivots of the H1 reduction under the same filtration order and cutoff.
+This includes zero-lifetime pairs and implicit apparent owners even though they
+contribute no public intervals. Omitting this set counts elements of $\operatorname{im}(\delta^1)$
+as H2 births; an empty set is valid only when $\operatorname{rank}(\delta^1)$ is zero. Every present
+triangle has a nonzero F2 boundary, so no H1 pivots certify no triangles and no
+higher cliques. The specialized H1 engines can therefore supply the clearing set
+without repeating generic H0/H1. Tuple decoding preserves the original colex
+order, and subsequent generic dimensions use their own ordinary pivot clearing.
+Independent boundary reduction and full-column transformation replay validate
+this composition, including tied and zero-valued filtrations.
 
 Only the current dimension, transformations, pivot ownership and a working
 coboundary are needed on the implicit path. These can still be exponentially

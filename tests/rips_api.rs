@@ -13,6 +13,233 @@ use std::cell::Cell;
 fn matrix(values: &[f64], n: usize) -> DissimilarityMatrixView<'_> {
     DissimilarityMatrixView::new(values, n, MatrixLayout::LowerTriangle).unwrap()
 }
+
+#[test]
+fn higher_requests_agree_across_points_layouts_prepared_graphs_and_explicit_sources() -> Result<()>
+{
+    // Six octahedral vertices: a genuine H2 sphere appears at sqrt(2) and
+    // dies at 2. Compare all public exact sources, including capped points.
+    let coordinates = [
+        1., 0., 0., -1., 0., 0., 0., 1., 0., 0., -1., 0., 0., 0., 1., 0., 0., -1.,
+    ];
+    let points = PointCloudView::new(&coordinates, 6, 3)?;
+    let weight = |a: usize, b: usize| {
+        if a == b {
+            0.
+        } else if a / 2 == b / 2 {
+            2.
+        } else {
+            2.0_f64.sqrt()
+        }
+    };
+    for construction in [None, Some(1.5), Some(2.)] {
+        let point_source = if let Some(cap) = construction {
+            RipsBuilder::from_points(points).max_edge_length(cap)
+        } else {
+            RipsBuilder::from_points(points)
+        };
+        let prepared_points = point_source.prepare()?;
+        let explicit_points = point_source.build_complex(4)?;
+        for cutoff in [None, Some(0.), Some(1.5), Some(2.)] {
+            if construction
+                .zip(cutoff)
+                .is_some_and(|(cap, requested)| requested > cap)
+            {
+                continue;
+            }
+            for field in [PrimeField::default(), PrimeField::new(3)?] {
+                let request = |q| {
+                    let mut request = point_source
+                        .persistence()
+                        .max_homology_dimension(q)
+                        .field(field);
+                    if let Some(t) = cutoff {
+                        request = request.max_filtration_value(t);
+                    }
+                    request.compute()
+                };
+                let low = request(1)?;
+                let expected = request(3)?;
+                for q in [0, 1] {
+                    assert_eq!(
+                        low.diagram().dimension(q)?.iter().collect::<Vec<_>>(),
+                        expected.diagram().dimension(q)?.iter().collect::<Vec<_>>()
+                    );
+                }
+                let mut prepared_request = prepared_points
+                    .persistence()
+                    .max_homology_dimension(3)
+                    .field(field);
+                let mut explicit_request = explicit_points
+                    .persistence()
+                    .max_homology_dimension(3)
+                    .field(field);
+                if let Some(t) = cutoff {
+                    prepared_request = prepared_request.max_filtration_value(t);
+                    explicit_request = explicit_request.max_filtration_value(t);
+                }
+                assert_eq!(prepared_request.compute()?.diagram(), expected.diagram());
+                assert_eq!(explicit_request.compute()?.diagram(), expected.diagram());
+                let h2: Vec<_> = expected.diagram().dimension(2)?.iter().collect();
+                let stop = construction.unwrap_or(2.).min(cutoff.unwrap_or(2.));
+                if stop < 2.0_f64.sqrt() {
+                    assert!(h2.is_empty());
+                } else {
+                    assert_eq!(h2.len(), 1);
+                    assert_eq!(h2[0].birth(), 2.0_f64.sqrt());
+                    assert_eq!(
+                        h2[0].end(),
+                        if stop < 2. {
+                            IntervalEnd::RightCensored { through: stop }
+                        } else {
+                            IntervalEnd::Finite(2.)
+                        }
+                    );
+                }
+                for layout in [
+                    MatrixLayout::LowerTriangle,
+                    MatrixLayout::UpperTriangle,
+                    MatrixLayout::Square,
+                ] {
+                    let values: Vec<_> = match layout {
+                        MatrixLayout::LowerTriangle => (0..6)
+                            .flat_map(|b| (0..b).map(move |a| weight(a, b)))
+                            .collect(),
+                        MatrixLayout::UpperTriangle => (0..6)
+                            .flat_map(|a| (a + 1..6).map(move |b| weight(a, b)))
+                            .collect(),
+                        MatrixLayout::Square => (0..6)
+                            .flat_map(|a| (0..6).map(move |b| weight(a, b)))
+                            .collect(),
+                    };
+                    let mut source = RipsBuilder::from_distance_matrix(
+                        DissimilarityMatrixView::new(&values, 6, layout)?,
+                    );
+                    if let Some(cap) = construction {
+                        source = source.max_edge_length(cap);
+                    }
+                    let mut request = source.persistence().max_homology_dimension(3).field(field);
+                    if let Some(t) = cutoff {
+                        request = request.max_filtration_value(t);
+                    }
+                    assert_eq!(request.compute()?.diagram(), expected.diagram());
+                }
+            }
+        }
+        // The supplied graph certifies its own completion: absent opposite
+        // edges make H2 essential rather than right-censored as in capped Rips.
+        let flag = FlagFiltration::new(prepared_points.graph().clone());
+        let supplied = flag.persistence().max_homology_dimension(3).compute()?;
+        let h2 = supplied.diagram().dimension(2)?.iter().next().unwrap();
+        assert_eq!(
+            h2.end(),
+            if construction == Some(1.5) {
+                IntervalEnd::Essential
+            } else {
+                IntervalEnd::Finite(2.)
+            }
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn truncated_matrix_preserves_zero_edges_isolates_and_closed_coverage_in_every_layout() -> Result<()>
+{
+    // A square with one zero edge and sixty isolated vertices below scale two.
+    let n = 64;
+    let weight = |a: usize, b: usize| {
+        let (a, b) = (a.min(b), a.max(b));
+        match (a, b) {
+            _ if a == b => 0.,
+            (0, 1) => -0.,
+            (1, 2) | (2, 3) | (0, 3) => 1.,
+            _ => 2.,
+        }
+    };
+    let lower: Vec<_> = (0..n)
+        .flat_map(|b| (0..b).map(move |a| weight(a, b)))
+        .collect();
+    let upper: Vec<_> = (0..n)
+        .flat_map(|a| (a + 1..n).map(move |b| weight(a, b)))
+        .collect();
+    let square: Vec<_> = (0..n)
+        .flat_map(|a| (0..n).map(move |b| weight(a, b)))
+        .collect();
+    for (values, layout) in [
+        (&lower[..], MatrixLayout::LowerTriangle),
+        (&upper[..], MatrixLayout::UpperTriangle),
+        (&square[..], MatrixLayout::Square),
+    ] {
+        let source =
+            RipsBuilder::from_distance_matrix(DissimilarityMatrixView::new(values, n, layout)?);
+        for cutoff in [0., 1., f64::from_bits(1_f64.to_bits() + 1), 2.] {
+            let result = source
+                .persistence()
+                .max_filtration_value(cutoff)
+                .compute()?;
+            let diagram = result.diagram();
+            let complete = cutoff == 2.;
+            assert_eq!(
+                diagram.coverage(),
+                if complete {
+                    Coverage::Complete
+                } else {
+                    Coverage::Through(cutoff)
+                }
+            );
+            let survivor = if complete {
+                IntervalEnd::Essential
+            } else {
+                IntervalEnd::RightCensored { through: cutoff }
+            };
+            let h0: Vec<_> = diagram.dimension(0)?.iter().collect();
+            assert_eq!(
+                h0.iter().filter(|bar| bar.end() == survivor).count(),
+                if cutoff == 0. {
+                    63
+                } else if complete {
+                    1
+                } else {
+                    61
+                }
+            );
+            assert_eq!(
+                h0.iter()
+                    .filter(|bar| bar.end() == IntervalEnd::Finite(1.))
+                    .count(),
+                if cutoff == 0. { 0 } else { 2 }
+            );
+            assert_eq!(
+                h0.iter()
+                    .filter(|bar| bar.end() == IntervalEnd::Finite(2.))
+                    .count(),
+                if complete { 60 } else { 0 }
+            );
+            assert!(h0.iter().all(|bar| bar.birth() == 0.));
+            assert_eq!(h0.len(), 63);
+            let h1: Vec<_> = diagram.dimension(1)?.iter().collect();
+            if cutoff == 0. {
+                assert!(h1.is_empty());
+            } else {
+                assert_eq!(h1.len(), 1);
+                assert_eq!(h1[0].birth(), 1.);
+                assert_eq!(
+                    h1[0].end(),
+                    if complete {
+                        IntervalEnd::Finite(2.)
+                    } else {
+                        survivor
+                    }
+                );
+            }
+            assert_eq!(result.context().construction_cutoff(), None);
+            assert_eq!(result.context().requested_cutoff(), Some(cutoff));
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn square_workflows_preserve_fields_bases_context_and_source_ownership() -> Result<()> {
     let result = {
