@@ -4,10 +4,10 @@ pub(super) mod representatives;
 
 use super::{PersistenceOptions, RepresentativeRequest};
 use crate::complex::SimplicialComplex;
-use crate::diagram::{PersistenceDiagram, Representative};
+use crate::diagram::{ComputationContext, PersistenceDiagram, PersistenceResult, Representative};
 use crate::execution::WorkBudget;
-use crate::filtration::Coverage;
 use crate::filtration::simplicial::ZeroBornExplicitAccess;
+use crate::filtration::{Coverage, SimplicialFiltration};
 use crate::{Error, Result};
 pub(super) fn source_range(
     coverage: Coverage,
@@ -114,4 +114,62 @@ pub(super) fn finish_zero_born(
     };
     budget.check()?;
     Ok(result)
+}
+
+pub(super) fn compute_filtration_budget(
+    input: &SimplicialFiltration,
+    options: &PersistenceOptions,
+    requests: &[RepresentativeRequest],
+    budget: &mut WorkBudget<'_>,
+) -> Result<PersistenceResult> {
+    if !input.complete && options.max_homology_dimension() >= input.dimension {
+        return Err(Error::InsufficientSkeleton {
+            requested_homology_dimension: options.max_homology_dimension(),
+            constructed_simplex_dimension: input.dimension,
+        });
+    }
+    let (cutoff, coverage) = source_range(
+        input.coverage,
+        input.complex.max_filtration_value(),
+        options.max_edge(),
+    )?;
+    let effective = PersistenceOptions::for_filtration(options.max_homology_dimension(), cutoff)?
+        .with_field(options.field());
+    let (diagram, representatives) =
+        compute(&input.complex, &effective, requests, coverage, budget)?;
+    Ok(PersistenceResult::new(
+        diagram,
+        ComputationContext::from_filtration(
+            input.context.clone(),
+            options.field(),
+            options.max_edge(),
+        ),
+        representatives,
+    ))
+}
+
+pub(super) fn compute_supplied_budget(
+    input: &SimplicialComplex,
+    options: &PersistenceOptions,
+    requests: &[RepresentativeRequest],
+    budget: &mut WorkBudget<'_>,
+) -> Result<PersistenceResult> {
+    let (_, coverage) = source_range(
+        crate::filtration::Coverage::Complete,
+        input.max_filtration_value(),
+        options.max_edge(),
+    )?;
+    let (diagram, representatives) = compute(input, options, requests, coverage, budget)?;
+    Ok(PersistenceResult::new(
+        diagram,
+        ComputationContext::new(
+            options.field(),
+            crate::filtration::FiltrationKind::SuppliedSimplicial,
+            input.vertex_count(),
+            options.max_edge(),
+            None,
+            None,
+        ),
+        representatives,
+    ))
 }

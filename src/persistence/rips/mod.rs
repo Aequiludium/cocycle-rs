@@ -5,14 +5,17 @@
 //! cohomology; H0-only requests use an independent union-find path.
 
 use super::assemble_diagram;
-use crate::Result;
-use crate::diagram::{Coverage, PersistenceDiagram};
+use crate::diagram::{ComputationContext, Coverage, PersistenceDiagram, PersistenceResult};
 use crate::geometry::{DissimilarityView, PointCloudView, euclidean_distances};
+use crate::{Error, Result};
 
 use super::execution::WorkBudget;
 use super::{ExecutionLimits, PersistenceOptions, RepresentativeRequest};
 use super::{flag, simplicial};
+use crate::filtration::RipsBuilder;
 use crate::filtration::flag::CliqueAccess;
+use crate::filtration::rips::builder::Input;
+use crate::geometry::{DissimilarityMatrixView, MatrixLayout};
 pub(super) mod approximation;
 pub(super) mod expanded;
 pub use approximation::{
@@ -316,4 +319,64 @@ pub fn compute_rips_from_points_with_representatives(
         );
         Ok(result.with_context(context))
     }
+}
+
+pub(super) fn compute_builder_budget(
+    input: &RipsBuilder<'_>,
+    options: &PersistenceOptions,
+    requests: &[RepresentativeRequest],
+    budget: &mut WorkBudget<'_>,
+) -> Result<PersistenceResult> {
+    input.validate()?;
+    let result = match input.input {
+        Input::Matrix(matrix) => {
+            if let Some(through) = input.max_edge.filter(|t| *t < matrix.diameter())
+                && options.max_edge().is_some_and(|t| t > through)
+            {
+                return Err(Error::IncompleteFiltration {
+                    requested: options.max_edge().unwrap(),
+                    through,
+                });
+            }
+            let effective = match (input.max_edge, options.max_edge()) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+            let effective = PersistenceOptions::new(options.max_homology_dimension(), effective)?
+                .with_field(options.field());
+            self::compute_rips_from_distances_budget(matrix, &effective, requests, budget)?
+        }
+        Input::Points(_) if input.max_edge.or(options.max_edge()).is_some() => {
+            // Retain only edges needed by this analysis. Construction still scans
+            // every pair, so coverage records omitted edges even across a gap in
+            // edge values. The caller's source cap is restored in result context.
+            let effective = match (input.max_edge, options.max_edge()) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+            let prepared = RipsBuilder {
+                input: input.input,
+                max_edge: effective,
+            }
+            .prepare_budget(budget)?;
+            self::compute_threshold_rips_budget(&prepared, options, requests, budget)?
+        }
+        Input::Points(points) => {
+            let values = crate::geometry::euclidean_distances_with(points, &mut || budget.step())?;
+            budget.check()?;
+            let matrix =
+                DissimilarityMatrixView::new(&values, points.len(), MatrixLayout::LowerTriangle)?;
+            self::compute_rips_from_distances_budget(matrix, options, requests, budget)?
+        }
+    };
+    let context = ComputationContext::new(
+        options.field(),
+        crate::filtration::expansion::kind(input.input.kind(), false),
+        input.input.len(),
+        options.max_edge(),
+        input.max_edge,
+        None,
+    );
+    budget.check()?;
+    Ok(result.with_context(context))
 }

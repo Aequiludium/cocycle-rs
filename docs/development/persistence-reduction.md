@@ -6,7 +6,12 @@ Start with the algorithm's mathematical input and output. A boundary-matrix
 researcher can work directly on ordered columns; an implicit cohomology researcher
 can work on coface access. Neither implementation calls the default Builder.
 This guide covers in-crate contributions. The internal types and functions below
-are reusable implementation tools, not a stable external reducer API.
+are reusable implementation tools, not a stable external reducer API. Source adapters
+belong with their computations: exact builder preparation in `persistence/rips/mod.rs`,
+approximate preparation in `persistence/rips/approximation.rs`, and supplied/frozen
+simplicial range and result assembly in `persistence/simplicial/mod.rs`.
+`persistence/source.rs` only wires the sealed extension to these existing owners;
+it does not introduce a second reducer or reset the request's work budget.
 
 ## Find the relevant computation
 
