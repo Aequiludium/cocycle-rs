@@ -75,6 +75,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
 | [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
+| [Data modeling](research/data-modeling.md) | Three first objects, stable borrowed reads, two-consumer entry and conditional Alpha/cubical/cellular expansion order |
 | [Result interpretation and comparison](research/result-contracts.md) | Four result families, availability, units, certificates, ownership/import losses and fixed-source spectral/distance discrepancies |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
