@@ -32,6 +32,114 @@ call existing main APIs and fixed external reference code. #62 owns minimal
 implementation and #63 owns compatibility acceptance; future spectral/Dirac/F2
 capabilities retain their separate mathematics and validation tasks.
 
+## Computation-family outputs and resources
+
+This 2026-10-11 stage-A supplement for #73–#76 uses main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5` and the
+[family input proposals](input-contracts.md#computation-family-preparation-on-main-a7ee9e9).
+It defines future output requirements, not callable result types. Earlier finite
+reference observations retain their original versions/counts. No algorithm,
+solver or spectral/projector result is produced by this supplement.
+
+### Actions, matrices and spectral reads
+
+| Proposed output | Required information and ownership | Availability and checks |
+| --- | --- | --- |
+| Laplacian action | Owned Lx coordinates in the declared degree basis; source/stage, full/lower/upper definition, scalar domain, Grams/adjoints, units and vector identity | Length equals the domain size; explicit empty domain returns length zero. Borrowed reads need no matrix or PH computation. Nonfinite action or failed validation is an error. |
+| Dirac action | Owned Kx in the ordered graded basis, with degree offsets, endpoint/truncation definition, block Grams, coefficient domain and units | Coordinates may mix degrees; empty degrees retain offsets. Missing adjacent data differs from intentional endpoint zeros. Truncated K gives no full-source Hodge guarantee. |
+| Explicit matrix | Owned storage, row/column shape, basis maps, layout and the same operator identity as the action | Sparse/dense and zero rows/columns stay explicit. Requesting action does not compute this matrix. Densifying is a new allocation with checked sizes. |
+| Selected spectrum | Owned values with multiplicity and optional matching vector columns; ordinary/transformed/generalized eigenproblem, basis, solver/revision/dtype and convergence | Declare all/index-range/algebraic/magnitude/interval selection, ordering, requested and returned counts. Dirac has signed values; magnitude and algebraic selections differ. |
+| Kernel/harmonic space | Requested basis or verified dimension, coefficient domain, operator and numerical/exact-rank evidence | An empty selection does not establish zero nullity or an empty domain. Thresholded zeros are numerical evidence, not exact Betti certification. |
+
+Vector reads borrow slices; moving a concrete result transfers owned coordinates
+and metadata. Cloning/materialization is explicit. Owned results remain
+interpretable after source release: local handles require retained basis
+descriptions. No output is silently converted into `PersistenceData`, a diagram
+or a real orthogonal projector; no common availability enum is prescribed.
+
+Numeric policy supplies finite nonnegative absolute/relative tolerances,
+zero-classification threshold, iteration/work limits and norm definitions.
+For `G=R*R`, report Hermitian-coordinate residual
+`r=H(Rv)-lambda(Rv)` with H and normalization identified. A relative measure may
+use `||r||/((||H||+|lambda|)||Rv||)`; for a zero denominator report the absolute
+residual and explicitly unavailable relative value. Label a norm estimate as
+an estimate. Report G-orthogonality `||V* G V-I||`, solver convergence and returned
+coverage separately. Residual alone certifies neither multiplicity/completeness
+nor exact kernel dimension. Use the correct conjugation/dtype; do not discard
+imaginary parts, clamp negative values or change tolerances after a mismatch.
+
+Repeated eigenspaces permit rotations and vectors permit phases/signs. Later
+#109 comparison needs explicit coordinate identification and compatible
+Grams/operator/units, then appropriate subspace comparisons. Partial spectra
+retain their actual selection and any certified excluded range; without such
+evidence they establish no global gap or Betti number. Negative Laplacian values
+need diagnosis against the PSD tolerance; negative Dirac values are expected.
+
+### F2 projection reads and certificates
+
+The proposed owned result binds k/A/D, three basis orders, source/stage, costs,
+arithmetic/units, P or its actual action representation, method/revision and
+solve identity. Content equality does not authenticate source claims. Read support
+in that basis; class comparisons require compatible window/operator/cost policies.
+Borrow/move retains these facts without demanding a full n-by-n P or history schema.
+
+| Evidence/state | Permitted claim | Claim it cannot establish |
+| --- | --- | --- |
+| P independently validated against all four input-report conditions | Feasible representative selection, exact F2 action, beta and class equality for that window | Minimum stretch/class mass, real Hodge projection or equality to an arbitrary PH representative. |
+| Selected mass `m_w(Pz)` | Sum of costs on the returned support in declared arithmetic | Minimum over every representative `z+image(D)`. |
+| Current stretch `Gamma(P)=max_{z!=0,Az=0} m_w(Pz)/m_w(z)` | Objective of this P, with independently verified evaluation coverage/budget | Global optimum over all legal P. Exact integer costs still require checked sums and exact ratio comparisons. |
+| Replayed global lower bound and feasible upper bound | Their proven objective/domain/identities; optimality only when equality is established in valid arithmetic | Certification from a label, unreplayed bounds or a partial search. |
+| Interrupted/exhausted solve or certificate search | Failure with diagnostic, or an explicitly retained independently validated candidate under a future partial-result policy | Success/optimality/zero objective or a silently weakened certificate request. |
+
+Existing `Execution` terminals return errors without partial results. The first
+proposed Rust solve follows that rule; retaining an interrupted candidate needs
+an explicit new contract before adoption. Replay is included in a terminal
+promising certified output; a later separate replay has its own budget/report.
+Unread kernel/objective stays not computed; unsupported shortest-class mass stays
+unsupported. A dead class has computed zero representative/support/mass.
+An eventual stretch API declares its empty-cycle convention (the studied
+reference uses `EmptyDomain` with 0); nonempty cycles with beta=0 can instead have
+computed stretch 0. Neither convention substitutes for an error.
+
+### Resources, errors and future acceptance
+
+The eventual operation names charge units/checkpoints for source/basis/Gram/cost
+validation, extraction, products, iterative action, factorization and certificate
+checks. One fresh terminal shares its budget across promised steps; prior input
+validation is outside only when genuinely reused. Iterator/callback, allocation
+and external solver interiors are not preemptible through this cooperative API.
+Wall time, RSS, entry quotas and thread limits need separate explicit controls;
+none follows from `max_work`.
+
+For dimensions m/n/p, index maps and sparse boundaries need
+O(m+n+p+nnz(A)+nnz(D)) storage; dense boundaries need O(mn+np), dense L/P O(n^2)
+and r vectors O(nr). General Grams/factorizations and fill-in can be dense.
+Dirac dense export needs O((sum n_j)^2); block action need not export it.
+F2 exhaustive cycle/class searches can be exponential. Check products/cost sums
+before allocation; a logical entry limit is not a hard memory bound.
+
+Future errors distinguish invalid input/shape/basis/source, unsupported
+domain/definition/representation/certificate, incompatible units/Grams,
+numeric/nonconvergence/overflow, allocation, cancellation and work exhaustion.
+Reuse applicable current errors; add variants only for actual consumers.
+Failure never becomes apparently successful empty/NaN/zero output.
+
+Stage-B #73/#74 requires real source for action/matrix/spectral operations,
+independent path/triangle/edge expectations, G-adjoint and K-square checks, empty
+and truncation fixtures, residual/orthogonality/selection diagnostics and
+invalid/unsupported/budget behavior. #75 requires actual construction/action,
+all four legality checks against an independent tiny F2 oracle, false-zero-P and
+noncycle rejections, hand-derived reads, arithmetic/budget behavior and separate
+certificate replay. GUDHI can check ordinary topology in the same coefficient
+domain; it cannot verify Gram, Dirac, projection or optimization semantics.
+Documentation and existing PH CI do not replace those future algorithm checks.
+
+The selected #76 sheaf case returns stalk-coordinate cohomology/spectral facts,
+not an ordinary diagram; its implementation gate is in the input report.
+#88–#90 and #109 later consume actual results. Research checks, algorithm
+execution, costs, hosted CI, review, merge and release are separate milestones.
+This supplement completes interface preparation only.
+
 ## Fixed sources, reading and choices
 
 | Source | Revision and material actually read | Chosen lesson / remaining boundary |
