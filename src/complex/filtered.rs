@@ -51,3 +51,24 @@ impl FilteredComplex for SimplicialComplex {
             .map(|term| (term.face, i32::from(term.coefficient)))
     }
 }
+
+impl FilteredComplex for crate::filtration::SimplicialStage<'_> {
+    type CellId = SimplexId;
+    fn cells(&self) -> impl Iterator<Item = SimplexId> + '_ {
+        (0..self.len()).map(SimplexId)
+    }
+    fn dimension(&self, cell: SimplexId) -> usize {
+        self.simplex(cell)
+            .expect("valid stage simplex ID")
+            .dimension()
+    }
+    fn filtration_value(&self, cell: SimplexId) -> f64 {
+        self.simplex(cell).expect("valid stage simplex ID").value()
+    }
+    fn boundary(&self, cell: SimplexId) -> impl Iterator<Item = (SimplexId, i32)> + '_ {
+        self.boundary(cell)
+            .expect("valid stage simplex ID")
+            .iter()
+            .map(|term| (term.face, i32::from(term.coefficient)))
+    }
+}

@@ -47,6 +47,16 @@ impl SimplicialComplex {
     pub fn max_filtration_value(&self) -> Option<f64> {
         self.simplices.last().map(Simplex::value)
     }
+    /// Borrow simplices with value <= a finite scale, preserving IDs and boundaries.
+    ///
+    /// This supplied complex is the mathematical source; no larger construction
+    /// coverage is asserted. For certified construction use
+    /// [`crate::filtration::SimplicialFiltration::stage`] instead.
+    /// # Errors
+    /// Rejects nonfinite scales. Negative scales and empty stages are valid.
+    pub fn stage(&self, scale: f64) -> Result<crate::filtration::SimplicialStage<'_>> {
+        crate::filtration::SimplicialStage::new(self, None, scale)
+    }
     /// Number of stored vertices, independent of their original IDs and birth order.
     pub fn vertex_count(&self) -> usize {
         self.vertex_count

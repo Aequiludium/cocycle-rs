@@ -21,7 +21,7 @@ proposed APIs and remaining acceptance gates.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
-  storage, the filtered-cell contract, signed scales and generic boundary reduction.
+  storage, borrowed stages and inclusions, signed scales and boundary reduction.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret
   coverage and endpoints, and derive measurements.
 - [Rips construction guide](guides/rips-construction.md): matrix layouts, custom
@@ -77,6 +77,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
 | [Result interpretation and comparison](research/result-contracts.md) | Four result families, availability, units, certificates, ownership/import losses and fixed-source spectral/distance discrepancies |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
+| [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |

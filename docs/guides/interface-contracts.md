@@ -10,13 +10,15 @@ the decisions and the remaining spectral/operator boundaries.
 
 ## Read a signed stage for a matrix consumer
 
-Borrow a frozen complex and select cells with value <= scale. Preserve its
+Borrow a frozen complex and its `stage(scale)` with cells of value <= scale. Preserve
 degree-specific basis order, owner-local IDs and increasing-vertex orientation.
 The explicit conversion below returns owned dense matrices only because the
 small external consumer needs them. It is tutorial code, not a new public API.
 
 ```rust
-use cocycle::complex::{Simplex, SimplexId, SimplicialComplex};
+use cocycle::complex::{FilteredComplex, Simplex, SimplexId, SimplicialComplex};
+use cocycle::diagram::IntervalEnd;
+use cocycle::persistence::PersistenceExt;
 
 let complex = SimplicialComplex::new(vec![
     Simplex::new(vec![10], 0.)?, Simplex::new(vec![20], 0.)?,
@@ -26,10 +28,16 @@ let complex = SimplicialComplex::new(vec![
 ])?;
 let source = &complex;
 let scale = 1.;
+let stage = source.stage(scale)?;
+let filled = source.stage(2.)?;
+assert_eq!(stage.len(), 6);
+assert_eq!(stage.inclusion_into(&filled)?.len(), 6);
 let bases: [Vec<SimplexId>; 3] = std::array::from_fn(|degree| {
-    source.simplices().iter()
-        .filter(|s| s.dimension() == degree && s.value() <= scale)
-        .map(|s| source.find(s.vertices()).unwrap()).collect()
+    source.cells()
+        .filter(|&id| {
+            let s = source.simplex(id).unwrap();
+            s.dimension() == degree && s.value() <= scale
+        }).collect()
 });
 let keys: Vec<_> = bases[1].iter()
     .map(|id| source.simplex(*id).unwrap().vertices()).collect();
@@ -60,6 +68,22 @@ assert_eq!(d, vec![Vec::<i32>::new(); 3]);
 let a_f2: Vec<Vec<_>> = a.iter()
     .map(|row| row.iter().map(|x| x.rem_euclid(2)).collect()).collect();
 assert_eq!(a_f2, [[1, 1, 0], [1, 0, 1], [0, 1, 1]]);
+
+// A direct calculation at scale 1, with standard real inner products.
+// The signed edge cycle x has B1*x=0. No persistence request was needed.
+let x = [1, -1, 1];
+let energy: i32 = a.iter()
+    .map(|row| row.iter().zip(x).map(|(b, x)| b * x).sum::<i32>().pow(2))
+    .sum();
+assert_eq!(energy, 0); // x^T B1^T B1 x; C2 is empty at this scale.
+
+// The other reader uses this exact owner and its stored filtration values.
+let ids_before: Vec<_> = source.cells().collect();
+let result = source.persistence().max_homology_dimension(1).compute()?;
+let h1 = result.diagram().dimension(1)?.iter().next().unwrap();
+assert_eq!((h1.birth(), h1.end()), (1., IntervalEnd::Finite(2.)));
+assert_eq!(source.cells().collect::<Vec<_>>(), ids_before);
+assert_eq!(source.simplex(bases[1][0]).unwrap().vertices(), &[20, 30]);
 # Ok::<(), cocycle::Error>(())
 ```
 
@@ -69,6 +93,13 @@ matrix coordinate and uses linear basis lookups; it is a deliberately small
 example, not a recommended large-complex representation. Sparse consumers can
 iterate signed incidence instead. The source is unchanged, and no persistence
 request is needed for this conversion.
+
+`FilteredComplex::cells()` already supplies the stored IDs without vertex-key
+lookups. A direct read of the entire object can omit the scale predicate, as the
+construction example does. The stage selection above includes all ties, while
+the PH query reads the full filtration and obtains H1 `[1,2)`. A scale-1 truncated
+PH query would instead retain a right-censored endpoint; the direct stage's
+cycle does not certify essentiality of that truncated query.
 
 For an ordinary nonaugmented H0 consumer, the previous space is empty and its
 boundary has shape 0-by-n. Export that shape explicitly. Simplex IDs belong to
@@ -81,6 +112,13 @@ and derive vertex-edge incidence. Its interpretation as a one-dimensional
 complex is explicit: a graph triangle is not automatically a filled clique.
 Filtration values, spectral Grams and F2 coordinate costs remain separate.
 This prepares inputs; it implements no Laplacian, Dirac or F2 projection solver.
+
+The stage borrow checks the inclusion into the filled triangle; the matrix
+reader selects the same source-local IDs with the explicit scale predicate.
+Stage selection itself allocates no storage. See the
+[stage guide](filtered-complexes.md#read-stages-and-their-inclusions) for checked
+inclusions and for the distinction between analyzing the original source through
+a stage and choosing its stored topology as a new complete supplied source.
 
 ## Move persistence data while retaining its meaning
 
