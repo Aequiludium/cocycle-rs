@@ -14,33 +14,28 @@ analysis and explicit simplicial construction.
 Start with a task below; design pages distinguish implemented decisions from
 proposed APIs and remaining acceptance gates.
 
-## Version and capability status
+<a id="version-and-capability-status"></a>
 
-This index owns the documentation's version interpretation. Usage pages describe
-the code in this checkout; a Cargo version label alone does not establish that
-unreleased APIs are available from the registry.
+Usage pages describe this checkout, including **Unreleased** borrowed stages,
+critical sets and source/interval assembly integration. The README dependency
+selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
+and [architecture](development/architecture.md) for candidate additions.
+Laplacian/Dirac solvers, persistent spectra, F2 homology projection, non-diagram
+similarity, external learning and automatic feedback remain future contracts.
+The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
+reports retain the proposals.
 
-| Scope | Meaning and entry |
-| --- | --- |
-| Versioned releases | [0.1.1](../CHANGELOG.md#011) and [0.1.0](../CHANGELOG.md#010) describe their delivered scope; the README dependency selects 0.1.1. |
-| Implemented, Unreleased | Borrowed stages/inclusions, opt-in critical sets and source/interval assembly integration are available in the candidate code. [Unreleased notes](../CHANGELOG.md#unreleased) and the [architecture](development/architecture.md) describe this checkout. |
-| Future contracts | Laplacian/Dirac solvers, persistent spectra, F2 homology projection, non-diagram similarity, external learning and automatic feedback have no production implementation here. [Phase 4](design/roadmap.md#phase-4-priorities) selects the work; [input](research/input-contracts.md) and [result](research/result-contracts.md) reports own the proposals. |
-| Historical evidence | Research baselines, original PR states, finite checks and benchmark results apply to their recorded revisions. They do not establish current merge, release or performance acceptance. |
+This revision is prepared from [#119 at
+`a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
+observed open on 2026-10-11, including the later accessor-contract clarification.
+The original audit used `64ab5fdc`. The [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
+lists the migration/source/contract inputs. Those hashes, PR states and checks
+remain historical evidence after integration; they are not a live release status.
+Main integration and release follow the [release procedure](../CONTRIBUTING.md#release-procedure).
 
-The documentation revision is prepared from [#119 at
-`a2a1841c3d566758497f377da5a72f422b8728be`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
-observed open on 2026-10-11. That candidate contains #113-#119 and the original
-migration/source/contract inputs listed in the [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94).
-The original documentation audit used `64ab5fdc`; the later accessor-contract
-clarification and regression are included in this revision's baseline.
-This provenance stays historical after integration; it is not a live PR tracker.
-Main integration and release require the [release procedure](../CONTRIBUTING.md#release-procedure).
-
-The candidate excludes #26/#49's paused distance preparation and #56's experimental
-adaptive H1 dispatch. Their correctness, resource and performance adoption gates
-remain independent. In particular, the corrected #56 evidence retains favorable
-matrix-H1 timings but leaves direct-graph and H2/H3 performance unmeasured; it
-does not establish production admission. Recheck those PRs before later adoption.
+The candidate excludes #26/#49's paused preparation and #56's experimental adaptive
+H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
+do not supply its unmeasured direct-graph and H2/H3 performance gates.
 
 ## Use the library
 

@@ -9,12 +9,6 @@ dissimilarities into persistence diagrams: which components and loops appear,
 and how long they last. A general-purpose TDA library in pure Rust, with no runtime
 dependencies and no unsafe code.
 
-This checkout includes **Unreleased** additions prepared on the integrated
-candidate [#119 at `a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be).
-The dependency below selects **0.1.1**; it does not include those additions.
-Use the [version and capability status](docs/README.md#version-and-capability-status)
-to distinguish released behavior, implemented candidate code and future contracts.
-
 - **Rips persistence** — dimension-generic ordinary persistence over prime fields,
   with a specialized F₂ H₀/H₁ path. Euclidean points or borrowed matrix layouts.
 - **Inspectable construction** — exact threshold graphs, supplied weighted flag
@@ -72,11 +66,12 @@ The [0.1.1 release notes](CHANGELOG.md#011) describe the latest maintenance fixe
 the [initial release notes](CHANGELOG.md#010) describe the supported scope,
 limitations and migration from development Git revisions. See the
 [version policy and release procedure](CONTRIBUTING.md#release-procedure) for
-compatibility and publishing.
+compatibility and publishing. The dependency above selects 0.1.1;
+this checkout's Unreleased additions are identified in the
+[version status](docs/README.md#version-and-capability-status).
 
-## Read stages from one source (Unreleased)
-
-The following example requires this checkout's candidate API. A stage borrows
+**Unreleased stage access.** This example requires the candidate API. A stage
+borrows
 all stored simplices with value <= scale, including ties. An inclusion preserves
 owner-local IDs and signed incidence; equal IDs from separate owners are not a map.
 
@@ -111,25 +106,6 @@ cells as a standalone supplied complex makes a different coverage claim. See the
 [stage guide](docs/guides/filtered-complexes.md#read-stages-and-their-inclusions)
 for certified sources, errors and the distinction from general chain maps.
 
-## Six responsibilities and Phase 4
-
-Data owners supply geometry or signed topology. Filtration construction and stage
-access select scales when needed. Computation produces concrete results; comparison
-and analysis borrow those results or accept suitable data directly. Single-scale
-consumers need not run persistence, and analysis need not compute a distance.
-The [architecture overview](docs/development/architecture.md#six-responsibilities-and-data-routes)
-maps data, filtration, computation, results, comparison and analysis to existing owners.
-
-Phase 4 prepares these shared boundaries and concrete data handoffs. **Laplacian
-and Dirac solvers, persistent spectra, F₂ homology projection, non-diagram
-similarity, external learning and automatic feedback remain future work.** Their
-contracts and hand calculations do not implement production algorithms.
-Ordinary stage spectra alone would not establish a persistent Laplacian.
-Use the [roadmap](docs/design/roadmap.md#phase-4-priorities),
-[interface guide](docs/guides/interface-contracts.md) and
-[route report](docs/research/route-integration.md) for the plan, callable examples
-and future handoffs respectively.
-
 ## Explore
 
 [API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
@@ -159,6 +135,15 @@ To compare two complete diagrams, run
 `cargo run --locked --example diagram_distances`. The [distance example](examples/diagram_distances.rs)
 demonstrates all three metrics; see the [matching contract](docs/reference/mathematics.md#16-diagram-matching-distances)
 for ground costs, essential intervals and error semantics.
+
+Phase 4 connects six responsibilities: data, filtration, computation, results,
+comparison and analysis. Filtration selects scales when needed; computation
+produces concrete results that comparison and analysis can borrow independently.
+See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
+[roadmap](docs/design/roadmap.md#phase-4-priorities) and
+[interface guide](docs/guides/interface-contracts.md). Laplacian/Dirac solvers,
+persistent spectra, F₂ homology projection, non-diagram similarity and external
+learning remain future contracts, described in the [route report](docs/research/route-integration.md).
 
 Work and memory depend on the input and reduction fill-in. Rips comparisons
 use native GUDHI and upstream Ripser C++; see the maintained

@@ -2,105 +2,187 @@
 
 [Documentation](../README.md) / Design
 
-This page owns future priorities, not a delivery schedule or API specification.
-The [version status](../README.md#version-and-capability-status) separates releases,
-Unreleased implementation and dated evidence. The
-[architecture overview](../development/architecture.md#six-responsibilities-and-data-routes)
-owns current capabilities; the [changelog](../../CHANGELOG.md) owns version notes.
+This document records priorities, not a delivery schedule. Supported behavior is
+listed in the [architecture](../development/architecture.md) and usage guides;
+the [changelog](../../CHANGELOG.md) records versioned and Unreleased work.
+Use the [version status](../README.md#version-and-capability-status) to
+distinguish candidate implementation from releases and dated research.
 
 ## Direction
 
-Build a native Rust TDA kernel around six usable responsibilities: data,
-filtration, computation, results, comparison and analysis. Keep specialized
-ordinary persistence paths and concrete consumers. Filtration, diagrams and
-distances are optional when a consumer does not need them. Six responsibilities
-do not imply six crates, empty framework modules or a universal backend registry.
+Build a native Rust TDA kernel with GUDHI's C++ capabilities as a reference and
+specialized Rips computation where appropriate. Prioritize coherent input and
+result contracts, composable analysis operations, ownership, and resource
+behavior. Runnable Rust examples demonstrate the kernel; language bindings and
+application frameworks are not first-stage deliverables.
 
-The earlier Rips subsystem plan remains a bounded subsystem design and evidence
-source. Phase 4 broadens the next priorities beyond Rips; it does not abandon
-existing Rips correctness, compatibility or resource obligations.
+Phase 4 extends this direction across data, filtration, computation, results,
+comparison and analysis. Keep specialized persistence and concrete consumers;
+filtration, diagrams and distances are optional when a route does not need them.
+The six responsibilities do not require six crates or a runtime registry.
 
-## Current foundation
+The [GUDHI C++ study](../research/gudhi-cpp.md) maps upstream capabilities and remaining
+reading work. The [kernel design](kernel.md) defines responsibility boundaries
+and distinguishes implemented changes from future extensions.
+The [Rips subsystem design](rips.md) defines the selected complete Rips target,
+including upstream Ripser, its API draft and acceptance gates. These are design
+inputs, not claims of implemented parity or a request to copy either source layout.
 
-Borrowed geometry, checked graphs and signed simplicial/cell sources already
-support ordinary prime-field persistence, concrete result reading, complete-diagram
-distances and descriptors. The integrated candidate adds borrowed stages and
-same-source inclusions and retains opt-in Big Steps critical sets. Use the
-[stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions),
-[interface guide](../guides/interface-contracts.md) and
-[critical-set guide](../guides/critical-sets.md) for callable behavior and limits.
-Critical-set proposals are distinct from F2 homology projections.
+## Current scope
 
-The [interface preparation gate](interface-compatibility.md) and
-[route record](../research/route-integration.md) retain their exact source and
-validation scope. They deliver current calls, contracts and finite examples;
-they do not implement Laplacian, Dirac, persistent spectra, F2 projection,
-generalized topology, non-diagram similarity or external learning algorithms.
+The implemented core provides borrowed point clouds and matrix layouts, exact
+threshold graph construction, supplied weighted flag filtrations, ordinary prime-field
+persistence through dense/sparse access, explicit simplicial expansion and
+incidence queries, requested cycle/cocycle bases, blocker-aware sparse approximation,
+owned diagrams/context, basic descriptors and exact bottleneck/Wasserstein distances.
+Cooperative work limits and cancellation are available on the richer compute
+entry points. An independent explicit boundary implementation remains a test oracle; the
+production representative path owns a separate reducer. See the
+[construction guide](../guides/rips-construction.md) and the
+[0.1.0 release scope](../../CHANGELOG.md#010).
 
-## Phase 4 priorities
+The [filtered-complex boundary](../guides/filtered-complexes.md) is implemented:
+validated supplied simplices, a four-method cell trait, signed-scale boundary
+reduction and shared source context. This supplies an integration boundary for
+future Alpha geometry; it does not implement triangulation or Alpha construction.
 
-The public [Phase-4 plan #57](https://github.com/Aequiludium/cocycle-rs/issues/57)
-organizes work by capability and evidence. Complete coherent documentation and
-reviewed integration first. Then advance each concrete family through its own
-mathematical specification, minimal implementation and independent acceptance.
-Interface preparation is a prerequisite; it does not close algorithm tasks.
+[Algorithm contribution paths](../development/algorithm-contributions.md) now
+include descriptor, diagram-distance and explicit construction paths,
+mathematical tests and focused checks exercised by CI. The lower-star constructor
+is a teaching example, not an additional production API. The
+[persistence algorithm walkthrough](../development/persistence-reduction.md)
+now covers direct column work, implicit alternatives and default integration.
 
-| Responsibility / plan | Next bounded work | Decision owner and exit evidence |
-| --- | --- | --- |
-| Data, [#64](https://github.com/Aequiludium/cocycle-rs/issues/64) | Extend an existing owner only when a concrete Alpha, cubical/cellular or generalized consumer needs it. | [Data decisions](../research/data-modeling.md): validate topology, orientation, source identity and conversion costs independently. |
-| Filtration, [#67](https://github.com/Aequiludium/cocycle-rs/issues/67) | Retain finite same-owner stages; research general chain maps and multiparameter semantics separately. | [Stage decisions](../research/filtration-stages.md): basis association, chain-map squares, composition and coverage; no inference from matching IDs across owners. |
-| Computation, [#70](https://github.com/Aequiludium/cocycle-rs/issues/70) | Implement concrete single-scale Laplacian/Dirac, true persistent spectral pairs and F2 homology operations in separate review units; generalized models need their own theory. | [Input proposals](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) and [output/resource contracts](../research/result-contracts.md#computation-family-outputs-and-resources): independent matrices/actions, complete or explicitly partial solver evidence and measured resources. |
-| Results, [#77](https://github.com/Aequiludium/cocycle-rs/issues/77) | Add an interpretable result owner only with its actual producer. | [Result decisions](../research/result-contracts.md): ordered bases, availability, multiplicity, residuals/certificates, moves and explicit provenance loss. |
-| Comparison, [#80](https://github.com/Aequiludium/cocycle-rs/issues/80) | Define one useful non-diagram similarity before adding an API. | [Comparison proposals](../research/result-contracts.md#future-comparison-interface-information-only): mathematical meaning, coordinates, units, incompatible/undefined cases and independent expected values. |
-| Analysis, [#83](https://github.com/Aequiludium/cocycle-rs/issues/83) | Preserve concrete descriptors; implement a minimal exporter/external consumer only for a validated use case. | [Handoff information](../research/analysis-learning.md#future-external-input-information-84-to-92): sample/stage/basis keys, shapes, units, conversion cost, roundtrip and an actual external run. |
+Borrowed stages and same-source inclusions, opt-in Big Steps critical sets and
+source/interval assembly integration are implemented Unreleased additions. Use
+the [stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions),
+[critical-set guide](../guides/critical-sets.md) and
+[interface guide](../guides/interface-contracts.md) for calls and limits.
+The [input](../research/input-contracts.md) and [result](../research/result-contracts.md)
+reports and [route record](../research/route-integration.md) prepare future handoffs;
+they do not implement spectral/Dirac, F2 projection or learning algorithms.
 
-After actual producers exist, [route work #86](https://github.com/Aequiludium/cocycle-rs/issues/86)
-can test single-scale spectral/Dirac consumption, persistent spectral pairs,
-F2 class transport, direct comparisons and external learning. The
-[route report](../research/route-integration.md) owns these handoffs. Separate
-stage spectra are not a persistent Laplacian; legal F2 projections are not
-automatically optimal or matrix-commuting. Feedback remains application-owned
-and deferred until invalidation and derivative/tie behavior have concrete evidence.
+## Next priorities
 
-## Integration and adoption gates
+<a id="phase-4-priorities"></a>
 
-Prepare one documentation consolidation after the #113-#119 code candidate is
-reviewed and integrated. Its README, changelog, index, architecture, guides and
-fixed doctest list must describe the same version before a release. Check the
-actual Cargo package's local links as well as the checkout. Follow the
-[release procedure](../../CONTRIBUTING.md#release-procedure); a passed historical
-gate or open PR is not a published capability.
+The [Phase-4 plan #57](https://github.com/Aequiludium/cocycle-rs/issues/57) sets the
+next capability priorities. Complete reviewed integration and coherent documents,
+then advance concrete families through narrow implementations and independent
+acceptance. Interface preparation does not complete algorithm delivery.
 
-Keep [#26](https://github.com/Aequiludium/cocycle-rs/pull/26) and
-[#49](https://github.com/Aequiludium/cocycle-rs/pull/49) distance-preparation
-admission separate and paused until their own review and current-head performance
-evidence. [#56](https://github.com/Aequiludium/cocycle-rs/pull/56) remains an
-experimental adaptive H1 candidate outside this integration. Its corrected
-matrix-H1 measurements do not supply the missing direct-graph/H2/H3 performance
-gates. Documentation consolidation does not change any adoption decision.
+1. **Data.** Extend an existing owner only for a concrete Alpha, cubical/cellular
+   or generalized consumer, following the [modeling decisions](../research/data-modeling.md).
+2. **Filtration.** Retain finite same-owner stages; research general chain maps and
+   multiparameter transport separately under the [stage decisions](../research/filtration-stages.md).
+3. **Computation.** Implement single-scale Laplacian/Dirac, true persistent spectral
+   pairs and F2 homology operations in separate review units, following the
+   [family inputs](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
+   and [output/resource contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
+4. **Results.** Add a concrete interpretable result owner with its actual producer;
+   preserve ordered bases, availability and certificates under the [result decisions](../research/result-contracts.md).
+5. **Comparison.** Define one useful non-diagram similarity, coordinate alignment,
+   units and incompatible cases before adding an [API](../research/result-contracts.md#future-comparison-interface-information-only).
+6. **Analysis.** Preserve existing descriptors; validate a minimal exporter and
+   actual external consumer under the [handoff requirements](../research/analysis-learning.md#future-external-input-information-84-to-92).
 
-## Rips maintenance and evidence
+After actual producers exist, the [route record](../research/route-integration.md)
+guides their composition. Separate stage spectra are not a persistent Laplacian;
+legal F2 projections are not automatically optimal or matrix-commuting. Feedback
+remains application-owned and deferred until invalidation and derivative/tie
+behavior have concrete evidence. The implemented API and kernel revisions below
+provide the existing foundation for this work.
 
-The [Rips subsystem design](rips.md), [API design](rips-api.md),
-[implementation scope](rips-implementation.md) and [acceptance audit](rips-acceptance.md)
-retain the R1-R10 requirements, source history and subsystem validation.
-The [kernel design](kernel.md) owns the implemented dependency/result/extension
-decisions, and the [GUDHI study](../research/gudhi-cpp.md) is fixed upstream
-reading evidence rather than a feature-parity claim.
+The [API design](rips-api.md) is implemented with a compatibility stage:
+`RipsBuilder::build_complex` creates inspectable topology and `.persistence()`
+configures direct analysis. Approximation, callback ownership, source context and
+whole-operation execution controls follow the same contracts. Guides and native
+workers use the new paths. Legacy names and functions remain available; removing
+them requires a separately declared breaking release. Algorithm
+optimizations and new filtration families remain separate review units.
 
-Review enumeration/reduction optimization separately from public API and storage
-changes. Preserve pivot order, F2 parity, multiplicity, coverage and prime-field
-semantics. Extend independent and pinned native comparisons for each capability.
-Use the [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) for same-fixture, same-source,
-same-boundary measurements; retain regressions, timeouts and unsupported cases.
-Historical timings and saved-diagram replays do not measure a newer head.
+The [aligned kernel design](kernel.md) owns the dependency, ownership, result and
+extension decisions. Its [implementation sequence](kernel.md#implementation-sequence)
+is included in the 0.1.0 release in four steps:
+
+1. Reuse frozen simplicial incidence, cache structural facts,
+   and limit direct exact point edge retention to the effective analysis range,
+   without changing public result semantics.
+2. Common result data and computed dimensions in the explicitly
+   [declared result-API revision](kernel.md#result-api-migration), including analysis
+   consumers and equivalent source-context assembly.
+3. Independent owned-boundary computation, exact flag
+   dispatch and direct simplicial calls for explicit/approximate Rips. Share
+   compatible types and keep specialized public operations optional.
+4. Contributor guides and examples reflect the current
+   boundaries; persistence reduction has a focused check exercised by CI.
+
+Diagrams support explicit computed-dimension sets;
+default builders still compute every dimension through their requested maximum.
+Current representatives remain simplicial bases. Common data supports cheap
+`AsRef` borrowing. The design specifies static cell adaptation and the scope
+of in-crate result construction. External result import, runtime plugins and
+generic cellular witnesses are separate workstreams, not prerequisites for an
+algorithm contribution. Mathematical optimizations and legacy-API removal also
+remain separate changes.
+
+Rips maintenance and evidence priorities remain within this broader plan:
+
+1. **Complete the Rips subsystem.** Follow the
+   [delivery sequence and exit gates](rips.md#delivery-sequence-and-exit-gates):
+   exact sparse input through computation, explicit and higher-dimensional Rips,
+   prime fields and requested representatives, then sparse approximation through
+   computation. Stages 1-4 are implemented, including sparse approximation
+   with hypotheses, blocker rules and provenance. Stage 5 has an [acceptance audit](rips-acceptance.md), resource
+   regressions and native workflow measurements. Hosted CI for the submitted
+   revision remains a release gate. Review new API contracts before extending scope.
+   Each stage delivers a usable path with tests, examples and documentation;
+   finishing one stage does not complete the whole target.
+   The [implementation scope](rips-implementation.md) identifies exact directories,
+   existing-file edits and review units for the first stage and later additions.
+2. **Extend native evidence with each capability.** The
+   [native suites](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) compare pinned GUDHI and upstream
+   Ripser C++ workers. Exact and sparse correctness suites now cover construction,
+   higher dimensions, fields and approximation; the pipeline records phase and
+   end-to-end resource snapshots. Extend those fixtures with each new contract,
+   following the [verification matrix](rips.md#verification-and-native-comparison)
+   and [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md). Stronger performance claims
+   need a fresh comparative study with externally retained evidence.
+3. **Retain focused H1 performance work.** The scoped sequence below can improve
+   the existing path while broader capabilities arrive. Include nonmetric and
+   bipartite fixtures alongside geometric inputs; performance claims need fresh
+   native evidence.
+   Review enumeration/reduction optimizations separately from API and storage
+   refactors.
+
+The earlier Rips-first plan remains the subsystem's design and evidence record.
+Phase 4 broadens the next priorities without relaxing its ownership, resource,
+reproducibility or result-interpretation requirements. See
+[R1-R10](rips.md#required-capability-matrix).
+
+Each crates.io release requires hosted CI for the exact release commit and
+inspection of the packaged crate, following the
+[release procedure](../../CONTRIBUTING.md#release-procedure). Release notes in the
+[changelog](../../CHANGELOG.md) describe delivered capabilities; this roadmap
+does not commit to dates for future work.
+
+After reviewed code integration, a separate focused documentation consolidation
+must align README, changelog, index, architecture and guides before release.
+Run the fixed Markdown doctests and check the actual Cargo package's local links.
+Keep #26/#49's paused preparation and #56's experimental adaptive H1 adoption gates
+independent. Corrected matrix-H1 measurements do not supply #56's unmeasured
+direct-graph/H2/H3 performance gates; documentation acceptance does not admit it.
+
+Performance-only changes to existing paths must preserve pivot order, F2 parity,
+multiplicity, and public coverage. New fields and generalized algorithms establish
+their own documented invariants. Check each optimization against the reference and external
+implementations; do not remove hard cases or use point count as a universal limit.
 
 ## H1 implementation sequence
 
-**Historical subsystem sequence.** The table below preserves the earlier
-Rips-focused plan. It is not the Phase-4 queue or a current delivery status.
-Subsequent production changes and experiment dispositions belong to the
-changelog and revision-bound reports; recheck source before resuming a step.
+**Historical subsystem sequence.** This table preserves the earlier Rips-focused
+plan, not the Phase-4 queue. Recheck source and revision-bound reports before
+resuming a step; the changelog owns subsequent production changes.
 
 Keep maintenance refactors separate from changes to enumeration, reduction, or
 storage. The current baseline has a single result-normalization path, named
@@ -134,9 +216,8 @@ optimizations. Other mathematical capabilities remain separate work.
 
 ## Feature admission
 
-A new capability needs a mathematical specification, narrow input/output
-contracts, a runnable implementation, an independent correctness check and an
-ownership/error/resource model. Start in an existing owner where possible.
-Avoid speculative registries, unused traits, placeholder modules and application
-dependencies in the kernel. Research or a justified no-go can complete a study
-without delivering the proposed algorithm. Merge and release remain separate.
+A new capability needs a mathematical specification, clear input/output contracts,
+an independent correctness check, and a reasonable ownership/error model.
+Avoid speculative backend registries, unused traits, placeholder modules, and
+application-specific research features. Language bindings remain separate from
+the kernel's Rust API and release process.

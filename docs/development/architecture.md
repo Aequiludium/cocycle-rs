@@ -16,46 +16,22 @@ Algorithm authors can start with the [contribution paths](algorithm-contribution
 for focused descriptor, diagram-distance and explicit-construction workflows. This page owns
 the broader dependency map used for kernel integration.
 
-## Six responsibilities and data routes
+<a id="six-responsibilities-and-data-routes"></a>
 
-Phase 4 organizes six mathematical responsibilities within the existing crate.
-They do not require six crates, a universal source/result type or runtime registry.
+Phase 4 connects six responsibilities within these existing owners. `geometry`
+and `complex` supply data; `filtration` constructs scale-dependent sources and
+exposes stages; `persistence` computes ordinary PH; `diagram` owns results;
+`diagram_distances` compares diagrams; `descriptors` supplies analysis. Concrete
+results preserve context, coverage and optional witnesses. These responsibilities
+do not require six crates or a common source/result registry.
 
-| Responsibility | Implemented owner and behavior | Future capability and contract owner |
-| --- | --- | --- |
-| Data | `geometry` borrows points/matrices; `complex` owns checked graphs and signed simplicial incidence; `FilteredComplex` statically adapts ordered cells. | Alpha geometry, production cubical/cellular containers and generalized models: [data decisions](../research/data-modeling.md). |
-| Filtration | `filtration` constructs exact/sparse Rips and supplied flag sources with coverage/context; frozen simplicial owners expose borrowed `SimplicialStage` and same-source inclusions. | General chain maps, unrelated-source and multiparameter transport: [stage decisions](../research/filtration-stages.md). |
-| Computation | `persistence` computes ordinary prime-field PH with specialized F2 paths; `optimization::CriticalSetWorkspace` supplies opt-in Big Steps endpoint proposals. | Laplacian/eigensolver, Dirac, true persistent spectral pairs, F2 homology projections and generalized topology: [input proposals](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9). |
-| Results | `diagram` owns diagrams/context and optional representative witnesses; computed dimensions, coverage, ordinals and immutable borrows retain their meaning. | Concrete spectral and projection outputs/certificates: [result proposals](../research/result-contracts.md#computation-family-outputs-and-resources). |
-| Comparison | `diagram_distances` provides exact complete-diagram bottleneck, W1 and W2, including contextual and controlled facades. | Defined non-diagram similarities with explicit coordinate/unit alignment: [comparison proposals](../research/result-contracts.md#future-comparison-interface-information-only). |
-| Analysis | `descriptors` reads finite lifetimes, entropy and Betti curves from diagrams. Application code can consume returned scalars directly. | Exporters, external learning and automatic feedback: [handoff proposals](../research/analysis-learning.md#future-external-input-information-84-to-92) and the [route record](../research/route-integration.md). |
-
-```mermaid
-flowchart LR
-    data[Data owners] --> filtration[Filtration and stages]
-    filtration --> ph[Ordinary persistence]
-    ph --> results[Diagrams, context and witnesses]
-    results --> comparison[Diagram comparison]
-    results --> analysis[Descriptors and application consumers]
-    data -.-> direct[Future single-scale or direct consumers]
-    filtration -.-> direct
-    direct -.-> future[Future spectral, projection or learning outputs]
-```
-
-Solid routes exist in this checkout; dotted routes are contract handoffs for future
-algorithms. Source incidence can already be read without PH, and supplied diagrams
-can already be compared/analyzed without a source owner. A filtration is optional
-for single-scale computations; diagrams and distances are optional for direct
-consumers. These alternatives are not an automatic pipeline or new callable facade.
+Filtration is optional for single-scale consumers; diagrams and distances are
+optional for direct consumers. Signed incidence can already be read without PH,
+and supplied diagrams can already be compared/analyzed without a source owner.
 The [interface guide](../guides/interface-contracts.md) exercises current calls;
-the [route report](../research/route-integration.md) owns composed examples and
-future information requirements rather than duplicating the contracts above.
-
-IDs belong to one owner and coordinate bases retain order and signs. Filtration
-values, spectral inner-product Grams and F2 class costs have distinct meanings.
-Reading an ordinary stage or computing its PH does not produce a persistent
-Laplacian or an F2 projection operator. Application code owns optional feedback,
-invalidation and recomputation; the Rust kernel has no learning dependency.
+the [route report](../research/route-integration.md) records composed handoffs and
+future requirements. Proposed producers and output types remain outside the
+implemented source tree below.
 
 ## Production code
 
@@ -454,6 +430,18 @@ Keep public paths stable when splitting a file into private submodules. Add a ne
 public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
+
+Future Laplacian/Dirac, true persistent spectral pairs and F2 homology projection
+need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
+and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
+Non-diagram similarities need defined coordinates and units; exporters, external
+learning and automatic feedback need the [handoff contracts](../research/analysis-learning.md).
+None of these algorithms is implemented by the current interfaces.
+
+IDs belong to one owner; ordered bases retain signs and associations. Filtration
+values, spectral Grams and F2 class costs are distinct. Ordinary stage spectra
+would not establish a persistent Laplacian, and critical-set proposals do not
+compute F2 homology projections. Applications own feedback and recomputation.
 
 Current integration has specific limits. `PersistenceExt` is sealed, its Builder
 compute hook is private, and column arithmetic and work budgets are crate-internal.
