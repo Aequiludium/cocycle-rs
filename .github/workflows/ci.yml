@@ -231,6 +231,9 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+      - run: cargo build --locked --lib
+      - run: rustc --edition 2024 --test benches/distances/preparation.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/preparation-tests
+      - run: target/preparation-tests
       - run: python tools/reproduce_distance_preparation.py --mode all --samples 2 --iterations 3 --output target/distance-preparation-smoke
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
