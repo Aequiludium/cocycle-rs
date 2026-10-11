@@ -3,7 +3,7 @@ use crate::diagram::{
     ComputationContext, Coverage, FiltrationKind, PersistenceResult, RipsApproximation,
 };
 use crate::filtration::{
-    RipsInputKind, SparseRips, SparseRipsExpansion,
+    ApproximateRipsBuilder, RipsInputKind, SparseRips, SparseRipsExpansion,
     rips::approximation::SparseRipsAccess,
     simplicial::{ZeroBornExplicitAccess, ZeroBornSimplicialAccess},
 };
@@ -156,4 +156,15 @@ fn compute(
         ),
         representatives,
     ))
+}
+
+pub(in crate::persistence) fn compute_builder_budget(
+    input: &ApproximateRipsBuilder<'_>,
+    options: &PersistenceOptions,
+    requests: &[RepresentativeRequest],
+    budget: &mut WorkBudget<'_>,
+) -> Result<PersistenceResult> {
+    input.validate()?;
+    let prepared = input.prepare_budget(budget)?;
+    compute_sparse_rips_budget(&prepared, options, requests, budget)
 }

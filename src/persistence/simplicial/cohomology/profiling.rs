@@ -115,7 +115,7 @@ pub(super) fn workspace_level(
 fn workspace_boundary_failures_return_no_partial_result_and_retry_cleanly() {
     use crate::complex::{WeightedEdge, WeightedGraph};
     use crate::diagram::Coverage;
-    use crate::persistence::assemble_diagram;
+    use crate::persistence::assembly::assemble_diagram;
     // Octahedral sphere plus an isolate: two H0 classes and one essential H2.
     let graph = WeightedGraph::new(
         7,

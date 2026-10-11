@@ -12,11 +12,11 @@ use crate::filtration::flag::{FlagAccess, SimplexEntry};
 use crate::filtration::rips::cone_radius;
 #[cfg(test)]
 use crate::geometry::DissimilarityView;
+use crate::persistence::assembly::RawIntervals;
 use crate::persistence::execution::WorkBudget;
 use crate::persistence::union_find::UnionFind;
 use crate::{Error, Result};
 
-type RawIntervals = Vec<(usize, f64, Option<f64>)>;
 type Coboundary = BinaryHeap<Reverse<SimplexEntry>>;
 
 const NO_SHORTCUTS: u8 = 0;
