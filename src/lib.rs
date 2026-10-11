@@ -17,6 +17,8 @@
 //! diagrams; concrete simplicial sources also support vertex-labelled representatives.
 //! Requested cycle/cocycle representatives use production boundary reduction;
 //! independent test oracles verify ranks and interval semantics.
+//! Opt-in F2 critical-set workspaces retain sparse decompositions for endpoint
+//! proposals and bounded partial U queries on frozen simplicial complexes.
 //! Work and memory can still grow substantially with input size and reduction
 //! fill-in. See the mathematical specification and benchmark records for limits.
 //!
@@ -43,6 +45,7 @@ mod error;
 pub mod execution;
 pub mod filtration;
 pub mod geometry;
+pub mod optimization;
 pub mod persistence;
 
 pub use error::{Error, Result};

@@ -35,6 +35,7 @@ jobs:
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+      - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -43,6 +44,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/rips-representatives.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
       - run: python tools/check_algorithm.py complex-construction
@@ -78,6 +80,9 @@ jobs:
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --release --example complex_construction
       - run: cargo run --locked --example diagram_distances
+      - run: cargo run --locked --example critical_sets
+      - run: cargo test --locked --example critical_sets
+      - run: cargo test --locked --release --example critical_sets
 
   msrv:
     name: Minimum Rust (1.91)
@@ -91,6 +96,7 @@ jobs:
       - run: cargo test --locked --all-features
       - run: cargo check --locked --all-targets --all-features
       - run: cargo test --locked --example complex_construction
+      - run: cargo test --locked --example critical_sets
 
   package:
     name: Package and packaged example
@@ -110,10 +116,11 @@ jobs:
           metadata = json.load(sys.stdin)
           package = metadata["packages"][0]
           print("{}/package/{}-{}/Cargo.toml".format(metadata["target_directory"], package["name"], package["version"]))')"
-          for example in square diagram_analysis diagram_distances complex_construction; do
+          for example in square diagram_analysis diagram_distances complex_construction critical_sets; do
             cargo run --locked --manifest-path "$package_manifest" --example "$example"
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
+          cargo test --locked --manifest-path "$package_manifest" --example critical_sets
 
   reference:
     name: Native C++ reference comparisons
@@ -158,6 +165,22 @@ jobs:
       - run: python tools/compare_rips.py --output target/rips-reference
       - run: python tools/compare_sparse_rips.py --output target/sparse-rips-reference
       - run: python tools/benchmark_rips_pipeline.py --quick --samples 1 --output target/rips-pipeline-smoke
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: anigmetov/oineus
+          ref: e52814a1ffb5b8a81e71ff1e93b4c14194673f0f
+          path: target/optimization-sources/oineus
+          sparse-checkout: |
+            include
+            extern
+      - name: Check critical-set native adapters
+        shell: bash
+        run: |
+          cpu="$(python -c 'import os; print(min(os.sched_getaffinity(0)))')"
+          python tools/benchmark_critical_sets.py --quick --samples 1 \
+            --rustc "$(command -v rustc)" --cpu "$cpu" \
+            --oineus-source target/optimization-sources/oineus \
+            --boost-include /usr/include --output target/critical-set-smoke
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -189,6 +212,10 @@ jobs:
             target/rips-pipeline-smoke/measurements.json
             target/rips-pipeline-smoke/fixtures/
             target/rips-pipeline-smoke/build/build.log
+            target/critical-set-smoke/
+            target/optimization-sources/oineus/license.txt
+            target/optimization-sources/oineus/legal.txt
+            target/optimization-sources/oineus/extern/taskflow/LICENSE
 
   distances:
     name: Native diagram-distance references

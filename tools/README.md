@@ -18,6 +18,15 @@ follow the shared [reporting rules](../benches/reporting.md).
 [benchmark_inputs.py](benchmark_inputs.py) owns deterministic fixture generation,
 shared with historical controllers without sharing their Python worker path.
 
+## Critical-set performance and persistence context
+
+[benchmark_critical_sets.py](benchmark_critical_sets.py) runs native sparse,
+pinned dense and Oineus critical-set queries on Linux/WSL. It also measures
+concrete/generic persistence, requested cycles, the internal reference reducer,
+and the implicit flag path on compatible inputs. Different requested outputs
+remain separate comparison scopes. The [critical-set guide](../benches/optimization/README.md)
+owns baseline availability, setup, deterministic fixtures, timing and validation.
+
 ## Diagram-distance correctness and ablations
 
 [compare_distances.py](compare_distances.py) checks bottleneck/L-infinity,

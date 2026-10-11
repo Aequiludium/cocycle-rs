@@ -63,5 +63,31 @@ class AdmissionTests(unittest.TestCase):
         self.assertTrue(all(row['median_ms'] == '' for row in rows))
 
 
+class ContinuationTests(unittest.TestCase):
+    def test_workloads_cover_direct_graph_h1_h2_h3_and_odd_field(self):
+        cases = list(study.continuation_workloads())
+        self.assertEqual(len({c.name for c in cases}), len(cases))
+        for degree in (1, 2, 3):
+            self.assertTrue(any(c.path == 'flag' and c.fixture.q == degree for c in cases))
+        self.assertTrue(any(c.fixture.q == 3 and c.fixture.cutoff == 1. for c in cases))
+        self.assertTrue(any(c.fixture.characteristic == 3 for c in cases))
+
+    def test_consistently_wrong_h3_and_failed_samples_withhold_rankings(self):
+        case = next(c for c in study.continuation_workloads()
+                    if c.fixture.name == 'cross_polytope_h3')
+        commands = {n: [n] for n in ('baseline', 'candidate', 'gudhi', 'ripser')}
+        wrong = {'status': 'completed', 'intervals': [[0, 0., None]],
+                 'elapsed_ms': 1., 'peak_rss_kib': 20}
+        for output in (wrong, {'status': 'timeout'}):
+            with self.subTest(output=output), tempfile.TemporaryDirectory() as directory:
+                fixture = Path(directory) / 'input.txt'
+                case.fixture.write(fixture)
+                with patch.object(study.pipeline, 'worker', return_value=output):
+                    record = study.measure_continuation(case, fixture, commands, 12,
+                                                        1729, 1., 64, 0)
+                self.assertEqual(record['validation'], 'failed')
+                self.assertTrue(all(r['median_ms'] is None for r in record['summary'].values()))
+
+
 if __name__ == '__main__':
     unittest.main()

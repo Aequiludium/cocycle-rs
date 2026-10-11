@@ -5,6 +5,7 @@ processes and no warmups. A failed or incomplete case cannot receive rankings.
 """
 
 import argparse
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import io
@@ -12,10 +13,12 @@ import os
 from pathlib import Path
 import platform
 import random
+import statistics
 import subprocess
 import tarfile
 
 import build_native
+import benchmark_rips_pipeline as pipeline
 from benchmark_inputs import Case, make_case
 from benchmark_native import compare, expected, save, summarize, validate, worker
 from benchmark_rips_pipeline import provenance, schedule
@@ -106,6 +109,140 @@ def fingerprint(root, paths):
     return {'sha256': digest.hexdigest(), 'files': inventory}
 
 
+def continuation_workloads():
+    """Frozen graph/H1 and H2 controls, plus H3 handoff and odd-field controls."""
+    seen = set()
+    for quick in (True, False):
+        for case in pipeline.phase3_cases(quick):
+            if case.name not in seen:
+                seen.add(case.name)
+                yield case
+    for case in pipeline.phase3_cases(True):
+        if case.fixture.q == 2 and any(name in case.name for name in
+                                      ('uniform', 'low_degree', 'high_fill', 'equal_clique')):
+            yield replace(case, fixture=replace(case.fixture, name=case.fixture.name + '_h3', q=3))
+    fixture = pipeline.Fixture('cross_polytope_h3', 'dense', 8, 3, None,
+                               [2. if a // 2 == b // 2 else 1.
+                                for b in range(8) for a in range(b)])
+    yield pipeline.Case(fixture, 'dense')
+    yield pipeline.Case(replace(fixture, name='cross_polytope_h3_cutoff', cutoff=1.), 'dense')
+    yield pipeline.Case(replace(fixture, name='cross_polytope_h3_odd', characteristic=3), 'dense')
+
+
+def measure_continuation(case, fixture, commands, samples, seed, timeout, memory_mib, cpu):
+    record = {'case': case.name, 'homology_max': case.fixture.q, 'path': case.path,
+              'field': case.fixture.characteristic, 'cutoff': case.fixture.cutoff,
+              'fixture_sha256': build_native.sha256(fixture), 'samples': [],
+              'validation': 'passed', 'errors': []}
+    anchors = {}
+    for entry in schedule(commands, samples, seed):
+        name = entry['backend']
+        result = pipeline.worker([*commands[name], str(fixture), case.path, case.layout,
+                                  str(case.epsilon), 'no'], case, timeout, memory_mib, cpu)
+        result.update(entry)
+        record['samples'].append(result)
+        if result['status'] != 'completed':
+            record['errors'].append(f'{name}: {result["status"]}')
+            continue
+        try:
+            if case.fixture.name.startswith('cross_polytope_h3'):
+                # The boundary of the 4D cross-polytope is S^3 at scale 1;
+                # adding antipodal edges at scale 2 produces a full simplex.
+                expected_bars = [[0, 0., 1.]] * 7 + [[0, 0., None],
+                                  [3, 1., None if case.fixture.cutoff == 1. else 2.]]
+                if pipeline.canonical(result) != pipeline.canonical({'intervals': expected_bars}):
+                    raise ValueError('cross-polytope hand-derived H0/H3 mismatch')
+            for anchor in anchors.values():
+                pipeline.compare_samples(anchor, result, case)
+            anchors.setdefault(name, result)
+        except ValueError as error:
+            record['errors'].append(f'{name}: {error}')
+    if any(sum(s['backend'] == name and not s['warmup'] and s['status'] == 'completed'
+               for s in record['samples']) != samples for name in commands):
+        record['errors'].append('incomplete measured group')
+    if record['errors']:
+        record['validation'] = 'failed'
+    record['summary'] = {}
+    for name in commands:
+        rows = [s for s in record['samples'] if s['backend'] == name and not s['warmup']]
+        times = [s['elapsed_ms'] for s in rows] if not record['errors'] else []
+        record['summary'][name] = {
+            'median_ms': statistics.median(times) if times else None,
+            'min_ms': min(times, default=None), 'max_ms': max(times, default=None),
+            'peak_rss_kib': max((s['peak_rss_kib'] for s in rows), default=None)
+            if times else None}
+    return record
+
+
+def continuation(args):
+    names = ('baseline', 'candidate', 'gudhi', 'ripser')
+    if args.samples % len(names):
+        raise ValueError('continuation samples must be a multiple of four')
+    identity = provenance('HEAD')
+    baseline = subprocess.check_output(['git', 'rev-parse', '--verify',
+                                       args.baseline + '^{commit}'], cwd=REPO, text=True).strip()
+    paths = ('Cargo.toml', 'Cargo.lock', 'src', 'benches/pipeline',
+             'tools/benchmark_flag_h1.py', 'tools/benchmark_rips_pipeline.py',
+             'tools/benchmark_inputs.py', 'tools/compare_rips.py', 'tools/build_native.py',
+             'tools/reference/rips_common.hpp', 'benches/native/sources.json')
+    sources = fingerprint(REPO, paths)
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    metadata = {**identity, 'baseline_commit': baseline, 'sources': sources,
+                'kernel': fingerprint(REPO, ('Cargo.toml', 'Cargo.lock', 'src')),
+                'protocol': pipeline.PROTOCOL, 'samples_per_cell': args.samples,
+                'repeats': args.repeats, 'warmups': 1, 'seed': 20261011,
+                'cpu': args.cpu, 'platform': platform.platform(),
+                'cpuinfo': Path('/proc/cpuinfo').read_text().split('\n\n')[0],
+                'frequency_and_host_load': 'uncontrolled', 'status': 'building',
+                'start_utc': datetime.now(timezone.utc).isoformat()}
+    save(output / 'environment.json', metadata)
+    try:
+        metadata['reference_build'] = pipeline.build(args, output)
+        root = output / 'baseline-source'
+        archive_baseline(baseline, root)
+        metadata['baseline_kernel'] = fingerprint(root, ('Cargo.toml', 'Cargo.lock', 'src'))
+        target = output / 'baseline-build'
+        commands = [
+            ['cargo', 'build', '--release', '--locked', '--offline', '--lib', '--target-dir', str(target)],
+            ['rustc', '--edition=2024', '-O', '-D', 'warnings', str(REPO / 'benches/pipeline/cocycle.rs'),
+             '--extern', f'cocycle={target}/release/libcocycle.rlib', '-L',
+             f'dependency={target}/release/deps', '-o', str(output / 'build/baseline')]]
+        metadata['baseline_build_commands'] = commands
+        with (output / 'build/build.log').open('a') as log:
+            for command in commands:
+                subprocess.run(command, cwd=root, check=True, stdout=log, stderr=subprocess.STDOUT)
+        binaries = {n: output / 'build' / ('cocycle' if n == 'candidate' else n) for n in names}
+        metadata['binaries_sha256'] = {n: build_native.sha256(p) for n, p in binaries.items()}
+        metadata['status'] = 'running'
+        save(output / 'environment.json', metadata)
+        fixtures = output / 'fixtures'
+        fixtures.mkdir()
+        records = []
+        for index, case in enumerate(continuation_workloads()):
+            fixture = fixtures / (case.name + '.txt')
+            case.fixture.write(fixture)
+            for repeat in range(args.repeats):
+                record = measure_continuation(case, fixture, {n: [str(p)] for n, p in binaries.items()},
+                                              args.samples, 20261011 + 100 * index + repeat,
+                                              args.timeout, args.memory_mib, args.cpu)
+                record['repeat'] = repeat + 1
+                records.append(record)
+                save(output / 'results.json', records)
+                print(case.name, repeat + 1, record['validation'], flush=True)
+        if provenance('HEAD') != identity or fingerprint(REPO, paths) != sources:
+            raise ValueError('sources changed during measurement')
+        metadata['status'] = 'passed' if all(r['validation'] == 'passed' for r in records) else 'failed'
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        metadata['status'] = 'failed'
+        metadata['error'] = str(error)
+        raise
+    finally:
+        metadata['end_utc'] = datetime.now(timezone.utc).isoformat()
+        save(output / 'environment.json', metadata)
+    return 0 if metadata['status'] == 'passed' else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', required=True)
@@ -116,11 +253,19 @@ def main():
     parser.add_argument('--repeats', type=int, default=2)
     parser.add_argument('--timeout', type=float, default=30.)
     parser.add_argument('--memory-mib', type=int, default=2048)
+    parser.add_argument('--suite', choices=('matrix-h1', 'continuation'), default='matrix-h1')
+    parser.add_argument('--gudhi-source', type=Path)
+    parser.add_argument('--boost-include', type=Path)
+    parser.add_argument('--cxx', default='c++')
     args = parser.parse_args()
     if args.samples < 12 or args.samples % len(BACKENDS) or args.repeats < 2:
         parser.error('use at least 12 samples in multiples of three and two repeats')
     if args.cpu not in os.sched_getaffinity(0):
         parser.error('CPU is outside inherited affinity')
+    if args.suite == 'continuation':
+        if args.gudhi_source is None:
+            parser.error('continuation requires --gudhi-source')
+        return continuation(args)
     identity = provenance('HEAD')
     baseline = subprocess.check_output(['git', 'rev-parse', '--verify',
                                        args.baseline + '^{commit}'], cwd=REPO, text=True).strip()
