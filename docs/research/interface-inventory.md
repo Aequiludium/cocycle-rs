@@ -338,7 +338,7 @@ No speedup or zero-allocation target is invented for mechanical migration.
 | #72 batch 2: interval assembly facade | Reassess `assemble_diagram` and `RawIntervals` after batch 1; if retained as a distinct assembly owner, move the single helper and all live imports together, with source-linked documentation | Existing multiset/endpoint/reference tests and standalone workers; no duplicate helper or new public type. Any assembly allocation or routing change requires measured controls; otherwise keep the body unchanged. Revert the batch independently. |
 | #79-L: result consumers | Retain the existing diagram/data/result files and reads listed in M1; any demonstrated stale caller is fixed in this owner, with explicit ordinal/loss checks | `contracts`, witness moves/contextual distances; no pending preparation adoption. Source/tests currently support a boundary-specific no-op. |
 | #82-L: distance consumers | Retain facade/solver ownership; unique preparation changes remain #26/#49 | Existing exhaustive/public contracts; measure extraction/solve if changed. No preparation clone is introduced by #72. |
-| #85-L: descriptors / optional optimization | Retain diagram-only descriptor files and separate CriticalSetWorkspace | `descriptors`, analysis example, critical-set tests; measure changed sorting/copy/allocation only. New learning remains #85-N. |
+| #85-L: descriptors / optional optimization | Retain diagram-only descriptor files and separate CriticalSetWorkspace | `descriptors`, analysis example, critical-set tests; measure changed sorting/copy/allocation only. Future learning is outside this migration; its separate owner is #111. |
 
 No dead private duplicate has been proven. In particular, test oracles, generic
 fallbacks, basis-retaining reduction and experimental cfg code retain distinct
@@ -346,36 +346,44 @@ consumers or mathematical/cost reasons. This decision does not authorize deletin
 them to manufacture a refactor. All PH/common M decisions are now sufficient
 to start #72; the other three owners retain their own implementation acceptance.
 
-### N: five computation families and actual increments
+### N: future computation contracts outside the migration scope
 
 The [input](input-contracts.md) and [result](result-contracts.md) reports already
 fix signed bases, Grams, projection certificates and finite examples at their
 listed upstream revisions. Their external runtimes/older experiments are not
-rerun by this decision. The following choices narrow the remaining work and do
-not announce those algorithms as production features.
+rerun by this decision. Under the current [Phase-4 scope](https://github.com/Aequiludium/cocycle-rs/issues/57),
+#71 delivers only the M1-M4 legacy migration decisions. The candidates below
+describe future inputs, outputs and mathematical acceptance conditions, not
+algorithm implementation or completion of #73-#76 in this refactoring phase.
+#73-#75 prepare interface information independently from #60/#61; they do not
+wait for each other's algorithms. Future implementation needs its own explicit
+task and acceptance, outside #72/#79/#82/#85 and the #94 refactoring exit.
 
-| Family / decision | Reusable code and missing mathematical data | First input/output, independent validation and cost / implementation owner |
+| Family / future candidate | Reusable code and missing mathematical data | Proposed input/output, independent validation and cost / future responsibility |
 | --- | --- | --- |
 | Ordinary PH: continue internal migration | Existing prime field, cofaces, two readers, boundary reducer, interval/witness owners are sufficient; no new backend needed | Signed delayed triangle: births -4/-3/-2, edges 0/1/2, face 3 -> H0 (-4,infinity), (-3,0), (-2,1), H1 (2,3). Existing hand-derived boundary test plus independent explicit/bitmask oracle; GUDHI/Ripser for supported route changes. Implicit diagram-only access stays implicit; representatives remain optional. #72 batches above. |
-| Single-scale Laplacian: continue minimal unweighted real action; defer weighted/complex/persistent spectra and eigensolver adoption | Reuse graph or frozen **signed integer** incidence and owner/basis map, not modular PH coefficients. Choose ordinary nonaugmented chains and Euclidean Gram I. Need f64 action/output, overflow/nonfinite/residual policy; no current production spectral owner | A path graph as a 1-complex has B1=[[-1,0],[1,-1],[0,1]], L1=B1^T B1=[[2,-1],[-1,2]], spectra {1,3} by hand. Triangle ring has L1 spectrum {0,3,3}; filled triangle L1=3I. #73 first implements borrowed sparse action and small independently assembled matrices; a numerical solver is a separate explicit decision in #73, not an undocumented dependency here. Action is O(nnz B); tiny dense validation O(n^2), general dense spectrum O(n^3) time/O(n^2) storage. Default PH incurs none of it. |
-| Dirac: continue after the same real convention in #73; defer persistent Dirac | Reuse ordered adjacent signed boundaries and Gram I. For a finite graded chain choose D=B+B^T on the direct sum with zero blocks; require B^2=0 over the reals and keep degree offsets | For path C0+C1, D=[[0,B1],[B1^T,0]], D^2=diag(L0,L1), spectrum {0,+/-1,+/-sqrt(3)}. Filled triangle includes C2 and square includes all Hodge blocks. Check block multiplication exactly, spectral +/- pairing and empty-degree shapes with independent matrices. #74 sparse action O(nnz B); full export quadratic; numerical spectrum uses only an adopted #73 scheme. No fabricated filtration or F2 I+P substitution. |
-| F2 homology operator: continue bounded feasible projection; defer global optimality/general geometry | Existing frozen incidence/field can extract A:m-by-n and D:n-by-p with AD=0 mod 2, source-local ordered bases and **separate** positive costs. Current PH pairs/critical sets do not provide legal P/certificates. Local candidate code is not main or automatically authorized for publication | Ring edge space: A is signed triangle incidence reduced mod 2, D has zero columns; cycle 111 costs (2,3,5) -> selected mass 10. Filled ring D=111 -> beta1=0, selected class mass 0. Require AP=0, PD=0, P^2=P and z+Pz in im(D) for every z in ker(A), with rank beta=dim ker(A)-rank D. Exhaustive tiny binary linear algebra checks feasibility independently; homology-operator `a8d03d1` supplies a comparison contract, not a runtime dependency. #75 needs explicit budget/failure/certificate output. Dense extraction O(mn+np), factorized/exhaustive solving bounded and potentially large; feasibility never implies optimality/shortest mass. |
-| Generalized topology: defer production adoption; continue focused research in #76 | Sheaf restrictions/stalk dimensions, directed allowed path chains, hypergraph embedded chain spaces and Mayer N-differentials are missing. Shared column arithmetic may be reused only after a theory's chain law is established; ordinary `FilteredComplex` is insufficient | Sheaf first case: two vertices/one edge with declared stalk maps -> coboundary and Laplacian; directed path first case: 0->1->2 requires checking whether its boundary stays in the allowed chain space; hypergraph case: one 3-vertex hyperedge lacks automatic face closure; Mayer case must specify N and generalized homology for d^N=0. #76 compares at least three candidates against original definitions and independent finite matrices before choosing implementation. Costs depend on stalk dimensions/allowed paths/N and cannot inherit PH benchmarks. No universal generalized backend is adopted. |
+| Single-scale Laplacian: future minimal unweighted real action; no current algorithm or eigensolver adoption | Reuse graph or frozen **signed integer** incidence and owner/basis map, not modular PH coefficients. Choose ordinary nonaugmented chains and Euclidean Gram I. Need f64 action/output, overflow/nonfinite/residual policy; no current production spectral owner | A path graph as a 1-complex has B1=[[-1,0],[1,-1],[0,1]], L1=B1^T B1=[[2,-1],[-1,2]], spectra {1,3} by hand. Triangle ring has L1 spectrum {0,3,3}; filled triangle L1=3I. #73 currently documents the proposed action/matrix/spectrum interface. Borrowed sparse action, independent matrices and any numerical solver belong to separately accepted future implementation. Action is O(nnz B); tiny dense validation O(n^2), general dense spectrum O(n^3) time/O(n^2) storage. Default PH incurs none of it. |
+| Dirac: future graded action with independently documented real conventions; defer persistent Dirac | Reuse ordered adjacent signed boundaries and Gram I. For a finite graded chain choose D=B+B^T on the direct sum with zero blocks; require B^2=0 over the reals and keep degree offsets | For path C0+C1, D=[[0,B1],[B1^T,0]], D^2=diag(L0,L1), spectrum {0,+/-1,+/-sqrt(3)}. Filled triangle includes C2 and square includes all Hodge blocks. Check block multiplication exactly, spectral +/- pairing and empty-degree shapes with independent matrices. #74 currently documents graded action/matrix/spectrum requirements alongside #73, without an algorithm dependency. Future sparse action is O(nnz B); full export is quadratic; any numerical scheme needs separate implementation acceptance. No fabricated filtration or F2 I+P substitution. |
+| F2 homology operator: future bounded feasible projection; defer global optimality/general geometry | Existing frozen incidence/field can extract A:m-by-n and D:n-by-p with AD=0 mod 2, source-local ordered bases and **separate** positive costs. Current PH pairs/critical sets do not provide legal P/certificates. Local candidate code is not main or automatically authorized for publication | Ring edge space: A is signed triangle incidence reduced mod 2, D has zero columns; cycle 111 costs (2,3,5) -> selected mass 10. Filled ring D=111 -> beta1=0, selected class mass 0. Require AP=0, PD=0, P^2=P and z+Pz in im(D) for every z in ker(A), with rank beta=dim ker(A)-rank D. Exhaustive tiny binary linear algebra checks feasibility independently; homology-operator `a8d03d1` supplies a comparison contract, not a runtime dependency. #75 currently documents explicit budget/failure/certificate output requirements; projection and class-query solvers are future implementation work. Dense extraction O(mn+np), factorized/exhaustive solving bounded and potentially large; feasibility never implies optimality/shortest mass. |
+| Generalized topology: later research candidate in #76; no current production adoption | Sheaf restrictions/stalk dimensions, directed allowed path chains, hypergraph embedded chain spaces and Mayer N-differentials are missing. Shared column arithmetic may be reused only after a theory's chain law is established; ordinary `FilteredComplex` is insufficient | Sheaf first case: two vertices/one edge with declared stalk maps -> coboundary and Laplacian; directed path first case: 0->1->2 requires checking whether its boundary stays in the allowed chain space; hypergraph case: one 3-vertex hyperedge lacks automatic face closure; Mayer case must specify N and generalized homology for d^N=0. Future #76 research would compare at least three candidates against original definitions and independent finite matrices before a separate implementation decision. Costs depend on stalk dimensions/allowed paths/N and cannot inherit PH benchmarks. No universal generalized backend is adopted. |
 
 The generalized deferral has concrete obstructions: nontrivial sheaf restrictions
 are not scalar +/-1 simplex incidence; the boundary of the allowed directed path
 (0,1,2) includes (0,2), which need not be allowed; a hyperedge is not automatically
 its downward-closed simplicial complex; and d^N=0 for N>2 does not satisfy the
 ordinary d^2=0 reducer contract. These justify postponing integration rather than
-renaming existing PH. Original-paper/full-runtime evaluation stays with #76.
+renaming existing PH. Original-paper/full-runtime evaluation remains future #76 work.
 The references in #76 are reading candidates, not sources claimed newly read here.
 
-PH and the three selected finite-chain families have concrete definitions, first
-fixtures, result/certificate limits, independent checks and implementation owners.
-Generalized production adoption is explicitly deferred for incompatible/missing
-inputs. Parallel reducers, unsafe acceleration, new dependencies and persistent
-spectral claims are not selected. #73-#76 perform their own actual implementations
-or further theory decisions; #71 research completion does not close those issues.
+The PH migration queue in M1-M4 is this #71 delivery. The finite-chain examples
+below only illustrate proposed contracts and independent hand-derived expectations;
+they do not select, implement or adopt a production algorithm. #73-#75 retain
+future algorithm goals, but only prepare interface information during the current
+refactoring phase; actual implementation requires separately scoped future work.
+#76 remains a later research candidate. These issues remain open independently
+of #71's migration decision and cannot block #94 through unimplemented algorithms.
+Parallel reducers, unsafe acceleration, new dependencies and persistent spectral
+claims are not selected.
 
 ### Reproduce the first finite definitions
 
