@@ -6,7 +6,16 @@ Start with the algorithm's mathematical input and output. A boundary-matrix
 researcher can work directly on ordered columns; an implicit cohomology researcher
 can work on coface access. Neither implementation calls the default Builder.
 This guide covers in-crate contributions. The internal types and functions below
-are reusable implementation tools, not a stable external reducer API.
+are reusable implementation tools, not a stable external reducer API. Source adapters
+belong with their computations: exact builder preparation in `persistence/rips/mod.rs`,
+approximate preparation in `persistence/rips/approximation.rs`, and supplied/frozen
+simplicial range and context assembly in `persistence/simplicial/mod.rs`.
+`persistence/source.rs` only wires the sealed extension to these existing owners;
+it does not introduce a second reducer or reset the request's work budget.
+The private `persistence/assembly.rs` owns the shared raw interval alias
+and single ordinary endpoint normalizer. It filters out zero-lifetime and
+out-of-domain pairs, interprets unpaired births using established coverage,
+and constructs the canonical diagram without source validation or dispatch.
 
 ## Find the relevant computation
 
@@ -109,7 +118,8 @@ assert_eq!(result.diagram(), &expected);
 
 ## Connect a default operation when appropriate
 
-`source.rs` handles supported sources and context. `flag/dispatch.rs` selects H0,
+`source.rs` wires supported sources to their computation-owned adapters.
+Those adapters interpret source range and assemble context. `flag/dispatch.rs` selects H0,
 specialized F2 H1 or general cohomology for exact flag inputs.
 F2 diagram-only H2+ retains specialized H0/H1 and hands all
 ordinary/emergent/virtual death triangles to generic continuation at dimension 2.

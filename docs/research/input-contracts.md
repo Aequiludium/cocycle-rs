@@ -309,6 +309,308 @@ as `target/operator-contract-example.py`. It builds these exact A/D windows,
 checks selected masses 10 and 0, and demonstrates an unavailable minimum.
 It reproduces representative decisions, not all 47 original conditions.
 
+## Computation-family preparation on main a7ee9e9
+
+This 2026-10-11 supplement supplies stage A of
+[#73](https://github.com/Aequiludium/cocycle-rs/issues/73),
+[#74](https://github.com/Aequiludium/cocycle-rs/issues/74),
+[#75](https://github.com/Aequiludium/cocycle-rs/issues/75) and
+[#76](https://github.com/Aequiludium/cocycle-rs/issues/76), under
+[#70](https://github.com/Aequiludium/cocycle-rs/issues/70).
+The source baseline is main `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`.
+These are proposed operation contracts and independent hand expectations;
+no new algorithm, public type, trait, numerical backend or runtime dependency is
+implemented. Stage B of #73–#75 remains future algorithm work. The #76 decision
+below selects a future research example without approving its implementation.
+
+### Source reading and compatibility disposition
+
+The current `src/complex/filtered.rs`, `src/complex/simplicial/{mod,simplex,incidence}.rs`,
+`src/persistence/filtered.rs`, `src/execution/mod.rs`, interface guide and existing
+construction example were read at that main. TopoNetX's fixed simplicial source
+was reread at `ce3d414b571fff95916c4cbc20b8d2c2c9d428e6`, blob
+`8ace5fef7ad5e9a44cce02b284578444340bbae9`: `incidence_matrix`,
+`hodge_laplacian_matrix`, `dirac_operator_matrix` and hypergraph closure.
+The homology reference's `docs/INTERFACE.md` was reread at
+`a8d03d1699307ce1997b3c7e81a1946bb83f5408`, blob
+`9a5423763e4e7b5ebb8b2ab10063001a3d0f573a`.
+This is source inspection, not a new execution of either external package.
+
+| Existing owner | Retain now | Future consumer's additional responsibility |
+| --- | --- | --- |
+| Frozen simplicial owner and integer incidence | Increasing-vertex signs, traversal order and owner-local IDs; no change to storage or `FilteredComplex` | Select degree bases, preserve position-to-cell maps and establish the actual coefficient-domain chain equation. |
+| Generic filtered PH reader and implicit flag/Rips paths | Field-specific reduction and current dispatch; do not route spectra through PH or materialize implicit cliques | A concrete spectral/projector consumer extracts only the required stage/window, independently of persistence requests. |
+| `Execution` and errors | Fresh terminal budget, cooperative cancellation, fallible allocation; no memory/thread quota | Define charge units and checkpoints for extraction, validation, matrix action, numerical solving and certificate replay before implementing the operation. |
+| Diagram, representatives and `CriticalSetWorkspace` | Existing result/witness and optional critical-set ownership | Spectrum and homology-projector results need their own owners; critical sets do not supply a legal P. |
+| Pending PRs #100/#102/#103/#104 | Preserve their stage, modeling and PH-migration scope; no branch update here | Use a merged version or an explicit future stack if required; these contracts use main's existing access and do not require those PRs to run. |
+
+For each extraction, traverse `cells()` once, select every cell with value <= the
+declared scale (or all cells for an explicitly unfiltered use), then restrict that
+order by degree. Validate unique keys, faces, dimensions and summed integer
+incidences; duplicate terms sum before coefficient conversion, with checked
+arithmetic. Supply explicit shapes when either basis is empty. Borrow the source
+during the call; an owned output retains owned basis/source descriptions rather
+than dangling `SimplexId` interpretations. External identities remain caller
+declarations until checked. No global identity service is required.
+
+### Laplacian input and operation proposal
+
+Use the three-degree window `C[k-1] <-A- C[k] <-D- C[k+1]` above, over the
+declared real or complex scalar domain, with `AD=0` and an explicitly ordinary
+nonaugmented H0. Signed integer simplicial data can feed either domain.
+Arbitrary custom sources need their integer/domain validity established;
+PH's selected-field check is insufficient. Reject a missing adjacent degree
+needed by the requested operator; an explicitly absent degree in the selected
+finite complex is a valid zero-size map. A supplied k-skeleton can intentionally
+define a lower-only problem, but cannot claim the full Hodge operator of a
+larger complex. Source cutoff and skeleton information stay attached.
+
+Require finite Hermitian positive-definite `Gprev`, `Gcur`, `Gnext`, including an
+explicit standard-inner-product choice. A zero-dimensional Gram is valid.
+Singular/indefinite Grams, nonfinite coefficients, incompatible bases/shapes and
+unknown weight semantics fail validation. Complex conjugation is mandatory;
+ordinary transpose is valid only for real inputs. A future real-only backend
+must report complex input unsupported rather than discard imaginary parts.
+
+The proposed calls, in descriptive notation rather than compilable/public Rust,
+are:
+
+```text
+laplacian_action(source_or_window, degree, selection, grams, x, execution)
+    -> Result<owned coordinates L x with basis and operator identity>
+laplacian_matrix(source_or_window, degree, selection, grams, layout, execution)
+    -> Result<owned shaped matrix with the same identity>
+laplacian_spectrum(source_or_window, degree, selection, grams,
+                   eigenpair_selection, vectors_requested, numeric_policy, execution)
+    -> Result<owned spectral result described in result-contracts.md>
+```
+
+Use `L=A_adjoint A + D D_adjoint`, with the adjoints defined above. Distinguish
+full, lower-only and upper-only operators in identity and output. If
+`Gcur=R* R`, the Hermitian coordinate problem is `H=R L inverse(R)`;
+equivalently `(Gcur L)v=lambda Gcur v`. Applying a generalized solver to
+`L v=lambda diag(L) v` is a different problem. Do not form inverses unnecessarily
+in an eventual implementation; stable solves/factorization need their own review.
+Unit declarations must make both summands commensurate; the request supplies
+Gram/weight units and resulting eigenvalue units rather than inheriting edge
+length units. Normalized, persistent and indefinite-inner-product variants are
+separate definitions, presently unsupported by this proposal.
+
+The [existing path and triangle hand matrices](#concrete-finite-examples-and-outcomes)
+are the first fixtures. For the path with `Gprev=diag(1,2,3)`,
+`Gcur=diag(2,3)` and empty next degree, `L=[[3/2,-1],[-2/3,5/3]]` and its
+hand eigenvalues are `(19-sqrt(97))/12` and `(19+sqrt(97))/12`.
+It is self-adjoint in G, not Euclidean symmetric. For the unfilled signed
+triangle, `z=(1,-1,1)` spans the real kernel; filling adds `D=z`, making `L=3I`.
+Its F2 cycle is `(1,1,1)`, which is not the same real coordinate vector.
+The ordinary two-vertex edge has `L0=[[1,-1],[-1,1]]` and nullity 1.
+These are expectations, not a delivered eigensolver or nullity certificate.
+
+### Dirac input, grading and truncation proposal
+
+Use a finite ordered direct sum `C[a] + ... + C[b]`, with explicit degree
+offsets, adjacent maps `B[j]:C[j]->C[j-1]`, `B[j-1]B[j]=0` in the declared
+real/complex field, and block Gram `G=diag(G[a],...,G[b])`. Empty degrees retain
+their offsets. For the first proposed ordinary full complex, `a=0` and
+`C[-1]=0`; neither augmentation nor cross-degree inner-product terms are implied.
+
+Write `d` for the degree-lowering block operator and `K=d+d_adjoint` for Dirac,
+to avoid confusing it with the next-boundary matrix D. The proposed operations
+are `dirac_action(graded_source, selection, grams, x, execution)`,
+`dirac_matrix(graded_source, selection, grams, layout, execution)` and
+`dirac_spectrum(graded_source, selection, grams, eigenpair_selection,
+vectors_requested, numeric_policy, execution)`, returning the corresponding
+owned action/matrix/spectral information. These names are text proposals.
+Each coordinate/result retains degree and local basis position; a spectral
+vector generally mixes degrees and must not be assigned a single PH degree.
+
+With compatible adjoints and `d^2=0`, `K^2` has the Hodge blocks
+`B[j]_adjoint B[j] + B[j+1] B[j+1]_adjoint`. This identity applies to the same
+chosen graded complex. Cutting to degrees [a,b] sets maps crossing its endpoints
+to zero: the bottom block loses its lower term and the top loses its upper term.
+Squaring a truncated K does not recover the full source's endpoint Laplacians.
+Any future alternative boundary condition must be named and validated.
+Compatible units/scalings are needed for the summed block operator and its
+eigenvalues; degree-dependent units cannot silently be added.
+
+For one ordinary edge and standard Grams, order `(v0,v1,e01)`:
+
+```text
+K   = [[0,0,-1], [0,0,1], [-1,1,0]]
+K^2 = [[1,-1,0], [-1,1,0], [0,0,2]]
+expected spectrum = (-sqrt(2), 0, sqrt(2)); kernel = span((1,1,0))
+```
+
+Selecting only `C1` instead gives K=0, whereas full `L1=[2]`; this detects the
+truncation error. In the full ordinary finite case, grading parity anticommutes
+with K, so nonzero eigenvalues occur in +/- pairs. That check requires the same
+unmodified block definition; mass terms/other Dirac variants are not covered.
+Laplacian and Dirac share mathematical conventions, without requiring one
+solver's private implementation as a dependency of the other.
+
+### F2 window, legality and query proposal
+
+Extract A:m-by-n and D:n-by-p in the three named degree bases, reducing summed
+integer incidence modulo 2 and preserving the original signed source. Check
+`AD=0` over F2, k>=0, unique basis keys, explicit empty shapes and n strictly
+positive coordinate costs. The first bounded Rust proposal uses exact positive
+integer costs with checked arithmetic; rational, floating and arbitrary-precision
+costs remain explicit future choices, not silently rounded inputs. Changing a
+basis permutes A columns, D rows and costs together. Changing costs or source
+claims changes the applicable result identity even if topology is unchanged.
+
+The text-level entry is
+`solve_homology_projection(window, costs, requested_certificate, execution)`;
+direct reads are `project(x)`, `operator_action(x)`, `class_representative(z)`,
+`same_class(z,y)`, `selected_mass(z)` and `support(z)` on its validated result.
+Arbitrary chains are allowed for project/action; class queries require `Az=0`
+for every argument. Unsupported optimality, arithmetic or representation
+requests must remain unsupported; they cannot be downgraded silently to feasible.
+No reference solver dispatch registry or snapshot schema is adopted.
+
+For P:n-by-n over F2, legality requires all of
+
+```text
+P^2=P, AP=0, PD=0,
+for every cycle z: (I+P)z belongs to image(D).
+```
+
+It suffices to check the last condition on an independently obtained cycle
+basis, with boundary preimages/rank evidence. The zero P passes the first three
+conditions even when nonzero homology exists, so those tests alone are unsound.
+Legality yields `rank(P)=n-rank(A)-rank(D)` and `ker(I+P)=image(P)`, not
+`ker(I+P)=ker(A)`. P chooses a representative complement; it is not a real Hodge
+orthogonal projector. Explicit matrix output is optional only when an actual
+factorized representation supplies equivalent actions and independently
+verifiable legality; matrix-free support is not promised by a label.
+
+For the abstract F2 window `A=[1,1,0]`, `D=(1,1,0)^T`, costs `(2,3,5)`, a
+hand choice is `P=diag(0,0,1)`. Its cycle basis is `(1,1,0),(0,0,1)`, the first
+is a boundary, beta=1, and `(1,1,1)` projects to `(0,0,1)` of selected mass 5.
+Zero P fails homology preservation on `(0,0,1)`. `(1,0,0)` is not a cycle.
+The selected representative, support and feasibility evidence refer to this P;
+minimum class mass and globally minimum stretch remain separate requests.
+Family transport needs the two chain-map equations in [stage maps](#stage-maps)
+and compatible identities/cost policies; neither an ordinary barcode nor
+CriticalSetWorkspace supplies them. #90 owns later running integration.
+
+### Generalized-model comparison and selected first investigation
+
+The primary readings below cover definitions and input requirements, not a
+full reproduction or performance review of each paper. These are four distinct
+candidate theories; no generalized model is inserted into the existing trait.
+
+| Candidate and source read | Data missing from current owners | Decision and reason |
+| --- | --- | --- |
+| Cellular sheaf: Hansen/Ghrist, [arXiv:1808.01513v2](https://arxiv.org/html/1808.01513v2), sections 2.2–3.2 | Stalk spaces and ordered stalk coordinates; face-to-coface linear restrictions with composition, signed coboundaries and stalk Grams. Cell incidence alone supplies none of the restriction values. | Select a one-edge rank-one real sheaf for the next investigation: tests nonconstant restrictions with minimal extra data and a hand-derived spectral expectation. |
+| Path homology: Grigoryan/Lin/Muranov/Yau, [arXiv:1207.2834v4](https://arxiv.org/pdf/1207.2834v4), section 3.2 and Example 3.9 | Directed allowed paths, regular/nonregular and reduced/ordinary convention, plus a basis of boundary-invariant chains `Omega[p]={x in allowed[p]: boundary(x) in allowed[p-1]}`. Basis vectors can be combinations of paths. | Defer: `WeightedGraph` is undirected and simplex deletion is not a path-chain constructor. For `0->1->2`, boundary(012)=12-02+01 contains forbidden 02; merely enumerating allowed paths fails. |
+| Embedded hypergraph homology: Bressan/Li/Ren/Wu, [arXiv:1610.00890v5](https://arxiv.org/html/1610.00890v5), sections 2 and 3.1–3.2 | Original hyperedge membership and the chosen embedded chain subspaces; simplicial closure changes the mathematical input. | Defer: first choose the intended homology, preserve non-face-closed membership and construct its chain basis. TopoNetX's inspected closure makes a simplicial complex, which does not establish embedded-homology support. |
+| Mayer N-complex: Shen/Liu/Wei, [DOI:10.3934/fods.2024032](https://doi.org/10.3934/fods.2024032), abstract's N-differential definition | N, coefficient domain (and any q/root convention), degree bases, N-nilpotent differential, and the chosen homology index/powers. | Defer: `d^N=0` for N>2 permits `d^2!=0`; ordinary PH's square-zero boundary cannot express it. Persistent versions need their own maps and definitions. |
+
+The Mayer full-text endpoint returned a wrapper, so that row uses the primary
+abstract only; no detailed Mayer algorithm reading/reproduction is claimed.
+
+The selected sheaf investigation borrows one explicitly oriented graph edge,
+sets all three stalks to R with standard Grams, and supplies restrictions
+`R(v0,e)=1`, `R(v1,e)=2`. Its coboundary is `delta=[-1,2]`, so the hand
+expectation is `L0=delta^T delta=[[1,-2],[-2,4]]`, kernel `span((2,1))` and
+eigenvalues `(0,5)`. Unlike the constant-sheaf kernel, the vertex values need
+not be equal. No composition through a 2-cell is needed in this one-edge case;
+general sheaves must check every face-chain composition. Result identity includes
+stalk bases and restriction maps, not merely the underlying graph identity.
+This is sheaf cohomology, not a claim that an ordinary PH class has changed.
+
+A future operation can receive `(borrowed graph, ordered stalk bases,
+restriction maps, grams)` directly; no six-crate model hierarchy is justified.
+Its implementation gate is actual restriction assembly/action, the constant
+sheaf specialization, zero/rectangular stalk cases, independent residual and
+kernel checks, resource/error behavior and a source/fixture-bound cost report.
+No sheaf engine is approved or delivered here. The other candidates remain
+deferred for the model-specific gaps above, not cancelled and not blockers of
+old PH migration. As a separate hand counterexample, maps `C2->C1->C0` all equal
+to [1] and zero outside satisfy `d^3=0` but `d^2:C2->C0=[1]`; feeding them to
+`FilteredComplex` would violate its contract rather than extend it.
+
+The [family output and resource contracts](result-contracts.md#computation-family-outputs-and-resources)
+complete these input proposals. Their future algorithms and #88–#90 running
+integration must establish their own actual support and evidence.
+
+### Recheck the hand tables without a solver
+
+Save this block as `target/family-hand-check.py` and run
+`python3 target/family-hand-check.py`. It multiplies the stated tiny matrices and
+checks exact polynomial/coefficient identities. It performs no eigendecomposition,
+projection construction or production algorithm. The source/basis extraction
+remains exercised by the existing interface-guide doctest.
+
+```python
+from fractions import Fraction as Q
+from itertools import product
+
+def mul(a, b):
+    return [[sum(x * b[k][j] for k, x in enumerate(row))
+             for j in range(len(b[0]))] for row in a]
+
+def adj(a):
+    return [[x.conjugate() for x in row] for row in zip(*a)]
+
+def add(a, b):
+    return [[x + y for x, y in zip(r, s)] for r, s in zip(a, b)]
+
+path = [[-1, 0], [1, -1], [0, 1]]
+assert mul(adj(path), path) == [[2, -1], [-1, 2]]
+g0 = [[1, 0, 0], [0, 2, 0], [0, 0, 3]]
+g1 = [[2, 0], [0, 3]]
+l = mul([[Q(1, 2), 0], [0, Q(1, 3)]], mul(adj(path), mul(g0, path)))
+assert l == [[Q(3, 2), -1], [Q(-2, 3), Q(5, 3)]]
+assert mul(g1, l) == [[3, -2], [-2, 5]]
+assert l[0][0] + l[1][1] == Q(19, 6)
+assert l[0][0] * l[1][1] - l[0][1] * l[1][0] == Q(11, 6)
+# Characteristic polynomial: 6 lambda^2 - 19 lambda + 11.
+a = [[1, 1, 0], [-1, 0, 1], [0, -1, -1]]
+d = [[1], [-1], [1]]
+assert mul(a, d) == [[0], [0], [0]]
+assert mul(mul(adj(a), a), d) == [[0], [0], [0]]
+assert add(mul(adj(a), a), mul(d, adj(d))) == [[3, 0, 0], [0, 3, 0], [0, 0, 3]]
+k = [[0, 0, -1], [0, 0, 1], [-1, 1, 0]]
+assert mul(k, k) == [[1, -1, 0], [-1, 1, 0], [0, 0, 2]]
+assert mul(k, [[1], [1], [0]]) == [[0], [0], [0]]
+assert mul([[0]], [[0]]) != [[2]]  # Truncated C1 versus full L1.
+# A complex square-zero window; using transpose instead of adjoint is wrong.
+ca, cd = [[1, 1j]], [[-1j], [1]]
+assert mul(ca, cd) == [[0]]
+assert add(mul(adj(ca), ca), mul(cd, adj(cd))) == [[2, 0], [0, 2]]
+
+fa, fd = [[1, 1, 0]], [[1], [1], [0]]
+p = [[0, 0, 0], [0, 0, 0], [0, 0, 1]]
+assert mul(p, p) == p and mul(fa, p) == [[0, 0, 0]]
+assert mul(p, fd) == [[0], [0], [0]] and mul(fa, fd)[0][0] % 2 == 0
+for z in product((0, 1), repeat=3):
+    if (z[0] + z[1]) % 2 == 0:
+        pz = [r[0] % 2 for r in mul(p, [[x] for x in z])]
+        assert [(x + y) % 2 for x, y in zip(z, pz)] in ([0, 0, 0], [1, 1, 0])
+assert [0, 0, 1] not in ([0, 0, 0], [1, 1, 0])  # Zero P loses this class.
+assert sum(w * x for w, x in zip((2, 3, 5), (0, 0, 1))) == 5
+delta = [[-1, 2]]
+sheaf_l = mul(adj(delta), delta)
+assert sheaf_l == [[1, -2], [-2, 4]]
+assert mul(delta, [[2], [1]]) == [[0]]
+assert sheaf_l[0][0] + sheaf_l[1][1] == 5
+assert sheaf_l[0][0] * sheaf_l[1][1] == sheaf_l[0][1] * sheaf_l[1][0]
+nd = [[0, 1, 0], [0, 0, 1], [0, 0, 0]]  # Basis order C0,C1,C2.
+assert mul(nd, nd)[0][2] == 1
+assert mul(mul(nd, nd), nd) == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+print("Hand matrix, Gram, Dirac, F2 legality, sheaf and N-complex checks passed.")
+```
+
+Local preparation checks on 2026-10-11 passed with Python 3.12.13 and Rust
+1.98.1: the block above, source/Markdown checks, the existing construction
+example and its four tests, and the three interface-guide doctests. The primary
+local collaboration checker also passed. All production source, tests, examples,
+workers, Cargo files and workflows remain byte-identical to the fixed main.
+No external algorithm runtime, native oracle, performance, new feature or hosted
+CI result is inferred from these documentation checks.
+
 [cells]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/src/complex/filtered.rs
 [simplex]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/src/complex/simplicial/simplex.rs
 [storage]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/src/complex/simplicial/mod.rs

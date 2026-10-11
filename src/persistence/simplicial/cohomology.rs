@@ -8,7 +8,7 @@ use crate::algebra::{PrimeField, column::Column};
 use crate::complex::Simplex;
 use crate::filtration::simplicial::{ZeroBornSimplicialAccess, next_dimension};
 use crate::persistence::execution::WorkBudget;
-use crate::persistence::{RawIntervals, union_find::UnionFind};
+use crate::persistence::{assembly::RawIntervals, union_find::UnionFind};
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
 

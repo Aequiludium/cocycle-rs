@@ -32,6 +32,114 @@ call existing main APIs and fixed external reference code. #62 owns minimal
 implementation and #63 owns compatibility acceptance; future spectral/Dirac/F2
 capabilities retain their separate mathematics and validation tasks.
 
+## Computation-family outputs and resources
+
+This 2026-10-11 stage-A supplement for #73–#76 uses main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5` and the
+[family input proposals](input-contracts.md#computation-family-preparation-on-main-a7ee9e9).
+It defines future output requirements, not callable result types. Earlier finite
+reference observations retain their original versions/counts. No algorithm,
+solver or spectral/projector result is produced by this supplement.
+
+### Actions, matrices and spectral reads
+
+| Proposed output | Required information and ownership | Availability and checks |
+| --- | --- | --- |
+| Laplacian action | Owned Lx coordinates in the declared degree basis; source/stage, full/lower/upper definition, scalar domain, Grams/adjoints, units and vector identity | Length equals the domain size; explicit empty domain returns length zero. Borrowed reads need no matrix or PH computation. Nonfinite action or failed validation is an error. |
+| Dirac action | Owned Kx in the ordered graded basis, with degree offsets, endpoint/truncation definition, block Grams, coefficient domain and units | Coordinates may mix degrees; empty degrees retain offsets. Missing adjacent data differs from intentional endpoint zeros. Truncated K gives no full-source Hodge guarantee. |
+| Explicit matrix | Owned storage, row/column shape, basis maps, layout and the same operator identity as the action | Sparse/dense and zero rows/columns stay explicit. Requesting action does not compute this matrix. Densifying is a new allocation with checked sizes. |
+| Selected spectrum | Owned values with multiplicity and optional matching vector columns; ordinary/transformed/generalized eigenproblem, basis, solver/revision/dtype and convergence | Declare all/index-range/algebraic/magnitude/interval selection, ordering, requested and returned counts. Dirac has signed values; magnitude and algebraic selections differ. |
+| Kernel/harmonic space | Requested basis or verified dimension, coefficient domain, operator and numerical/exact-rank evidence | An empty selection does not establish zero nullity or an empty domain. Thresholded zeros are numerical evidence, not exact Betti certification. |
+
+Vector reads borrow slices; moving a concrete result transfers owned coordinates
+and metadata. Cloning/materialization is explicit. Owned results remain
+interpretable after source release: local handles require retained basis
+descriptions. No output is silently converted into `PersistenceData`, a diagram
+or a real orthogonal projector; no common availability enum is prescribed.
+
+Numeric policy supplies finite nonnegative absolute/relative tolerances,
+zero-classification threshold, iteration/work limits and norm definitions.
+For `G=R*R`, report Hermitian-coordinate residual
+`r=H(Rv)-lambda(Rv)` with H and normalization identified. A relative measure may
+use `||r||/((||H||+|lambda|)||Rv||)`; for a zero denominator report the absolute
+residual and explicitly unavailable relative value. Label a norm estimate as
+an estimate. Report G-orthogonality `||V* G V-I||`, solver convergence and returned
+coverage separately. Residual alone certifies neither multiplicity/completeness
+nor exact kernel dimension. Use the correct conjugation/dtype; do not discard
+imaginary parts, clamp negative values or change tolerances after a mismatch.
+
+Repeated eigenspaces permit rotations and vectors permit phases/signs. Later
+#109 comparison needs explicit coordinate identification and compatible
+Grams/operator/units, then appropriate subspace comparisons. Partial spectra
+retain their actual selection and any certified excluded range; without such
+evidence they establish no global gap or Betti number. Negative Laplacian values
+need diagnosis against the PSD tolerance; negative Dirac values are expected.
+
+### F2 projection reads and certificates
+
+The proposed owned result binds k/A/D, three basis orders, source/stage, costs,
+arithmetic/units, P or its actual action representation, method/revision and
+solve identity. Content equality does not authenticate source claims. Read support
+in that basis; class comparisons require compatible window/operator/cost policies.
+Borrow/move retains these facts without demanding a full n-by-n P or history schema.
+
+| Evidence/state | Permitted claim | Claim it cannot establish |
+| --- | --- | --- |
+| P independently validated against all four input-report conditions | Feasible representative selection, exact F2 action, beta and class equality for that window | Minimum stretch/class mass, real Hodge projection or equality to an arbitrary PH representative. |
+| Selected mass `m_w(Pz)` | Sum of costs on the returned support in declared arithmetic | Minimum over every representative `z+image(D)`. |
+| Current stretch `Gamma(P)=max_{z!=0,Az=0} m_w(Pz)/m_w(z)` | Objective of this P, with independently verified evaluation coverage/budget | Global optimum over all legal P. Exact integer costs still require checked sums and exact ratio comparisons. |
+| Replayed global lower bound and feasible upper bound | Their proven objective/domain/identities; optimality only when equality is established in valid arithmetic | Certification from a label, unreplayed bounds or a partial search. |
+| Interrupted/exhausted solve or certificate search | Failure with diagnostic, or an explicitly retained independently validated candidate under a future partial-result policy | Success/optimality/zero objective or a silently weakened certificate request. |
+
+Existing `Execution` terminals return errors without partial results. The first
+proposed Rust solve follows that rule; retaining an interrupted candidate needs
+an explicit new contract before adoption. Replay is included in a terminal
+promising certified output; a later separate replay has its own budget/report.
+Unread kernel/objective stays not computed; unsupported shortest-class mass stays
+unsupported. A dead class has computed zero representative/support/mass.
+An eventual stretch API declares its empty-cycle convention (the studied
+reference uses `EmptyDomain` with 0); nonempty cycles with beta=0 can instead have
+computed stretch 0. Neither convention substitutes for an error.
+
+### Resources, errors and future acceptance
+
+The eventual operation names charge units/checkpoints for source/basis/Gram/cost
+validation, extraction, products, iterative action, factorization and certificate
+checks. One fresh terminal shares its budget across promised steps; prior input
+validation is outside only when genuinely reused. Iterator/callback, allocation
+and external solver interiors are not preemptible through this cooperative API.
+Wall time, RSS, entry quotas and thread limits need separate explicit controls;
+none follows from `max_work`.
+
+For dimensions m/n/p, index maps and sparse boundaries need
+O(m+n+p+nnz(A)+nnz(D)) storage; dense boundaries need O(mn+np), dense L/P O(n^2)
+and r vectors O(nr). General Grams/factorizations and fill-in can be dense.
+Dirac dense export needs O((sum n_j)^2); block action need not export it.
+F2 exhaustive cycle/class searches can be exponential. Check products/cost sums
+before allocation; a logical entry limit is not a hard memory bound.
+
+Future errors distinguish invalid input/shape/basis/source, unsupported
+domain/definition/representation/certificate, incompatible units/Grams,
+numeric/nonconvergence/overflow, allocation, cancellation and work exhaustion.
+Reuse applicable current errors; add variants only for actual consumers.
+Failure never becomes apparently successful empty/NaN/zero output.
+
+Stage-B #73/#74 requires real source for action/matrix/spectral operations,
+independent path/triangle/edge expectations, G-adjoint and K-square checks, empty
+and truncation fixtures, residual/orthogonality/selection diagnostics and
+invalid/unsupported/budget behavior. #75 requires actual construction/action,
+all four legality checks against an independent tiny F2 oracle, false-zero-P and
+noncycle rejections, hand-derived reads, arithmetic/budget behavior and separate
+certificate replay. GUDHI can check ordinary topology in the same coefficient
+domain; it cannot verify Gram, Dirac, projection or optimization semantics.
+Documentation and existing PH CI do not replace those future algorithm checks.
+
+The selected #76 sheaf case returns stalk-coordinate cohomology/spectral facts,
+not an ordinary diagram; its implementation gate is in the input report.
+#88–#90 and #109 later consume actual results. Research checks, algorithm
+execution, costs, hosted CI, review, merge and release are separate milestones.
+This supplement completes interface preparation only.
+
 ## Fixed sources, reading and choices
 
 | Source | Revision and material actually read | Chosen lesson / remaining boundary |
@@ -291,6 +399,165 @@ replayed; arbitrary custom query content without supported parameter binding is
 not thereby mathematically certified. Supported recovery is not proof that every
 external provenance claim or format is trustworthy.
 
+## Result readers and migration decision on main a7ee9e9
+
+This 2026-10-11 follow-up completes the result-representation research in
+[#78](https://github.com/Aequiludium/cocycle-rs/issues/78) and the existing-result
+review in [#79](https://github.com/Aequiludium/cocycle-rs/issues/79). Its fixed
+production base is `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`, after #59-#63.
+The current task covers existing code and future interface information.
+Laplacian/eigensolver and F2 projection implementations remain future work;
+the proposed reads below are not callable Rust APIs or computed spectral output.
+
+The source review uses this base's `diagram/`, PH assembly, contextual distance
+facades, descriptors, examples and standalone workers. It also rereads the pinned
+Persim bottleneck/Wasserstein and TopoNetX spectrum functions and the pinned
+homology-operator result/readout implementation identified above. The earlier
+112-condition probe remains historical; it is not rerun or relabeled here.
+
+### Four consumers and the information they require
+
+| Output / concrete consumer | Minimum read and display | Authority, precision and retained identity |
+| --- | --- | --- |
+| Barcode / `betti_curve`, lifetime summary and diagram matching | Declared dimension membership, logical interval multiset, endpoint kind/value and coverage; borrow `PersistenceData` when field/source checks are required | Diagram owns dimensions/coverage; context owns field, source and construction/analysis ranges. Scales are finite binary64; declared scale convention is not physical-unit authentication. Manual diagrams have no inferred producer context. |
+| Representative basis / cycle or cocycle inspector in `rips_representatives` | Request ordinal, interval ordinal, degree, field, query scale, kind and borrowed oriented simplex terms | Terms use increasing original vertex labels and exact prime-field residues. The query scale uses source units. Duplicate bars have separate local ordinals. Cycles/cocycles have different equations; neither is a shortest representative or a canonical vector across runs. |
+| Spectrum / future value-only spectral summary or harmonic-subspace consumer | Operator/eigenproblem, degree, ordered coordinate basis, coefficient arithmetic, Grams/adjoints, units, requested/returned selection and values; paired vectors only when needed | Preserve actual method, source snapshot, convergence, residual/tolerance and normalization evidence. Full/partial selection and numerical zero thresholds are explicit. A residual alone proves neither completeness nor orthogonality. No production spectrum exists at this base. |
+| Projection / future class-action and selected-mass consumer | Window/basis/field, selected P identity, source, coordinate costs/units, query availability/value and independently established feasibility/objective/certificate | F2 action is exact in its declared coordinates; floating costs can remain numerical. A valid zero action on a boundary is computed, not missing. Feasibility, current objective, global optimality and minimum-class mass are distinct. No production homology projector exists at this base. |
+
+Reading owns mathematical interpretation. Plotting chooses labels/axes and
+layout; feature extraction chooses a specified statistic and its domain. Neither
+responsibility requires exposing reducer arrays or rerunning PH. Computation
+may directly feed comparison or analysis without first exporting a display form.
+The two implemented result families here are diagrams and representatives;
+future spectrum/projection descriptions do not count as runnable consumers.
+
+### Selected conversions and their losses
+
+| Conversion / consumer | Semantics and cost | Lost information / decision |
+| --- | --- | --- |
+| `dimension(k)` and its iterator / one-degree reader | Borrow logical view; O(log(n+1)) lookup, O(k) traversal and O(1) auxiliary space; interval values are Copy | No full buffer copy. Retain the owning diagram/context for coverage/source. Selected degree alone does not describe the whole computed domain. Use existing API. |
+| `AsRef<PersistenceData>` / contextual comparison | Borrow already stored data, O(1); no clone, sorting or context reconstruction | Does not add provenance or certificates. Keep existing data/wrapper boundary. |
+| `into_parts()` / diagram plus witness consumer | Move existing data and optional witness vector; no clone or reordering | Keeps canonical interval ordinals. Borrow both moved outputs together when interpreting witnesses. Use existing API. |
+| `into_data()` / context-aware consumer without witnesses | Move data and drop representatives | Witnesses and their associations are intentionally discarded. Use existing explicit operation. |
+| `into_diagram()` / diagram-only statistic | Move diagram and drop context/witnesses | Field, source, approximation and request facts cannot be reconstructed from endpoints. Use only when those facts are not needed. |
+| Finite birth/death array / external plot or feature tool | Explicit selected-degree export, O(k) owned entries plus caller-retained ordinal map | Dropping essential/censored points changes the represented result. Preserve endpoint tags/coverage separately; never convert censoring into a death. Defer a general exporter until an actual external consumer needs it. |
+| Independent interval sorting / witness-aware external tool | An owned permutation/map costs O(k); sorting costs O(k log k) | Old interval ordinals require an explicit bijection. Deduplicating bars is not a bijection and loses witness identity. Do not add automatic reordering. |
+| Spectral value slice / future value-only consumer | Borrow stored values; requested optional vectors do not force a full eigenbasis | Discarding vectors loses coordinate/subspace information; a partial spectrum cannot establish full nullity or a gap. Keep selection and problem metadata. |
+| Eigenvectors to subspace projector / repeated-eigenvalue comparison | Explicit materialization in the aligned coordinate/Gram convention, generally quadratic output storage | Rotation/sign information is discarded deliberately; source basis and eigenspace selection remain necessary. Defer this helper until the concrete comparison is implemented. |
+| Projection action versus full P / future class query or external matrix consumer | Prefer a requested action; dense n-by-n export allocates O(n squared) entries. Actual action cost belongs to the adopted representation | A bare matrix loses basis, costs, query states and certificate binding. Do not impose dense export, the Python snapshot schema or serialization on every Rust result. |
+
+For example, two copies of H1 `[-2,0)` are two intervals, with independently
+addressable witnesses. A set of pairs loses multiplicity. Encoding both
+`Finite(1)` and `RightCensored { through: 1 }` as `(-2,1)` loses the difference
+between death and last observation. Pinned Persim's removal of infinite deaths
+is explicitly a finite-point projection, not a complete result conversion.
+
+For the repeated eigenvalue of `3I`, two valid orthonormal bases may differ by
+any rotation. Raw column equality is not an appropriate comparison. A dictionary
+keyed only by eigenvalue can overwrite vectors, as in the pinned TopoNetX source.
+Use paired values/vectors and, when required, a coordinate-aligned subspace
+comparison. Ordinary `L v = lambda v` and generalized `L v = lambda G v` cannot
+share an unexplained value-only label. Basis changes must also transform the
+operator/Gram; coordinate-cost changes can change a projection objective even
+when F2 homology is unchanged.
+
+### Existing source disposition and caller coverage
+
+Paths below are relative to `src/` unless otherwise stated. Each row retains a
+single existing implementation; no new result container or compatibility copy
+is introduced. The migration map in
+[PR #103](https://github.com/Aequiludium/cocycle-rs/pull/103) permits a
+source-supported no-op for these result boundaries.
+
+| File / symbols | Actual producers and consumers / regression | Disposition and reason |
+| --- | --- | --- |
+| `diagram/mod.rs` exports and filtration compatibility reexports | All public callers and standalone workers | Retain paths. These are thin forwards, not duplicate ownership or an algorithm facade. |
+| `diagram/persistence_diagram.rs`: `PersistenceDiagram`, `DiagramDimension`; `dimensions.rs`: `ComputedDimensions`; `interval.rs`: `PersistenceInterval`, `IntervalEnd` | PH assembly; distances/descriptors; `tests/contracts.rs`, `tests/descriptors.rs` | Retain logical reads and validation. Gaps, computed-empty, multiset order and censored endpoints already have public contracts. No physical slice/row API is added. |
+| `diagram/data.rs`: `PersistenceData` | `PersistenceResult`, contextual distance adapters and compatible downstream wrappers; `tests/diagram_distances.rs` | Retain shared owned diagram/context and borrowed `AsRef`. One common implementation already exists. |
+| `diagram/computation.rs`: `ComputationContext`, `PersistenceResult`, borrow/move/drop methods | `persistence/{source,filtered}.rs`, flag and Rips producers; `tests/{rips_api,diagram_distances,prime_fields}.rs` | Retain interpreted output and private constructors. Source lifetime and optional-witness distinctions remain explicit. Construction facts stay out of algebra. |
+| `diagram/representative.rs`: `Representative`, `RepresentativeKind`, `RepresentativeTerm` | `persistence/simplicial/representatives/{basis,dual}.rs`; example and independent closure/duality tests in `tests/prime_fields.rs` | Retain result-local ordinals and owned oriented terms. Extend the existing duplicate-interval test to consume moved outputs after source release. |
+| `persistence/mod.rs`: `assemble_diagram`, `RawIntervals`; `boundary/mod.rs` and Rips/simplicial call sites | Pairing kernels, reference tests and witness assembly | Keep assembly with computations; it interprets unpaired deaths using established coverage. Source-adapter relocation and any later assembly extraction belong to #72, not a second implementation in #79. |
+| `diagram_distances/mod.rs`: raw/contextual facades and `points` | `tests/{diagram_distances,execution}.rs`, matching example and standalone distance worker | Retain current conversion and validation. `points` allocates matching buffers; only borrowing common data is allocation-free. Logical/prepared changes remain PR #26/#49. |
+| `descriptors/{betti_curve,lifetime_statistics}.rs` | `diagram_analysis`, guide doctests, `tests/descriptors.rs` | Retain diagram-only consumers; no producer calls. Descriptor output/work allocations retain their own existing costs. |
+| `examples/rips_representatives.rs`, representative guide | Public paths and owned-output consumer | Adapt the existing example to release source buffers, borrow data, move witnesses and call a consumer with only interpreted outputs. Preserve the original F3 square's hand-derived H1 `[1,2)`. |
+| `tools/{diagram_dump,benchmark_driver}.rs`, `tools/reference/{rips_cocycle,sparse_cocycle}.rs`, `benches/{native,pipeline,distances,optimization}/cocycle.rs` | Logical interval iteration, public result/context access and explicit output protocols | Retain worker imports and formats. No stale result caller or dead private duplicate was found. Native comparisons retain their existing supported-case limits. |
+
+Pending #104 at `e0e294a209d731db29589bfb61760c334568f021` moves source adapters;
+it does not change diagram/result access. This follow-up uses main directly and
+touches none of its production files. #100/#102 retain stage/modeling ownership.
+No prepared-distance or adaptive-kernel candidate is adopted. Reverting this
+follow-up restores only an example, test and documentation; no data migration
+is required.
+
+### Future reading signatures and explicit unavailable states
+
+These are **interface sketches only**, to refine with #73/#75 before adopting
+concrete names, storage or numeric algorithms. They add no trait, placeholder
+method or universal status enum to the crate. A successful producer returns
+owned interpreted output or a diagnostic error; it cannot return an empty
+success to hide invalid input, unsupported requests or failed convergence.
+
+```text
+// Proposed spectrum reads, not existing cocycle symbols:
+values(&self) -> &[f64]
+vectors(&self) -> Option<borrowed paired vectors in the recorded ordered basis>
+// Read degree, field, basis/Gram, problem, source, units, requested/returned
+// selection and convergence/residual evidence from the same result.
+
+// Proposed projection reads/actions, not existing cocycle symbols:
+apply(&self, coordinates: &[u8]) -> Result<owned F2 coordinates>
+selected_mass(&self, cycle: &[u8]) -> Result<value in recorded cost arithmetic>
+// Bind action/readout to the same validated window, basis, P and costs.
+// Read actual feasibility and objective/certificate evidence separately.
+```
+
+For a computed zero-dimensional operator, the spectral domain has size zero
+and a complete spectrum can be empty. A requested empty partial selection still
+records its selection; omitted vectors mean not requested, not a zero-rank
+eigenspace. Missing residual estimates remain missing. A numerical eigenvalue
+threshold does not certify exact homology. The solver determines supported
+coefficient/eigenproblem cases and reports unsupported ones explicitly.
+
+For F2 projection, empty previous/next bases retain the A/D shapes. A boundary
+can have computed zero action and zero selected mass. Unread objectives,
+unavailable minimum-class-mass queries and failed construction retain different
+states in the concrete adopted interface. No class query accepts a noncycle.
+`P squared=P`, `AP=0`, `PD=0` and homology preservation need independent evidence;
+a feasible projection is not automatically optimal. Budget/cancellation errors
+carry no result unless a future solver explicitly defines a separately validated
+retained candidate. The actual producer owns that policy and its cost bounds.
+
+### Migration acceptance and limits
+
+[#87](https://github.com/Aequiludium/cocycle-rs/issues/87) G0/G1 and
+[#94](https://github.com/Aequiludium/cocycle-rs/issues/94) A/B apply to the output,
+ownership and downstream-consumption rows here. The fixed base's full debug
+suite passed 216 tests/doctests with four ignored diagnostics before editing.
+The follow-up changes no production source, public signature, runtime dependency,
+dispatch, sorting, allocation site or reducer lifetime. The read and move bodies
+are retained; the example performs one PH computation and uses the existing
+borrowed/moved payload. This is a source-level cost audit, not a timing/RSS
+measurement or a whole-pipeline zero-allocation claim.
+
+Regression scope includes interval multiplicity, gaps/computed-empty,
+finite/essential/censored coverage, fields/source context, independent cycle
+closure/duality and moved witness ordinals. The runnable representative example
+checks H1 Betti `[1,0]` at scales `[1,2]`, finite lifetime 1 and contextual
+self-distance 0 after releasing the source. Relevant descriptor/distance tests
+keep their own error and control semantics. New spectral/projection algorithms,
+plotters, serialization and bindings remain unimplemented future work. Local
+checks, hosted CI, merge and release remain separate evidence.
+
+Pre-submission Windows validation passed the full debug/release and Rust 1.91
+tests/checks (216 tests/doctests, four ignored diagnostics), Clippy, formatting,
+strict rustdoc, ten examples, construction/critical-set example tests, eleven
+Markdown doctest pages, source/docs/local-collaboration checks and the 183-file
+package build. Pinned source hash/archive checks passed. The unchanged Python
+tools ran 98 tests with two Windows platform failures (missing `resource` and
+slash/backslash diagnostics) and five skips; Linux hosted tool/reference checks
+remain separate. No new local native oracle or performance run is claimed for
+this example/test/documentation change.
+
 ## Finite validation and acceptance
 
 The standalone Rust probe was compiled against the fixed inventory-baseline library.
@@ -452,6 +719,111 @@ parsed here. Preserve failures caused by a different Python/dependency version
 as reproduction limitations. Cocycle's corresponding full-endpoint behavior is
 covered by the Rust interface-guide doctests and existing distance tests; Persim's
 finite-point result above cannot replace that acceptance.
+
+## Existing distance boundaries and migration decision on main a7ee9e9
+
+This 2026-10-11 increment addresses the current interface-only scopes of
+[#81](https://github.com/Aequiludium/cocycle-rs/issues/81) and
+[#82](https://github.com/Aequiludium/cocycle-rs/issues/82), under parent #80.
+The fixed implementation base is main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. #61's result decisions,
+[#71 / PR #103](https://github.com/Aequiludium/cocycle-rs/pull/103)'s migration map
+and [#87's completed baseline](https://github.com/Aequiludium/cocycle-rs/issues/87#issuecomment-6104708730)
+are the prerequisites. Earlier probes in this report keep their original versions.
+No new non-diagram algorithm, sample matrix, preparation API or runtime container
+is introduced. Research completion, local checks, hosted CI, merge and release
+remain distinct.
+
+### Existing compatibility target
+
+| Operation | Finite-point / diagonal cost | Essential-point combination |
+| --- | --- | --- |
+| `bottleneck_distance` | L-infinity / `(death-birth)/2`; minimize maximum cost | Sorted birth differences combined by maximum |
+| `wasserstein_1_infinity` | L-infinity / `(death-birth)/2`; minimize total cost | Sum absolute birth differences, with checked accumulation |
+| `wasserstein_2_euclidean` | Euclidean / `(death-birth)/sqrt(2)`; minimize squared costs, then square root | Euclidean norm of birth differences combined with the finite answer |
+
+Each compares one dimension recorded as computed in both operands. Computed-empty
+is valid; absent dimensions error. Multiplicity is retained. Essential counts must
+agree, otherwise the mathematical answer is positive infinity. Every
+`Coverage::Through` is rejected even if no censored interval appears in that degree.
+Numerical overflow/underflow, invalid input, allocation failure, cancellation and
+budget failure remain errors without a successful partial scalar; they cannot be
+converted into infinity or an empty result.
+
+The raw calls borrow `PersistenceDiagram` and cannot certify fields, sources,
+physical units or normalization. `_results` accepts `AsRef<PersistenceData>` and
+additionally checks equal field characteristics and declared edge-length scales.
+Unknown scales, including two unknown scales, are rejected; equal edge-length
+declarations still do not establish physical units. Vertex counts and construction
+kinds may differ if the diagrams are complete and coordinates comparable.
+Sparse-diagram comparison describes the supplied approximations, not an original
+data error certificate. Caller-established compatibility is never manufactured by
+a borrowed adapter.
+
+### File, symbol and consumer disposition
+
+Paths below are repository relative. This table is the #82 implementation
+disposition: **retain the existing owners and their consumers**. The #71 map and
+caller search reveal no misplaced implementation or proven dead private duplicate
+requiring a move, new forwarding layer or deletion. The public paths already lead
+to one diagram-distance owner. Its complete source tree, result storage, execution,
+errors, tests, examples, workers and manifests stay byte-identical to the base.
+
+| Owner / symbols | Actual consumers and checks | Disposition and cost boundary |
+| --- | --- | --- |
+| `src/diagram_distances/mod.rs`: three metrics, raw/`_results`/`_with`, `Kind`, `distance_with`, `distance_results_with` | `tests/diagram_distances.rs`, `examples/diagram_distances.rs`, contributor doctests and the public native-worker variant | Retain signatures, routing and unlimited/controlled specialization. Each scalar terminal starts one budget. No wrapper invocation or budget reset is added. |
+| Same facade: `points`, `Points`, `distance`, `distance_results`, `check_context` | All raw/contextual terminals; endpoint/coverage/dimension/context and private execution tests | Retain complete-only validation and owned per-call finite/essential vectors. Essential order comes from the diagram's sorted birth subsequence; no new sorting is required. A borrowed result does not imply zero preparation allocation. The buffers live through one solve and then drop. |
+| `bottleneck.rs` and `bottleneck/{geometry,matching,flow,instrumentation,tests}.rs` | Facade, `benches/distances/cocycle.rs`, tiny matching oracle and controlled tests | Retain geometric, search and capacity-flow kernels, candidates/scratch and compile-time diagnostics. No workspace lifetime change. |
+| `wasserstein.rs` and `wasserstein/{numeric,graph,dense,sparse,direct,instrumentation,tests}.rs` | Facade, instrumented worker and independent tiny matching tests | Retain adaptive dispatch, scaling, graph/component, dense/sparse solver and original-cost numerical fallback. Allocation, fallback and accumulation are unchanged. |
+| `src/diagram/{data,computation,persistence_diagram}.rs` | Contextual distance adapters, persistence producers, result and distance tests | Retain `AsRef` borrowing, `into_data`/`into_parts` moves and explicit provenance losses. No clone or second representation is inserted. #79 owns concrete result changes; this audit requires none. |
+| `src/execution/mod.rs`, `src/error.rs`, `src/geometry/distance.rs` | Existing raw/contextual controls, numerical kernels and resource/retry tests | Retain budget/error semantics and checked scalar helpers. Budget spans validation, extraction, preparation, candidates, matching and accumulation; it is neither a memory quota nor an aggregate batch limit. |
+| `benches/distances/{cocycle.rs,topp.cpp,gudhi.cpp,gudhi_worker.py}`, `tools/compare_distances.py` | Public/instrumented standalone calls, fixed GUDHI/Topp protocol and independent rational oracle | Retain worker imports/calls, binary fixtures, essential multiplicity, raw diagonal projection exclusions and compile-time instrumentation. No caller migration or new worker dependency is needed. |
+
+On intake, PR #26 head `8dcc8d885d93c0133988a47865f0ea3aaba740b3` targets
+main; #49 head `c30ee1ad353c144dc9b415caeca3d7ffc9fd4b9f` targets #26's branch.
+Both remain open. Preserve `main <- #26 <- #49`, their sole preparation ownership,
+review and performance gates. This increment does not copy logical preparation or
+`PreparedDiagram`, adopt an unmerged API, or inherit old speed claims. Recheck refs
+and overlapping files before later integration.
+
+### Future comparison interface information only
+
+These are requirements for later concrete proposals, not new Rust signatures,
+selected metrics or guarantees of implemented comparisons.
+
+| Future operands | Information required before choosing a definition | Possible result information / unsupported boundary |
+| --- | --- | --- |
+| Geometric data | Coordinate/metric definition, dimension, axes/origin, physical units, normalization, source/sample identity, treatment of multiplicity or mass and any alignment | Defined scalar or score, units, exact/approximate meaning and failures. Unknown conventions, alignment or mass do not receive a generic `Distance`. |
+| Filtrations or stages | Parameter domain/units, stage coverage, source cell correspondence, coefficient field and valid maps; clarify whether topology, values or maps are compared | Definition-specific output and covered domain. Equal array sizes or scale labels cannot establish comparable filtrations. |
+| Spectral outputs | Degree, operator and ordinary/generalized eigenproblem, Grams/normalization, eigenvalue units, requested/returned spectrum and multiplicity, residuals and numerical precision | Definition-specific scalar/score and selection/error information. Truncated spectra cannot claim a full spectral comparison; isospectrality does not establish source equality. #73 owns the actual computation contract. |
+| Real/complex operators or vectors | Source/ordered bases, dimensions, field, inner products, adjoints and an established basis map/isometry | Norm/score only after its formula is chosen. Same shape does not align bases; a spectrum-only consumer must not invent vector correspondence. |
+| F2 class/projector queries | Legal projection/query, owner-local ordered basis, cycle/boundary identity, coordinate costs, selected class, solver certificate and any transport map | Preserve feasibility versus optimality and selected-class versus true minimum-class meaning. No shortest-class metric follows from a feasible selected mass. #75 owns the operator capability. |
+
+Future multiple-sample outputs must retain row/column identities and order,
+definitions/units, compatibility decisions and explicit failed/uncomputed cells.
+No current batch/matrix API is promised. Whether a score is a metric, pseudometric,
+kernel or general similarity remains a property of its eventual mathematical
+definition; a matrix of scalars is not automatically a positive-semidefinite kernel.
+
+### Regression and cost acceptance
+
+Reuse #87's fixed-main outputs and assertions. The current boundaries are covered
+by `tests/diagram_distances.rs` (raw/contextual/controlled contracts), private tiny
+matching and numerical/cancellation oracles, `examples/diagram_distances.rs`,
+the [distance contribution path](../development/diagram-analysis.md#contribute-diagram-distances)
+and standalone workers. Direct diagram consumers never rerun PH. The baseline's
+duplicate signed bars, computed-dimension gaps, censored coverage and three
+consumer choices remain applicable without importing pending result/preparation APIs.
+
+The implementation decision introduces no dispatch, copy, allocation, preparation,
+workspace or lifetime delta. #94's synchronous cost gate is therefore a
+byte-identical source/consumer audit, not a benchmark or speedup claim. Any later
+change to those paths needs its own actual base/head workload measurements.
+No timing/RSS guarantee is transferred from older experiments. Ordinary correctness,
+MSRV, docs/tool tests and hosted native comparisons are recorded against the PR head.
+The original supported Topp/GUDHI suites still apply; reference exclusions and
+Windows tool limitations remain explicit, without weakening checks or changing
+unrelated tooling to make this documentation disposition pass.
 
 [kernel]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/design/kernel.md
 [analysis]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/development/diagram-analysis.md
