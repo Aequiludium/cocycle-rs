@@ -224,3 +224,223 @@ benchmark, release/MSRV or hosted-CI claim.
 [testing]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/development/testing.md
 [reporting]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/benches/reporting.md
 [pr56-corrected]: https://github.com/Aequiludium/cocycle-rs/blob/b08144d717e2de42b02088433b0887bd3a6b1d1f/benches/reports/f2-h1-adaptive.md
+
+## Legacy migration decisions on main a7ee9e9
+
+Research completion for [#71](https://github.com/Aequiludium/cocycle-rs/issues/71),
+2026-10-11. This section extends the historical inventory above with file-level
+dispositions; it does not repeat #59-#63 or adopt pending implementations.
+The old plan base is `9e6715f4c2e0118ab738486bd747ec3e361397de`; the inspected,
+freshly fetched implementation base is
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. Subsequent implementation PRs must
+record their own base/head and validation. A completed migration decision is
+distinct from its implementation, review, merge or release.
+
+### M1: files, symbols, consumers and disposition
+
+Actions below mean **retain in place**, **move internally**, **compatibility
+forward**, **delete obsolete private duplicate**, or **defer**. Retention is a
+boundary-specific decision with real consumers, not a blanket claim that
+internal refactoring is unnecessary. No public deletion is selected.
+
+| Files and symbols | Actual consumers / existing checks | Disposition, target owner and reason |
+| --- | --- | --- |
+| `geometry/{point_cloud,dissimilarity,matrix,metric}.rs`: `PointCloudView`, `DissimilarityView`, `DissimilarityMatrixView`, `validate_metric` | Rips builders, exact point/matrix computations; `tests/{contracts,matrix,euclidean,rips_api}.rs` | Retain in geometry: borrowed input validation and metric evidence already precede computation. No second input container (#65/#66). |
+| `complex/graph/{mod,adjacency}.rs`: `WeightedGraph`; `complex/simplicial/{mod,simplex,incidence}.rs`: `SimplicialComplex`, `SimplexId`, `boundary` | Flag/Rips expansion, frozen PH and critical sets; `tests/{graph,filtered_complex,critical_sets}.rs`, construction example | Retain in complex: one frozen owner, oriented incidence and local IDs; graph-to-clique interpretation stays explicit. #100 owns stage additions. |
+| `complex/filtered.rs`: `FilteredComplex::{cells,dimension,filtration_value,boundary}` | `PersistenceBuilder::from_complex`, frozen implementation; `tests/filtered_complex.rs` | Retain the four-method static contract. #100 owns any stage-associated increment; no universal solver/source trait. |
+| `filtration/rips/{builder,exact,expansion}.rs`: `RipsBuilder`, `ThresholdRips`, `RipsExpansion`; `filtration/flag/` and `filtration/expansion/` | Persistence source extension, explicit/implicit access and construction examples; `tests/{rips_construction,rips_expansion,rips_api,flag}.rs` | Retain in filtration: construction and access do not call PH. Requested cap, retained edges and original source coverage differ. |
+| `filtration/rips/approximation/{builder,metadata,access,blocker,expansion}.rs`: `ApproximateRipsBuilder`, `SparseRips`, `RipsApproximation` | Approximate PH and explicit sparse expansion; `tests/{sparse_rips,rips_api}.rs` | Retain blocker, labels and approximation hypotheses in their existing owner; a modified graph alone cannot reconstruct this topology. |
+| `persistence/builder.rs`: `PersistenceBuilder::{from_complex,compute,compute_with}` | All source extensions and external callers; `tests/{rips_api,execution,filtered_complex}.rs` | Retain request validation, borrowed lifetimes and one terminal budget. Existing function-pointer hook needs no registry or wrapper type (#72). |
+| `persistence/source.rs`: `PersistenceExt`, sealed implementations and `source!` | Public `.persistence()` calls; compile-fail rustdoc, `tests/rips_api.rs` | Retain consumer-owned sealed wiring here; move the four substantial adapters listed below to their existing mathematical owners (#72 batch 1). |
+| `source.rs::exact` | `RipsBuilder` hook; point/matrix layouts, independent caps, cancellation and representatives in `tests/rips_api.rs` | Move body to `persistence/rips/mod.rs::compute_builder_budget`. Input preparation, effective cap and exact-Rips context belong with the legacy Rips entry points. Preserve the current calls/checkpoints verbatim. |
+| `source.rs::approximate` | `ApproximateRipsBuilder` hook; `tests/{sparse_rips,rips_api}.rs` | Move to `persistence/rips/approximation.rs::compute_builder_budget`, alongside prepared-source computation. No new preparation or metadata clone. |
+| `source.rs::{explicit,supplied}` | `SimplicialFiltration` / `SimplicialComplex` hooks; signed/delayed/non-flag cases in `tests/filtered_complex.rs` | Move to `persistence/simplicial/mod.rs::{compute_filtration_budget,compute_supplied_budget}`. Range/skeleton checks, compute and result assembly then have one existing owner (#72 batch 1). |
+| `persistence/filtered.rs::{read,compute}` | `from_complex`; field-dependent cellular and malformed external inputs in `tests/filtered_complex.rs` | Retain validating external reader: ID/order/incidence and selected-field boundary-square checks cannot be replaced by trusted-owner assumptions (#72). |
+| `persistence/simplicial/input.rs::read` | General frozen computation and `representatives/basis.rs`; low-degree selection tests | Retain trusted frozen reader: validates at construction, selects only q+1/cutoff columns and maps selected owner IDs. Do not impose external validation costs (#72). |
+| `persistence/boundary/{mod,input}.rs`: `BoundaryInput`, `diagram`; `algebra/reduction/boundary.rs::{reduce_pairs,reduce}` | External/frozen readers, representative and critical-set consumers; `boundary/tests.rs`, independent D V = R check | Retain existing shared reduction. `reduce_pairs` omits V while `reduce` retains it intentionally. Neither is an obsolete duplicate (#72). |
+| `persistence/flag/{dispatch,h0}.rs`, `flag/cohomology/`, `union_find.rs`: `compute_dense`, `compute_graph`, F2 H1 | Legacy/builder matrix and graph routes; dispatch/cohomology tests, `tests/{flag,prime_fields,rips_expansion,rips_resources}.rs` | Retain admitted specialized routing, full clearing keys, H1-only no-clearing mode and workspace lifetime. #56 exclusively owns adaptive candidate changes; no default adoption (#72). |
+| `persistence/simplicial/cohomology.rs`: `compute`, higher-degree continuation | Frozen zero-born and implicit sparse/odd-prime/overflow fallback paths; cohomology tests, independent bitmask oracle in `tests/rips_expansion.rs` | Retain generic coface kernel and private H2 cfg boundary. Arbitrary births/signed cutoffs still route to boundaries; generic fallbacks are live (#72). |
+| `persistence/rips/{mod,expanded,approximation}.rs`, `persistence/flag/mod.rs`: all re-exported `compute_*`, `rips_from_*` | Existing public free functions and source hooks; `tests/{rips,rips_api,rips_construction,sparse_rips,flag}.rs` | Retain public paths and legacy budget scope. Batch 1 adds internal adapter owners, not duplicate public terminals or a forced builder conversion (#72). |
+| `persistence/simplicial/representatives/{request,basis,complex,dual}.rs`: `RepresentativeRequest`, basis extraction | Opt-in Rips/flag/frozen witnesses; `tests/{prime_fields,rips_api,filtered_complex}.rs` | Retain request semantics and independent closure/rank/duality tests. No default materialization; basis transformations have a real consumer (#72). |
+| `persistence/mod.rs::assemble_diagram`, `RawIntervals` | Boundary, legacy Rips, simplicial finish, representative basis and test/reference/profile callers | Move internally in #72 batch 2 to a small private assembly owner if the post-batch-1 review confirms it: canonical zero-lifetime/coverage handling has multiple live callers and currently lives in the export facade. Migrate imports together; no second implementation. |
+| `diagram/{persistence_diagram,dimensions,interval}.rs`: logical views, ordinals, `ComputedDimensions`, `IntervalEnd` | PH assembly, distances and descriptors; `tests/{contracts,descriptors,diagram_distances}.rs` | Retain result-layer reads: computed-empty/absent, multiplicity, canonical ordinals and censoring already have consumer tests (#79-L). Public `intervals()` compatibility remains supported. |
+| `diagram/{data,computation,representative}.rs`: `PersistenceData`, `PersistenceResult`, `ComputationContext`, `into_parts` | PH adapters and contextual distance facade; `tests/{rips_api,prime_fields,diagram_distances,execution}.rs` | Retain borrowed data and owned result assembly; move no context to algebra. Explicit dropping conversions retain their documented losses (#79-L). |
+| `diagram_distances/mod.rs`: raw / `_results` / controlled facades and `points`; bottleneck/wasserstein solvers | Distance example, `tests/{diagram_distances,execution}.rs`, exhaustive tiny matching | Retain public paths and solver ownership (#82-L); defer logical/prepared extraction changes to #14/#26 and #31/#49. Do not duplicate or adopt those paused branches. |
+| `descriptors/{betti_curve,lifetime_statistics}.rs`: `betti_curve`, `finite_lifetime_summary` | Diagram-analysis example/walkthrough, `tests/descriptors.rs` | Retain diagram-only reads (#85-L): no PH call, expected allocation differs by descriptor. New features/ML adapters stay in #85-N. |
+| `optimization/{mod,tests}.rs`: `CriticalSetWorkspace`; `algebra/{column,field}/` | Critical-set example, `tests/critical_sets.rs`, opt-in optimization tests | Retain sparse F2 critical sets as optional computation. Shared algebra does not supply a homology-preserving projector; #75 owns that increment. |
+| `execution/mod.rs`, `persistence/execution.rs`, `error.rs`, `lib.rs` | Existing domain exports/terminals; `tests/{execution,rips_resources,contracts}.rs` | Retain current public compatibility forwards and structured errors. `WorkBudget` is fresh per terminal, not an aggregate quota, RSS limit or concurrency guarantee. |
+| `persistence/reference/`, private profiling/cfg modules | Independent small oracles and explicit benchmark workers | Retain independent reference mathematics and experiment isolation. The caller search found no proven dead private computation to delete; similar formulas are not sufficient deletion evidence. |
+
+Paths in this table are relative to `src/` unless prefixed with `tests/`.
+The actual PH chain is extension/free terminal -> source-specific preparation
+and range interpretation -> existing dispatch/coface or boundary kernel ->
+diagram/witness assembly -> owned context result. The two boundary readers stay
+separate, and a representative request remains an explicit different-cost path.
+
+### M2: merged changes and parallel ownership
+
+Main's first-parent history from the old plan base contains #32 (`7dc517d`),
+#98 (`03e896d`), #50 (`168015b`), #51 (`eb3e291`), #52 (`5ce4f13`),
+#53 (`cedf596`), #101 (`eb38e52`) and #99 (`a7ee9e9`). This is a 71-file delta:
+resource reports, interface decisions, H1-to-H2 continuation, private H2 research,
+workspace/no-go records, opt-in critical sets and final research publication.
+It introduces no production Laplacian, Dirac, F2 projector or generalized engine.
+The shared `BoundaryInput`/`diagram`/`reduce_pairs` already existed at the old base.
+
+Live open PRs were checked again on 2026-10-11, including changed files:
+
+| PR / sole implementation owner | Actual base SHA / head SHA | Overlap and migration rule |
+| --- | --- | --- |
+| #100 / stages, #68/#69 | `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5` / `6f2b291067e4a834518c9f055dcc991b44c781ee` | `persistence/source.rs`, frozen/stage modules, architecture and filtered tests overlap batch 1. Move only main's four adapters; leave new stage wiring with #100. Merge whichever lands second normally and run stage tests then. No stage implementation is copied into this work. |
+| #102 / modeling example, #65/#66 | same main base / `0cff0f0bbd2daf58d7391f31fe17bef5fdfc6963` | Docs/index/guide and construction example, no production source. Batch 1 need not wait; example/doc conflicts belong to ordinary integration. |
+| #26 / logical distance preparation, #14 | same main base / `8dcc8d885d93c0133988a47865f0ea3aaba740b3` | Distance facade/solvers/workers/tests; no first-batch PH source overlap. Preserve existing review and cost decisions. |
+| #49 / opt-in operands, #31 | `8dcc8d885d93c0133988a47865f0ea3aaba740b3` / `c30ee1ad353c144dc9b415caeca3d7ffc9fd4b9f` | Preserve `main <- #26 <- #49`; #82-L does not independently rewrite preparation. |
+| #56 / draft adaptive H1 | `cedf5965b774855614b761a1ad311d9dc7992c49` / `b08144d717e2de42b02088433b0887bd3a6b1d1f` | Dispatch/cohomology, source access and contribution docs overlap later kernel work. Candidate stays draft and outside both migration batches; current main routing is the baseline. |
+
+These are snapshots, not continuing mergeability or CI claims. The source cap,
+stage owner and logical-distance preparation have one implementation authority
+each. Refresh these refs/files before each submission.
+
+### M3: behavior and cost gates before editing
+
+The pre-edit `cargo test --locked --all-features` on main a7ee9e9 passed
+216 tests including doctests; four diagnostic tests remained ignored.
+Source and Markdown checks passed. This is local Windows correctness evidence,
+not a fresh native performance/oracle result. Primary local collaboration checks
+are reported separately; copied local artifact links are not portable evidence.
+
+[#87](https://github.com/Aequiludium/cocycle-rs/issues/87) G0/G1 and
+[#94](https://github.com/Aequiludium/cocycle-rs/issues/94) A/B use this matrix
+inside each migration PR; neither entire issue must close before implementation.
+
+| Gate | Existing fixtures / command scope | Cost boundary and required response |
+| --- | --- | --- |
+| Public paths, request lifetimes, per-terminal errors | `rips_api`, source compile-fail doctests, `execution`, `rips_resources`; old free functions plus builder sources | Builder preparation/reduction/witnesses share one budget. Legacy point preparation retains its documented narrower scope. No extra wrapper invocation/budget reset. |
+| Exact matrix/points/graph and H0-H3 | `rips`, `flag`, `prime_fields`, `rips_expansion`, dispatch/cohomology independent oracle tests | Preserve dense/sparse/odd-prime/overflow routes, virtual death pairs, H1-only clearing suppression, H1 workspace end before H2. Dispatch/access/lifetime changes trigger same-fixture base/head pipeline measurements. |
+| External cells versus frozen arbitrary births/non-flag sources | `filtered_complex`, `boundary` tests and construction example | Construction is separate from input read/validation, reduction and assembly. Trusted read skips external boundary-square validation; low-degree requests retain only selected ID maps/columns. Allocation/validation changes require separate read and terminal timings. |
+| Sparse approximation and representatives | `sparse_rips`, `prime_fields`, `rips_api`, representative closure/duality checks | Retain blocker-aware access, original labels, metric/provenance and opt-in q+1/V storage. Changed metadata clones or witness preparation require representative and diagram-only controls. |
+| Multiset/availability/coverage/context and downstream reads | `contracts`, `descriptors`, `diagram_distances`, `rips_api`; `square`, `diagram_analysis`, `diagram_distances` examples | Preserve finite/essential/censored, computed-empty/absent, field/context and witness ordinals. Borrow, move, discard and clone differ. Distance/descriptor consumption never reruns PH. |
+| Engineering and independent scope | CONTRIBUTING debug/release, examples/guide doctests, format/Clippy/docs, MSRV and package checks | Pure body relocation needs these checks and a statement of unchanged operations/call topology. Any semantic change needs independent expectations plus GUDHI/Ripser where supported; distance changes additionally need Topp. Unsupported references are exclusions. |
+
+For a cost-affecting batch use [pipeline boundaries](../../benches/pipeline/README.md)
+and [reporting rules](../../benches/reporting.md) at the exact base/head with the
+same seed/input/field/cutoff, alternating cold/warm repetitions and retained raw
+failures. Isolate input preparation/read/validation, kernel, assembly and requested
+witnesses. Record RSS separately from capacity/work counts. Reuse the admitted
+H1/H2 fixtures and low-/high-degree controls; old timings do not certify new code.
+No speedup or zero-allocation target is invented for mechanical migration.
+
+### M4: executable small-PR queue
+
+| Batch / owner | Modification and preserved path | Acceptance and rollback |
+| --- | --- | --- |
+| #72 batch 1: source adapter ownership | Move `exact`, `approximate`, `explicit`, `supplied` from `source.rs` into three existing Rips/simplicial files, renaming private hooks; update only extension wiring and affected architecture/contribution notes | Body/statement comparison against a7ee9e9, unchanged function-pointer signature/checkpoint/call sequence; full current contract and independent reducer tests, examples, lint/docs/MSRV/package. Public paths and benchmark workers stay callable. Revert that PR alone; no stored format changes. |
+| #72 batch 2: interval assembly facade | Reassess `assemble_diagram` and `RawIntervals` after batch 1; if retained as a distinct assembly owner, move the single helper and all live imports together, with source-linked documentation | Existing multiset/endpoint/reference tests and standalone workers; no duplicate helper or new public type. Any assembly allocation or routing change requires measured controls; otherwise keep the body unchanged. Revert the batch independently. |
+| #79-L: result consumers | Retain the existing diagram/data/result files and reads listed in M1; any demonstrated stale caller is fixed in this owner, with explicit ordinal/loss checks | `contracts`, witness moves/contextual distances; no pending preparation adoption. Source/tests currently support a boundary-specific no-op. |
+| #82-L: distance consumers | Retain facade/solver ownership; unique preparation changes remain #26/#49 | Existing exhaustive/public contracts; measure extraction/solve if changed. No preparation clone is introduced by #72. |
+| #85-L: descriptors / optional optimization | Retain diagram-only descriptor files and separate CriticalSetWorkspace | `descriptors`, analysis example, critical-set tests; measure changed sorting/copy/allocation only. New learning remains #85-N. |
+
+No dead private duplicate has been proven. In particular, test oracles, generic
+fallbacks, basis-retaining reduction and experimental cfg code retain distinct
+consumers or mathematical/cost reasons. This decision does not authorize deleting
+them to manufacture a refactor. All PH/common M decisions are now sufficient
+to start #72; the other three owners retain their own implementation acceptance.
+
+### N: five computation families and actual increments
+
+The [input](input-contracts.md) and [result](result-contracts.md) reports already
+fix signed bases, Grams, projection certificates and finite examples at their
+listed upstream revisions. Their external runtimes/older experiments are not
+rerun by this decision. The following choices narrow the remaining work and do
+not announce those algorithms as production features.
+
+| Family / decision | Reusable code and missing mathematical data | First input/output, independent validation and cost / implementation owner |
+| --- | --- | --- |
+| Ordinary PH: continue internal migration | Existing prime field, cofaces, two readers, boundary reducer, interval/witness owners are sufficient; no new backend needed | Signed delayed triangle: births -4/-3/-2, edges 0/1/2, face 3 -> H0 (-4,infinity), (-3,0), (-2,1), H1 (2,3). Existing hand-derived boundary test plus independent explicit/bitmask oracle; GUDHI/Ripser for supported route changes. Implicit diagram-only access stays implicit; representatives remain optional. #72 batches above. |
+| Single-scale Laplacian: continue minimal unweighted real action; defer weighted/complex/persistent spectra and eigensolver adoption | Reuse graph or frozen **signed integer** incidence and owner/basis map, not modular PH coefficients. Choose ordinary nonaugmented chains and Euclidean Gram I. Need f64 action/output, overflow/nonfinite/residual policy; no current production spectral owner | A path graph as a 1-complex has B1=[[-1,0],[1,-1],[0,1]], L1=B1^T B1=[[2,-1],[-1,2]], spectra {1,3} by hand. Triangle ring has L1 spectrum {0,3,3}; filled triangle L1=3I. #73 first implements borrowed sparse action and small independently assembled matrices; a numerical solver is a separate explicit decision in #73, not an undocumented dependency here. Action is O(nnz B); tiny dense validation O(n^2), general dense spectrum O(n^3) time/O(n^2) storage. Default PH incurs none of it. |
+| Dirac: continue after the same real convention in #73; defer persistent Dirac | Reuse ordered adjacent signed boundaries and Gram I. For a finite graded chain choose D=B+B^T on the direct sum with zero blocks; require B^2=0 over the reals and keep degree offsets | For path C0+C1, D=[[0,B1],[B1^T,0]], D^2=diag(L0,L1), spectrum {0,+/-1,+/-sqrt(3)}. Filled triangle includes C2 and square includes all Hodge blocks. Check block multiplication exactly, spectral +/- pairing and empty-degree shapes with independent matrices. #74 sparse action O(nnz B); full export quadratic; numerical spectrum uses only an adopted #73 scheme. No fabricated filtration or F2 I+P substitution. |
+| F2 homology operator: continue bounded feasible projection; defer global optimality/general geometry | Existing frozen incidence/field can extract A:m-by-n and D:n-by-p with AD=0 mod 2, source-local ordered bases and **separate** positive costs. Current PH pairs/critical sets do not provide legal P/certificates. Local candidate code is not main or automatically authorized for publication | Ring edge space: A is signed triangle incidence reduced mod 2, D has zero columns; cycle 111 costs (2,3,5) -> selected mass 10. Filled ring D=111 -> beta1=0, selected class mass 0. Require AP=0, PD=0, P^2=P and z+Pz in im(D) for every z in ker(A), with rank beta=dim ker(A)-rank D. Exhaustive tiny binary linear algebra checks feasibility independently; homology-operator `a8d03d1` supplies a comparison contract, not a runtime dependency. #75 needs explicit budget/failure/certificate output. Dense extraction O(mn+np), factorized/exhaustive solving bounded and potentially large; feasibility never implies optimality/shortest mass. |
+| Generalized topology: defer production adoption; continue focused research in #76 | Sheaf restrictions/stalk dimensions, directed allowed path chains, hypergraph embedded chain spaces and Mayer N-differentials are missing. Shared column arithmetic may be reused only after a theory's chain law is established; ordinary `FilteredComplex` is insufficient | Sheaf first case: two vertices/one edge with declared stalk maps -> coboundary and Laplacian; directed path first case: 0->1->2 requires checking whether its boundary stays in the allowed chain space; hypergraph case: one 3-vertex hyperedge lacks automatic face closure; Mayer case must specify N and generalized homology for d^N=0. #76 compares at least three candidates against original definitions and independent finite matrices before choosing implementation. Costs depend on stalk dimensions/allowed paths/N and cannot inherit PH benchmarks. No universal generalized backend is adopted. |
+
+The generalized deferral has concrete obstructions: nontrivial sheaf restrictions
+are not scalar +/-1 simplex incidence; the boundary of the allowed directed path
+(0,1,2) includes (0,2), which need not be allowed; a hyperedge is not automatically
+its downward-closed simplicial complex; and d^N=0 for N>2 does not satisfy the
+ordinary d^2=0 reducer contract. These justify postponing integration rather than
+renaming existing PH. Original-paper/full-runtime evaluation stays with #76.
+The references in #76 are reading candidates, not sources claimed newly read here.
+
+PH and the three selected finite-chain families have concrete definitions, first
+fixtures, result/certificate limits, independent checks and implementation owners.
+Generalized production adoption is explicitly deferred for incompatible/missing
+inputs. Parallel reducers, unsafe acceleration, new dependencies and persistent
+spectral claims are not selected. #73-#76 perform their own actual implementations
+or further theory decisions; #71 research completion does not close those issues.
+
+### Reproduce the first finite definitions
+
+This standalone Python standard-library check was run on 2026-10-11. It verifies
+the stated path/filled-triangle matrices, Dirac square and tiny feasible F2
+projectors independently of production PH and any spectral/projector runtime.
+The eigenvectors and block matrix are hand-derived expectations. Exhaustive
+binary vectors check all projector identities in these three-coordinate spaces.
+This is finite definition validation, not implementation or general optimality
+evidence. Save the following as `target/migration-definitions.py` and run
+`python target/migration-definitions.py`:
+
+```python
+from itertools import product
+
+
+def transpose(a):
+    return [list(row) for row in zip(*a)]
+
+
+def multiply(a, b):
+    return [[sum(x * y for x, y in zip(row, col))
+             for col in transpose(b)] for row in a]
+
+
+path = [[-1, 0], [1, -1], [0, 1]]
+assert multiply(transpose(path), path) == [[2, -1], [-1, 2]]
+# Check the two hand-derived eigenvectors, without running an eigensolver.
+assert multiply([[2, -1], [-1, 2]], [[1], [1]]) == [[1], [1]]
+assert multiply([[2, -1], [-1, 2]], [[1], [-1]]) == [[3], [-3]]
+dirac = [[0] * 5 for _ in range(5)]
+for i in range(3):
+    for j in range(2):
+        dirac[i][j + 3] = dirac[j + 3][i] = path[i][j]
+assert multiply(dirac, dirac) == [
+    [1, -1, 0, 0, 0], [-1, 2, -1, 0, 0], [0, -1, 1, 0, 0],
+    [0, 0, 0, 2, -1], [0, 0, 0, -1, 2]]
+triangle = [[-1, -1, 0], [1, 0, -1], [0, 1, 1]]
+face = [[1], [-1], [1]]
+assert multiply(triangle, face) == [[0], [0], [0]]
+down = multiply(transpose(triangle), triangle)
+up = multiply(face, transpose(face))
+assert [[down[i][j] + up[i][j] for j in range(3)] for i in range(3)] == [
+    [3, 0, 0], [0, 3, 0], [0, 0, 3]]
+
+
+def action(a, z):
+    return tuple(sum(x * y for x, y in zip(row, z)) % 2 for row in a)
+
+
+cycles = {z for z in product((0, 1), repeat=3)
+          if action(triangle, z) == (0, 0, 0)}
+assert cycles == {(0, 0, 0), (1, 1, 1)}
+ring_projection = [[0, 0, 1]] * 3
+filled_projection = [[0] * 3 for _ in range(3)]
+for projection, boundaries, expected in [
+    (ring_projection, {(0, 0, 0)}, (1, 1, 1)),
+    (filled_projection, cycles, (0, 0, 0)),
+]:
+    for z in product((0, 1), repeat=3):
+        pz = action(projection, z)
+        assert pz in cycles and action(projection, pz) == pz
+        if z in cycles:
+            assert tuple(x ^ y for x, y in zip(z, pz)) in boundaries
+    assert all(action(projection, d) == (0, 0, 0) for d in boundaries)
+    assert action(projection, (1, 1, 1)) == expected
+print('Exact path/triangle/Dirac and exhaustive F2 projection checks passed.')
+```
