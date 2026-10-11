@@ -90,6 +90,8 @@ cargo run --locked --example rips_sphere
 cargo run --locked --example rips_representatives
 cargo run --locked --example sparse_rips
 cargo run --locked --example diagram_analysis
+cargo test --locked --example diagram_analysis
+cargo test --locked --release --example diagram_analysis
 cargo run --locked --example complex_construction
 cargo test --locked --example complex_construction
 cargo test --locked --release --example complex_construction
@@ -101,6 +103,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
 cargo +1.91.0 test --locked --all-features
 cargo +1.91.0 check --locked --all-targets --all-features
 cargo +1.91.0 test --locked --example complex_construction
+cargo +1.91.0 test --locked --example diagram_analysis
 cargo +1.91.0 test --locked --example critical_sets
 python3 tools/check_source.py
 python3 tools/check_artifacts.py

@@ -251,6 +251,27 @@ to inspect. Preserve the failing mathematical input when seeking help. The
 maintainer checklist and CI still cover release/MSRV builds, packaging and wider
 regressions before merge; a focused pass is not evidence for those other checks.
 
+## Optional external learning
+
+The same [analysis example](../../examples/diagram_analysis.rs) has a graph-only
+export mode. It borrows WeightedGraph adjacency, with no PH or distance call,
+and emits a fixed ten-sample CSV. The separate
+[Python example](../../examples/analysis_learning.py) validates sample identity,
+feature order and the predefined train/test split, then fits scikit-learn on
+training rows only. See [the decisions and reproducible commands](../research/analysis-learning.md#exchange-contract-and-selected-scope-85-n)
+for installation, precision, empty/missing data, costs and limits.
+
+```sh
+cargo run --locked --example diagram_analysis -- --export target/graph-features.csv
+python examples/analysis_learning.py target/graph-features.csv
+```
+
+Install the optional pinned Python packages from that guide in a separate virtual
+environment first. They are absent from Cargo and from the default descriptor
+example. The hand-labeled path/ring classifier demonstrates exchange and fitting;
+it does not establish a learning advantage on application data. Spectrum,
+operator and matrix TDL consumers need their own basis, units and certificates.
+
 ## Contribute diagram distances
 
 Matching algorithms live in `src/diagram_distances/`, independently of Rips and

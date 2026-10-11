@@ -76,6 +76,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
 | [Result interpretation and comparison](research/result-contracts.md) | Four result families, availability, units, certificates, ownership/import losses and fixed-source spectral/distance discrepancies |
+| [Analysis and optional learning](research/analysis-learning.md) | Existing descriptor disposition, fixed statistical/graph workloads, CSV identity and train-only external learning |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
