@@ -251,26 +251,43 @@ to inspect. Preserve the failing mathematical input when seeking help. The
 maintainer checklist and CI still cover release/MSRV builds, packaging and wider
 regressions before merge; a focused pass is not evidence for those other checks.
 
-## Optional external learning
+## Existing ownership and future external consumers
 
-The same [analysis example](../../examples/diagram_analysis.rs) has a graph-only
-export mode. It borrows WeightedGraph adjacency, with no PH or distance call,
-and emits a fixed ten-sample CSV. The separate
-[Python example](../../examples/analysis_learning.py) validates sample identity,
-feature order and the predefined train/test split, then fits scikit-learn on
-training rows only. See [the decisions and reproducible commands](../research/analysis-learning.md#exchange-contract-and-selected-scope-85-n)
-for installation, precision, empty/missing data, costs and limits.
+The [descriptor disposition and handoff record](../research/analysis-learning.md)
+identifies current implementations/callers, coverage/empty/error semantics and
+unchanged conversion costs. Future data or topology consumers need sample IDs,
+ordered bases, feature shapes, units and source information. They need not request
+PH or distances. Encoding, bindings, new feature algorithms and learning runtime
+integration remain future decisions; the record adds no such API or dependency.
+Existing CriticalSetWorkspace remains an optional computation with complex/algebra
+ownership, rather than a training-layer or homology-projection object.
 
-```sh
-cargo run --locked --example diagram_analysis -- --export target/graph-features.csv
-python examples/analysis_learning.py target/graph-features.csv
+The existing route can select diagram comparison, diagram descriptors or ordinary
+scalar consumption after a comparison independently. This hand fixture supplies
+both squares in the same coordinate units; result context checks do not establish
+physical units for an arbitrary application's data:
+
+```rust
+use cocycle::descriptors::betti_curve;
+use cocycle::diagram_distances::bottleneck_distance_results;
+use cocycle::filtration::RipsBuilder;
+use cocycle::geometry::PointCloudView;
+use cocycle::persistence::PersistenceExt;
+
+let unit = [0., 0., 1., 0., 1., 1., 0., 1.];
+let twice = [0., 0., 2., 0., 2., 2., 0., 2.];
+let a = RipsBuilder::from_points(PointCloudView::new(&unit, 4, 2)?)
+    .persistence().compute()?;
+let b = RipsBuilder::from_points(PointCloudView::new(&twice, 4, 2)?)
+    .persistence().compute()?;
+assert_eq!(betti_curve(a.diagram(), 1, &[0., 1., 2., 3.])?, [0, 1, 0, 0]);
+assert_eq!(betti_curve(b.diagram(), 1, &[0., 1., 2., 3.])?, [0, 0, 1, 0]);
+// Matching each bar to the diagonal is cheaper than matching them together.
+let distance = bottleneck_distance_results(&a, &b, 1)?;
+assert!((distance - (2.0_f64.sqrt() - 1.0)).abs() < 1e-14);
+assert!(distance < 0.5); // An ordinary caller consumes the already computed scalar.
+# Ok::<(), cocycle::Error>(())
 ```
-
-Install the optional pinned Python packages from that guide in a separate virtual
-environment first. They are absent from Cargo and from the default descriptor
-example. The hand-labeled path/ring classifier demonstrates exchange and fitting;
-it does not establish a learning advantage on application data. Spectrum,
-operator and matrix TDL consumers need their own basis, units and certificates.
 
 ## Contribute diagram distances
 

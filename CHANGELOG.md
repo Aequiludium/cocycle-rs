@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-- Extend the diagram-analysis example with direct graph-feature CSV export and a
-  separate optional scikit-learn teaching example. Keep sample identity, feature
-  order and training-only preprocessing explicit; no Rust dependency or API change.
-
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

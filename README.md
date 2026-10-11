@@ -75,9 +75,7 @@ Contributing an algorithm? Start with the [research-area navigation](docs/develo
 and the [diagram-analysis](docs/development/diagram-analysis.md) or
 [complex-construction](docs/development/complex-construction.md) walkthrough.
 Run `cargo run --locked --example diagram_analysis` to analyze supplied intervals
-without constructing a complex. Its optional graph export and a separate
-scikit-learn example demonstrate [external learning](docs/research/analysis-learning.md#exchange-contract-and-selected-scope-85-n)
-without PH or distances; Python ML packages remain outside the Rust core.
+without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
 

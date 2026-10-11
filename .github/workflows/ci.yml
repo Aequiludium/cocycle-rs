@@ -76,8 +76,6 @@ jobs:
       - run: cargo run --locked --example rips_representatives
       - run: cargo run --locked --example sparse_rips
       - run: cargo run --locked --example diagram_analysis
-      - run: cargo test --locked --example diagram_analysis
-      - run: cargo test --locked --release --example diagram_analysis
       - run: cargo run --locked --example complex_construction
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --release --example complex_construction
@@ -99,25 +97,6 @@ jobs:
       - run: cargo check --locked --all-targets --all-features
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --example critical_sets
-      - run: cargo test --locked --example diagram_analysis
-
-  learning-example:
-    name: Optional external learning example
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-        with:
-          toolchain: stable
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-      - run: python -m pip install scikit-learn==1.7.2 numpy==2.2.6 scipy==1.15.3 joblib==1.5.3 threadpoolctl==3.6.0
-      - run: mkdir -p target
-      - run: cargo run --locked --example diagram_analysis -- --export target/graph-features.csv
-      - run: python examples/analysis_learning.py target/graph-features.csv
-      - run: sha256sum target/graph-features.csv
 
   package:
     name: Package and packaged example
@@ -142,7 +121,6 @@ jobs:
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
           cargo test --locked --manifest-path "$package_manifest" --example critical_sets
-          cargo test --locked --manifest-path "$package_manifest" --example diagram_analysis
 
   reference:
     name: Native C++ reference comparisons
