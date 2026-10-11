@@ -12,13 +12,22 @@ use super::{SimplexId, SimplicialComplex};
 /// Implementations own validation of this mathematical contract. The generic
 /// persistence path additionally checks traversal/face order and boundary-square
 /// zero over the selected field. This is a safe trait: violations may return an
-/// error or an incorrect result, but never justify unsafe memory access.
+/// error, panic or an incorrect result, but never justify unsafe memory access.
 ///
 /// This contract describes the supplied complex, not its relationship to a larger
 /// Rips/Alpha source. Source coverage and construction-dimension certificates live
 /// outside it. Operations borrow stable storage; expensive lazy construction and
 /// mutation do not belong in these accessors. Cancellation cannot interrupt the
 /// interior of an accessor or iterator's `next` call.
+///
+/// # Panics
+/// [`Self::dimension`], [`Self::filtration_value`] and [`Self::boundary`] require
+/// an ID returned by [`Self::cells`] on this instance. Implementations may panic
+/// otherwise. An ID from a later stage or another owner does not meet this
+/// precondition, even if its numeric index coincides with a local cell's index.
+/// The inherent [`SimplicialComplex::simplex`] and [`SimplicialComplex::boundary`]
+/// methods, and their [`crate::filtration::SimplicialStage`] counterparts, return
+/// `None` for out-of-range IDs; numeric IDs alone cannot detect a different owner.
 pub trait FilteredComplex {
     /// Stable identity of one cell for the duration of a computation.
     type CellId: Copy + Eq + std::hash::Hash;
