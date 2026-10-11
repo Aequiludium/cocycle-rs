@@ -20,3 +20,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/p4_dependency_maintenance.py
+# retry after concurrent Issue #82 edit; preserve fresh issue text
