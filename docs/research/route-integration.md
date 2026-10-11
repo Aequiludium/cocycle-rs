@@ -412,3 +412,93 @@ comparison-to-analysis examples after #110's selected implementation. It must
 test the selected mathematical properties, every operand's identity/units,
 undefined/unsupported cases, independent expected values and comparable costs.
 The executable diagram route validates current behavior only.
+
+## External learning data handoff: #92
+
+The two planned routes are topology-to-external-tool and
+filtration-stage-to-external-tool. Neither requires PH, a diagram or distance.
+#84's [analysis/learning report](analysis-learning.md) supplies the existing
+descriptor and export boundaries; #111 owns future feature/external-call
+implementation. This stage fixes exchange information, without deploying a
+trainer, binding or new feature algorithm.
+
+| Information | Direct topology route | Stage route / integrity check |
+| --- | --- | --- |
+| Sample identity/order | Application-owned sample key, dataset snapshot and ordered sample position | Same sample identity plus stage index and finite signed inclusive scale; sample order and scale order are different. |
+| Source/topology | Explicit selected topology, original cell keys, dimensions, signed incidence and source coverage | Present cells and stage-to-owner association; sampling/skeleton/approximation facts survive export. An absent required degree is not computed empty. |
+| Coordinates/features | Declared feature meaning, units/domain, shape, degree-specific ordered row keys and supplied values | State whether features vary by stage; permute feature rows with the corresponding basis. No silent default feature or zero padding. |
+| Coefficients/weights | Integer signs or explicitly converted field; filtration, cost and Gram quantities are separately labeled | Do not turn a filtration value into a conductance, training label or class cost implicitly. |
+| Ownership/failure | Borrow source/values during an explicit export; serialize/copy only the requested arrays | External bytes own their keys and interpretation. Nonfinite values, duplicate keys, shape/order mismatch, write/process failure and output-key mismatch fail visibly. |
+| Returned output | External tool/version/configuration, sample keys and requested output meaning/shape | Every returned row joins by its declared sample/stage keys; reordering is explicit. Missing, duplicate or foreign keys are errors, not padding or success. |
+
+For a first simple consumer, propose UTF-8 JSON Lines: one independently shaped
+record per sample/selection, signed integer boundary terms, original cell keys,
+and explicit feature row keys. This is a **contract sample**, not a public
+serializer/schema API or an executed exchange with a trainer. A compact binary
+layout can be chosen later if an actual consumer needs its cost; the logical
+fields and shapes must survive that choice. JSON objects' key ordering is not
+the mathematical basis order; arrays carry the declared order.
+
+The following tiny one-edge sample uses an explicitly chosen external basis
+(10),(20),(10,20), with caller-supplied vertex coordinates -3 and 5. This basis
+can differ from source tie order only with a corresponding boundary/feature
+permutation. Two records keep sample order fixed while changing selection:
+
+```python
+# Hand contract #92; local JSON roundtrip, no file export or external call.
+import json
+record = {
+    "format": "cocycle-chain-handoff-v1-contract",
+    "sample_key": "edge-a", "sample_order": 0, "snapshot": "fixture-1",
+    "selection": {"kind": "supplied-topology", "scale": None},
+    "domain": "signed-integer", "coverage": "complete-supplied-source",
+    "bases": {"0": [[10], [20]], "1": [[10, 20]], "2": []},
+    "boundaries": {
+        "1": {"shape": [2, 1], "terms": [[0, 0, -1], [1, 0, 1]]},
+        "2": {"shape": [1, 0], "terms": []}},
+    "features": {"degree": 0, "shape": [2, 1], "row_keys": [[10], [20]],
+                 "values": [[-3.0], [5.0]], "meaning": "supplied-coordinate",
+                 "units": "dimensionless"}}
+stage = json.loads(json.dumps(record, allow_nan=False))
+stage["selection"] = {"kind": "stage", "index": 1, "scale": 1.0}
+stage["coverage"] = "selected-sublevel-of-fixture-1"
+records = [record, stage]
+wire = "\n".join(json.dumps(r, allow_nan=False) for r in records)
+restored = [json.loads(line) for line in wire.splitlines()]
+assert restored == records
+for r in restored:
+    f = r["features"]
+    assert f["row_keys"] == r["bases"][str(f["degree"])]
+    assert f["shape"] == [len(f["values"]), len(f["values"][0])]
+    assert r["boundaries"]["2"]["shape"] == [1, 0]
+assert restored[0]["sample_key"] == restored[1]["sample_key"]
+assert restored[1]["selection"]["scale"] != restored[1]["features"]["values"][0][0]
+permuted_keys = list(reversed(record["features"]["row_keys"]))
+assert permuted_keys != record["bases"]["0"]  # A row-order mismatch is detectable.
+try:
+    json.dumps({"feature": float("nan")}, allow_nan=False)
+except ValueError:
+    pass
+else:
+    raise AssertionError("nonfinite JSON features were silently accepted")
+print("#92 sample/shape/empty-boundary JSON handoff contract passed")
+```
+
+Empty datasets and zero-size degrees preserve requested shapes and availability;
+ragged features need a separately declared layout. Vertex-coordinate dimension
+is distinct from chain degree or number of cells. Serialized `SimplexId` indices
+cannot authenticate another owner; this first simplicial sample uses original
+vertex tuples and an explicit snapshot declaration. Truth of dataset declarations
+and train/test splitting remain application responsibilities. Metadata must not
+be stripped merely to satisfy an external tensor's shape.
+
+Source reads are borrowed; selected basis/feature buffers and serialization
+allocate or copy explicitly. Process setup, serialization, external execution
+and output validation are distinct cost/error boundaries. No Rust mathematical
+core dependency on an ML runtime is introduced.
+
+Stage B remains unimplemented until #111 supplies a selected real exporter and
+external call. Then both routes must actually execute, check complete input/output
+key joins and failure propagation, record fixed tool/runtime/input identities,
+and distinguish export success from external execution and training quality.
+This local roundtrip is interface evidence, not either running route.
