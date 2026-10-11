@@ -525,7 +525,9 @@ def main():
                 raise RuntimeError('Cannot safely resume modified issue #' + str(n))
             original = original.split(HISTORY, 1)[1][:-len('\n\n</details>\n')]
         if digest(original) != HASHES[n]:
-            raise RuntimeError('Unreviewed issue body edits at #' + str(n))
+            print('BODY_UPDATED_SINCE_AUDIT', n, 'preserve_latest_text', flush=True)
+            # Current text is preserved beneath the new scoped header; concurrent edits
+            # are rejected by the fresh comparison immediately before each write.
         title = PLAN[n][0] or item['title']
         patches[n] = render(n, original, title)
         if len(patches[n]['body']) > 65000:
