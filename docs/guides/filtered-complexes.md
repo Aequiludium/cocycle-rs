@@ -123,6 +123,12 @@ one and satisfy boundary-of-boundary zero over the integers. Coefficients are
 signed `i32` incidence numbers, reduced into the selected prime field. Accessors
 and iteration borrow stable storage and must honor this mathematical contract.
 
+Call `FilteredComplex::dimension`, `filtration_value` and `boundary` only with
+IDs returned by `cells()` on that instance. An ID from another owner or a later
+stage violates this precondition; implementations may panic. Inherent simplicial
+`simplex`/`boundary` reads return `None` for out-of-range IDs, but numeric IDs alone
+cannot authenticate an owner. See the trait's rustdoc for the full contract.
+
 The generic computation checks unique IDs, finite ordered values, and the
 retained skeleton's boundary references, dimensions and boundary-square zero in
 the selected field. This last check does not certify integer validity or validity

@@ -28,9 +28,11 @@ unreleased APIs are available from the registry.
 | Historical evidence | Research baselines, original PR states, finite checks and benchmark results apply to their recorded revisions. They do not establish current merge, release or performance acceptance. |
 
 The documentation revision is prepared from [#119 at
-`64ab5fdc962d42b4330641de3a28be7fdf369c4d`](https://github.com/Aequiludium/cocycle-rs/commit/64ab5fdc962d42b4330641de3a28be7fdf369c4d),
+`a2a1841c3d566758497f377da5a72f422b8728be`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
 observed open on 2026-10-11. That candidate contains #113-#119 and the original
 migration/source/contract inputs listed in the [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94).
+The original documentation audit used `64ab5fdc`; the later accessor-contract
+clarification and regression are included in this revision's baseline.
 This provenance stays historical after integration; it is not a live PR tracker.
 Main integration and release require the [release procedure](../CONTRIBUTING.md#release-procedure).
 

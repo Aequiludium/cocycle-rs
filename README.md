@@ -10,7 +10,7 @@ and how long they last. A general-purpose TDA library in pure Rust, with no runt
 dependencies and no unsafe code.
 
 This checkout includes **Unreleased** additions prepared on the integrated
-candidate [#119 at `64ab5fdc`](https://github.com/Aequiludium/cocycle-rs/commit/64ab5fdc962d42b4330641de3a28be7fdf369c4d).
+candidate [#119 at `a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be).
 The dependency below selects **0.1.1**; it does not include those additions.
 Use the [version and capability status](docs/README.md#version-and-capability-status)
 to distinguish released behavior, implemented candidate code and future contracts.
