@@ -204,5 +204,5 @@ representatives additionally retain owned simplex/coefficient terms.
 Run `cargo run --locked --example rips_graph` and
 `cargo run --locked --example flag_persistence`. For H2 and topology queries, run
 `cargo run --locked --example rips_sphere`. See the
-[native comparison command](../../tools/README.md#native-rips-correctness-checks)
+[native comparison command](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md#native-rips-correctness-checks)
 for construction and persistence validation against C++ references.

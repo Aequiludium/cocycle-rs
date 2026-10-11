@@ -106,7 +106,7 @@ analysis as applicable; legacy free functions retain their older scope. Controls
 are cooperative, not hard memory or time caps. Failure exposes no partial result. Source-independent result
 metadata owns the full sampling provenance, adding O(n) to approximate results.
 
-The [native comparison protocol](../../tools/README.md#native-sparse-rips-checks)
+The [native comparison protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md#native-sparse-rips-checks)
 compares GUDHI's C++ edges, blockers, filtered simplices and prime-field diagrams
 with fixed sampling semantics. Upstream Ripser has no matching approximation
 constructor. Exact-Rips comparisons against Ripser remain a separate suite.

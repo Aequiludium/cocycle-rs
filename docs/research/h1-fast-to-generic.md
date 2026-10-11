@@ -3,7 +3,7 @@
 [Documentation](../README.md) / Research / [Phase-3 T1](https://github.com/Aequiludium/cocycle-rs/issues/35)
 
 This audit reads frozen R0 `a1a7cb629187fbc17c9e2e638ee8ae4bf19c2656`.
-The [baseline report](../../benches/reports/h2-foundation.md) owns measurements,
+The [baseline report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/h2-foundation.md) owns measurements,
 finite coverage and source identities. Existing generic H2 support is not a new
 algorithm. The decisions below authorize a minimal clearing continuation, not
 production admission of a new H2 fast kernel.

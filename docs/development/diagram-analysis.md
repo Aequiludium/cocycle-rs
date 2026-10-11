@@ -382,6 +382,6 @@ matching path. Keep routing experiments and diagnostics out of ordinary builds.
 Run `python3 tools/check_algorithm.py diagram-distances`. It checks formatting,
 lint, public contracts, private kernel oracles, the example and this tutorial's
 code. It needs no C++ environment. Before merging a matching-kernel change,
-maintainers additionally run the pinned [native distance comparisons](../../benches/distances/README.md)
+maintainers additionally run the pinned [native distance comparisons](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/distances/README.md)
 and record relevant numerical limitations. Local Rust checks alone do not certify
 agreement with external implementations or establish performance rankings.

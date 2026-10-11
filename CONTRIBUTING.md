@@ -9,10 +9,10 @@ Application workflows and language bindings are outside this crate.
 Use Rust 1.91 or later, rustfmt, and Clippy. The core has no external runtime or
 test dependencies. Python's standard library runs documentation checks and tool
 tests. Native comparisons need a C++17 compiler, Boost headers, and pinned GUDHI
-and Ripser sources; see the [native setup](benches/native/README.md). Diagram-distance
+and Ripser sources; see the [native setup](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/README.md). Diagram-distance
 comparisons additionally require a C++20 Topp adapter, CGAL headers and pinned
-Python GUDHI/NumPy/POT packages; see the [distance setup](benches/distances/README.md#prepare-the-reference-environment).
-Other Python TDA wrappers remain [optional checks](tools/legacy-benchmarks.md).
+Python GUDHI/NumPy/POT packages; see the [distance setup](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/distances/README.md#prepare-the-reference-environment).
+Other Python TDA wrappers remain [optional checks](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/legacy-benchmarks.md).
 Algorithm authors can start with the [contribution paths](docs/development/algorithm-contributions.md)
 and the focused commands below. For wider kernel work, start with
 `cargo test --locked` and the [architecture](docs/development/architecture.md).
@@ -115,6 +115,7 @@ rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target
 rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/development/diagram-analysis.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/development/complex-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/development/persistence-reduction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -127,7 +128,7 @@ Select additional checks by the changed contract:
 | Documentation only | Source and Markdown checks; run affected Rust examples/doctests |
 | Rust implementation or public API | Commands above; update contract tests and relevant rustdoc |
 | Mathematical algorithm | Independent expectation/property and relevant native comparisons, in addition to Rust checks |
-| Diagram-distance algorithm | Independent tiny matching oracle, pinned Topp and GUDHI comparisons under the [distance protocol](benches/distances/README.md) |
+| Diagram-distance algorithm | Independent tiny matching oracle, pinned Topp and GUDHI comparisons under the [distance protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/distances/README.md) |
 | Python checks or controllers | Source and Markdown checks, all `test_*.py`; exercise the changed command on a small case |
 | Native adapters, builder, or benchmark protocol | Tool tests, standalone Rust formatting when affected, and the native smoke command below |
 | Performance | Comparable before/after measurements under the applicable native suite and reporting rules; keep unfavorable results |
@@ -139,13 +140,13 @@ generated outputs regardless of age, including forced additions. CI checks the
 same index policy. For
 mathematical or algorithm changes, update the [specification](docs/reference/mathematics.md), add an
 independent expected result or property, and run the relevant external comparisons
-in [tools/README.md](tools/README.md). Performance changes need the same fixtures,
+in the [tools guide](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md). Performance changes need the same fixtures,
 precision, and timing boundaries before and after; keep unfavorable results.
 Ordinary tests must not assert machine-dependent timing thresholds.
 
-Benchmark changes must follow the [reporting rules](benches/reporting.md) and the
-affected execution contract: [H0/H1 native](benches/protocol.md) or
-[Rips pipeline](benches/pipeline/README.md). Run the affected native smoke suite
+Benchmark changes must follow the [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) and the
+affected execution contract: [H0/H1 native](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/protocol.md) or
+[Rips pipeline](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/pipeline/README.md). Run the affected native smoke suite
 when changing workers, controllers or measurement semantics. GUDHI and Ripser comparisons use C++
 executables; Python TDA wrappers remain optional interface checks, outside native rankings. Tool
 changes also need `python3 -m unittest discover -s tools -p 'test_*.py'`.
@@ -175,7 +176,7 @@ python3 tools/compare_distances.py --gudhi-python target/distance-oracle-venv/bi
 
 Record the tested commit and summary in the PR. CI's `--quick` distance check
 covers a smaller suite. Worker/instrumentation changes also need the small
-[distance resource smoke](benches/distances/README.md#check-correctness-and-the-harness),
+[distance resource smoke](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/distances/README.md#check-correctness-and-the-harness),
 including `--profile-rust` when changing generated timing hooks.
 
 Documentation-only changes need source/documentation checks and any affected examples;
@@ -194,12 +195,12 @@ Review focuses on correctness, public contracts, independent evidence, and wheth
 the change fits the library's scope. Discuss technical choices respectfully and
 make feedback specific and actionable.
 
-The repository policy is recorded in the [CI ruleset](.github/rulesets/main.json)
-and [review ruleset](.github/rulesets/review.json). These files must be applied
+The repository policy is recorded in the [CI ruleset](https://github.com/Aequiludium/cocycle-rs/blob/main/.github/rulesets/main.json)
+and [review ruleset](https://github.com/Aequiludium/cocycle-rs/blob/main/.github/rulesets/review.json). These files must be applied
 through GitHub's repository settings or API; committing them does not activate
 the rules. CI checks, an up-to-date branch, and protection against force pushes
 and deletion apply to everyone. Pull requests normally require one approval
-from another [code owner](.github/CODEOWNERS); new commits dismiss stale approvals,
+from another [code owner](https://github.com/Aequiludium/cocycle-rs/blob/main/.github/CODEOWNERS); new commits dismiss stale approvals,
 and review conversations must be resolved. Repository administrators may
 explicitly bypass the review rules on a pull request, but cannot bypass CI.
 
@@ -208,6 +209,12 @@ weekly; maintainers review these updates through the same pull request process.
 Keep the required check names in the CI ruleset aligned when renaming CI jobs.
 
 ## Documentation ownership
+
+The [version status](docs/README.md#version-and-capability-status) owns release,
+Unreleased and historical interpretation. The [architecture overview](docs/development/architecture.md#six-responsibilities-and-data-routes)
+owns current capability relationships. Keep research baselines and old PR states
+as dated evidence; link to these owners rather than maintaining competing current
+inventories or rewriting old measurements.
 
 The [documentation index](docs/README.md#organization-and-maintenance) defines
 where usage, reference, development, design, and research pages belong. It also
@@ -226,27 +233,45 @@ When adding or moving a document:
    Run affected Rust examples using the commands above.
 3. Keep CI's guide doctest path aligned with the guide. If changing the checker,
    run `python3 -m unittest discover -s tools -p 'test_check_docs.py'`.
+   Research pages with runnable Rust API blocks, including
+   `docs/research/route-integration.md`, also belong in the fixed doctest list.
+   Python hand calculations on that page remain finite contract checks; Rust
+   doctests do not execute them or validate future algorithms.
 4. Do not stage logs, benchmark outputs, fixture collections or archives. Keep
    local runs under `target/` and publish selected evidence through CI artifacts
    or external storage; concise reports link that evidence.
 5. If changing directories or package inclusion, inspect
    `cargo package --locked --allow-dirty --list` and ensure nested docs remain in
    the package. Raw benchmark artifacts remain outside the crate payload.
+   After `cargo package --locked --allow-dirty`, run
+   `python3 tools/check_docs.py --root target/package/cocycle-0.1.1`, substituting
+   the manifest's actual package name/version. This checks the extracted package
+   without resolving missing files from the checkout. Use repository URLs for
+   excluded reports, tools and CI files; the checker does not fetch those URLs.
 
 Performance reports use stable topic-based paths; update the existing report on
 reruns and let Git retain its history. Each report binds to the measured commit
 and associated PR, with a full SHA, source fingerprint and protocol. Dates are
 execution metadata. The report commit and measured commit are distinct; uncommitted runs remain drafts. Do not
 rewrite its raw data after a refactor or treat old timing as a new measurement.
-The [reporting rules](benches/reporting.md) own evidence classification,
+The [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) own evidence classification,
 comparability, sampling and artifact retention; use the
-[report template](benches/report-template.md) for new experiments.
+[report template](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/report-template.md) for new experiments.
 
 ## Release procedure
 
 The crate is published as [cocycle](https://crates.io/crates/cocycle). Releases are
 explicit maintainer actions after a reviewed release PR and successful CI.
 GitHub CI verifies changes; it does not publish packages or select versions.
+
+Before a release, integrate the reviewed code candidate and a separate focused
+documentation consolidation. The README, changelog, index, roadmap, architecture
+and affected guides must describe the same source version, with implemented and
+future capabilities explicit. Run the fixed Markdown doctests, source/docs checks
+and packaged-document check on the final release source. Old baseline checks or
+successful code integration alone do not satisfy this documentation gate.
+Keep #26/#49 distance preparation and #56 adaptive H1 adoption conditions separate
+from documentation acceptance; this gate does not admit those experiments.
 
 ### Version and notes
 

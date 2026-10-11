@@ -139,6 +139,10 @@ interrupt the interior of a custom accessor or iterator call.
 
 ## Read stages and their inclusions
 
+Stage access and inclusions are **Unreleased** additions in this checkout.
+See the [version status](../README.md#version-and-capability-status) before using
+these calls with a registry dependency.
+
 `SimplicialComplex::stage(scale)` and `SimplicialFiltration::stage(scale)` borrow
 the closed sublevel set of stored simplices with value <= scale. Every tie is
 included. Selection uses a binary search and retains the source's simplex IDs,
@@ -241,7 +245,7 @@ higher-simplex values through stored cofaces. Other inputs use boundary reductio
 and representative requests retain their separate transformation work. Generic
 `PersistenceBuilder::from_complex` always uses the boundary contract. Native
 workers preserve their protocol; performance claims require measurements bound
-to the measured source commit. The [integration report](../../benches/reports/critical-sets.md)
+to the measured source commit. The [integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md)
 records the current-main gate that rejected automatic boundary rerouting.
 
 [g-complex]: https://gudhi.inria.fr/doc/latest/group__simplex__tree.html

@@ -2,6 +2,11 @@
 
 [Documentation](../README.md) / Usage
 
+This guide follows the current checkout, including **Unreleased** stage calls.
+See the [version status](../README.md#version-and-capability-status) for release scope
+and the [architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+for current owners and future capability boundaries.
+
 These examples use existing public interfaces. They connect modeling, stage
 selection, persistence, result access, comparison and analysis without a common
 source trait or a universal result container. The

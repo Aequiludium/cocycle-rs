@@ -2,6 +2,14 @@
 
 [Documentation](../README.md) / Research / [#60](https://github.com/Aequiludium/cocycle-rs/issues/60)
 
+**Proposed contracts with historical source evidence.** This report owns future
+input decisions; its dated baselines, including `a7ee9e9`, are preserved snapshots.
+API sketches and hand examples do not deliver solvers. Use the
+[version status](../README.md#version-and-capability-status) and
+[architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+for implemented capabilities, and the [result report](result-contracts.md) for
+output requirements. Route summaries link these contracts rather than redefine them.
+
 Technical report, 2026-10-09, following the [interface inventory](interface-inventory.md).
 This publishes the full input decision behind the
 [interface compatibility report](../design/interface-compatibility.md).

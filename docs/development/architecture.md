@@ -2,8 +2,10 @@
 
 [Documentation](../README.md) / Development
 
-This page describes implemented code. Proposed responsibilities and type boundaries
-belong in the [kernel design](../design/kernel.md).
+This page owns the implemented architecture for this checkout, including
+Unreleased additions. The [version status](../README.md#version-and-capability-status)
+separates that scope from releases and dated research. Proposed type boundaries
+belong in the [kernel design](../design/kernel.md) and the input/result reports.
 
 Cocycle is one Rust crate with a small public API. Modules follow mathematical
 responsibilities without requiring each computation to construct every possible
@@ -13,6 +15,47 @@ defines invariants; rustdoc defines public signatures and error behavior.
 Algorithm authors can start with the [contribution paths](algorithm-contributions.md)
 for focused descriptor, diagram-distance and explicit-construction workflows. This page owns
 the broader dependency map used for kernel integration.
+
+## Six responsibilities and data routes
+
+Phase 4 organizes six mathematical responsibilities within the existing crate.
+They do not require six crates, a universal source/result type or runtime registry.
+
+| Responsibility | Implemented owner and behavior | Future capability and contract owner |
+| --- | --- | --- |
+| Data | `geometry` borrows points/matrices; `complex` owns checked graphs and signed simplicial incidence; `FilteredComplex` statically adapts ordered cells. | Alpha geometry, production cubical/cellular containers and generalized models: [data decisions](../research/data-modeling.md). |
+| Filtration | `filtration` constructs exact/sparse Rips and supplied flag sources with coverage/context; frozen simplicial owners expose borrowed `SimplicialStage` and same-source inclusions. | General chain maps, unrelated-source and multiparameter transport: [stage decisions](../research/filtration-stages.md). |
+| Computation | `persistence` computes ordinary prime-field PH with specialized F2 paths; `optimization::CriticalSetWorkspace` supplies opt-in Big Steps endpoint proposals. | Laplacian/eigensolver, Dirac, true persistent spectral pairs, F2 homology projections and generalized topology: [input proposals](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9). |
+| Results | `diagram` owns diagrams/context and optional representative witnesses; computed dimensions, coverage, ordinals and immutable borrows retain their meaning. | Concrete spectral and projection outputs/certificates: [result proposals](../research/result-contracts.md#computation-family-outputs-and-resources). |
+| Comparison | `diagram_distances` provides exact complete-diagram bottleneck, W1 and W2, including contextual and controlled facades. | Defined non-diagram similarities with explicit coordinate/unit alignment: [comparison proposals](../research/result-contracts.md#future-comparison-interface-information-only). |
+| Analysis | `descriptors` reads finite lifetimes, entropy and Betti curves from diagrams. Application code can consume returned scalars directly. | Exporters, external learning and automatic feedback: [handoff proposals](../research/analysis-learning.md#future-external-input-information-84-to-92) and the [route record](../research/route-integration.md). |
+
+```mermaid
+flowchart LR
+    data[Data owners] --> filtration[Filtration and stages]
+    filtration --> ph[Ordinary persistence]
+    ph --> results[Diagrams, context and witnesses]
+    results --> comparison[Diagram comparison]
+    results --> analysis[Descriptors and application consumers]
+    data -.-> direct[Future single-scale or direct consumers]
+    filtration -.-> direct
+    direct -.-> future[Future spectral, projection or learning outputs]
+```
+
+Solid routes exist in this checkout; dotted routes are contract handoffs for future
+algorithms. Source incidence can already be read without PH, and supplied diagrams
+can already be compared/analyzed without a source owner. A filtration is optional
+for single-scale computations; diagrams and distances are optional for direct
+consumers. These alternatives are not an automatic pipeline or new callable facade.
+The [interface guide](../guides/interface-contracts.md) exercises current calls;
+the [route report](../research/route-integration.md) owns composed examples and
+future information requirements rather than duplicating the contracts above.
+
+IDs belong to one owner and coordinate bases retain order and signs. Filtration
+values, spectral inner-product Grams and F2 class costs have distinct meanings.
+Reading an ordinary stage or computing its PH does not produce a persistent
+Laplacian or an F2 projection operator. Application code owns optional feedback,
+invalidation and recomputation; the Rust kernel has no learning dependency.
 
 ## Production code
 
@@ -41,7 +84,7 @@ src/
       mod.rs                     owned WeightedGraph, edges and queries
       adjacency.rs               compact sorted adjacency construction
     simplicial/
-      mod.rs                     validated SimplicialComplex, lookup and stored incidence
+      mod.rs                     validated SimplicialComplex, incidence, stages and inclusions
       simplex.rs                 canonical vertices, IDs and shared filtration order
       incidence.rs               oriented codimension-one boundary terms
   filtration/
@@ -173,7 +216,7 @@ No backend registry or Alpha/cubical construction is implied. See the
 The generic filtered-cell path is the common boundary-reduction optimization
 owner. Existing zero-born concrete requests retain the shared coface kernel,
 which also serves implicit flag/Rips continuation and fallback. The
-[integration report](../../benches/reports/critical-sets.md) records why both
+[integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md) records why both
 uniform boundary routing and an H2+-only change were rejected on current main.
 The public interfaces, prime fields, coverage and result ownership are preserved.
 No dense production critical-set backend, engine option or adaptive size threshold

@@ -2,6 +2,14 @@
 
 [Documentation](../README.md) / Research / [#86](https://github.com/Aequiludium/cocycle-rs/issues/86)
 
+**Dated integration candidate and future handoffs.** Baseline hashes, original
+PR dispositions and acceptance counts below remain historical evidence. The
+[version status](../README.md#version-and-capability-status) and
+[architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+own the unified checkout scope. This report composes the
+[input](input-contracts.md) and [result](result-contracts.md) proposals; its
+handoff tables are route requirements, not additional authoritative APIs.
+
 This 2026-10-11 record separates existing pipeline acceptance from future
 algorithm integration. The current issue scopes require interface preparation
 for #88-#93, while keeping their later running goals open. Contract examples,

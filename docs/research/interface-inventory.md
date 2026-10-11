@@ -2,6 +2,13 @@
 
 [Documentation](../README.md) / Research / [#59](https://github.com/Aequiludium/cocycle-rs/issues/59)
 
+**Historical inventory and migration record.** The baseline/main hashes and PR
+states below describe their recorded revisions, including supplements based on
+`a7ee9e9`. They are not a live capability or open-PR list. Use the
+[version status](../README.md#version-and-capability-status) and
+[current architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+for this checkout; input/result reports own proposed family contracts.
+
 Technical report, 2026-10-09. This is the complete baseline inventory behind
 [input contracts](input-contracts.md), [result contracts](result-contracts.md)
 and the [#62/#63 compatibility decision](../design/interface-compatibility.md).
@@ -96,7 +103,7 @@ Main now contains merge commits #32 `7dc517d`, #98 `03e896d`, #50 `168015b`,
 #51 `eb3e291`, #52 `5ce4f13` and #53 `cedf596`, verified through main's first-parent
 history. #98 carries the compatibility report and executable guide. The merged
 [H1 continuation report](h1-fast-to-generic.md) and
-[benchmark report index](../../benches/reports/README.md) own the new source/research facts.
+[benchmark report index](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/README.md) own the new source/research facts.
 
 The current [dispatch](../../src/persistence/flag/dispatch.rs) runs specialized
 F2 H1 and continues generically from H2 with clearing where supported, retaining
@@ -339,8 +346,8 @@ inside each migration PR; neither entire issue must close before implementation.
 | Multiset/availability/coverage/context and downstream reads | `contracts`, `descriptors`, `diagram_distances`, `rips_api`; `square`, `diagram_analysis`, `diagram_distances` examples | Preserve finite/essential/censored, computed-empty/absent, field/context and witness ordinals. Borrow, move, discard and clone differ. Distance/descriptor consumption never reruns PH. |
 | Engineering and independent scope | CONTRIBUTING debug/release, examples/guide doctests, format/Clippy/docs, MSRV and package checks | Pure body relocation needs these checks and a statement of unchanged operations/call topology. Any semantic change needs independent expectations plus GUDHI/Ripser where supported; distance changes additionally need Topp. Unsupported references are exclusions. |
 
-For a cost-affecting batch use [pipeline boundaries](../../benches/pipeline/README.md)
-and [reporting rules](../../benches/reporting.md) at the exact base/head with the
+For a cost-affecting batch use [pipeline boundaries](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/pipeline/README.md)
+and [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) at the exact base/head with the
 same seed/input/field/cutoff, alternating cold/warm repetitions and retained raw
 failures. Isolate input preparation/read/validation, kernel, assembly and requested
 witnesses. Record RSS separately from capacity/work counts. Reuse the admitted

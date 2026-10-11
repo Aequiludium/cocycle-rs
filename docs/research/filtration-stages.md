@@ -2,6 +2,11 @@
 
 [Documentation](../README.md) / [Stage usage](../guides/filtered-complexes.md#read-stages-and-their-inclusions)
 
+**Dated research and implementation record.** Preserve the source baseline and
+validation below. The [stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions)
+owns callable behavior; the [version status](../README.md#version-and-capability-status)
+identifies its Unreleased scope in the integrated checkout.
+
 Research and implementation decision, 2026-10-09, for
 [#67](https://github.com/Aequiludium/cocycle-rs/issues/67),
 [#68](https://github.com/Aequiludium/cocycle-rs/issues/68) and

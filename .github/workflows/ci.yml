@@ -46,6 +46,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
       - run: python tools/check_algorithm.py complex-construction
       - run: python tools/check_algorithm.py diagram-distances
@@ -107,6 +108,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: stable
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
       - run: cargo package --locked
       - name: Check packaged examples
         shell: bash
@@ -116,6 +120,7 @@ jobs:
           metadata = json.load(sys.stdin)
           package = metadata["packages"][0]
           print("{}/package/{}-{}/Cargo.toml".format(metadata["target_directory"], package["name"], package["version"]))')"
+          python3 tools/check_docs.py --root "$(dirname "$package_manifest")"
           for example in square diagram_analysis diagram_distances complex_construction critical_sets; do
             cargo run --locked --manifest-path "$package_manifest" --example "$example"
           done

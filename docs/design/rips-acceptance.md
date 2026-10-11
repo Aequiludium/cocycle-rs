@@ -53,8 +53,8 @@ calls over different fields share only immutable input and retain separate state
 
 Historical measurement outputs and reports have been removed. Fresh evidence
 belongs in CI artifacts or external storage under the
-[reporting rules](../../benches/reporting.md). The
-[pipeline protocol](../../benches/pipeline/README.md) specifies phase timing,
+[reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md). The
+[pipeline protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/pipeline/README.md) specifies phase timing,
 end-to-end time, raw samples, process memory and native correctness checks.
 It separates public computation from construction/expansion and interval export;
 Rust's compute phase includes owned result normalization. References do not
