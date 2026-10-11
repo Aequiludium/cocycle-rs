@@ -2,7 +2,7 @@ name: P4 dependency maintenance
 on:
   push:
     branches: [maintenance/p4-dependencies-20261011]
-    paths: [.github/workflows/p4-dependencies.yml]
+    paths: [.github/workflows/p4-dependencies.yml, .github/p4_dependency_maintenance.py]
 permissions:
   contents: read
   issues: write
