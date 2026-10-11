@@ -267,3 +267,83 @@ independent real boundary-rank/image calculation, checks the same-stage limit
 and eigenpair errors, and records source extraction/subspace/solver costs.
 The example above fixes a first nontrivial pair without reimplementing that
 producer or blocking the existing-code #94 exit.
+
+## F2 class and transport handoff: #90
+
+The existing source producer is #69's same-owner stage/incidence access;
+#75's window/legality/query contract is the future projection producer. The
+[F2 family proposal](input-contracts.md#f2-window-legality-and-query-proposal)
+and [result readouts](result-contracts.md#f2-projections-actions-and-query-records)
+own those definitions. This route integrates their identities and maps, not a
+second solver, reference snapshot schema or a CriticalSetWorkspace projection.
+
+| Field or transition | Required meaning |
+| --- | --- |
+| Degree-k window | A:m-by-n, D:n-by-p over F2, AD=0, three ordered degree bases with source/stage keys and explicit empty dimensions. Sum signed integer incidence before reducing modulo 2. |
+| Positive costs | Exactly n positive costs with units/arithmetic and a basis-aligned identity; the initial bounded proposal uses checked integers. Costs are not filtration values or real Grams. |
+| Stage map | Jprev/Jcur/Jnext with `A_t Jcur=Jprev A_s` and `D_t Jnext=Jcur D_s` over F2; same-owner inclusion supplies coordinate injections, not arbitrary chain maps. |
+| Query/result | A usable legal P, same source/basis/cost description, operation/solver evidence and availability; class queries require cycles. `Computed(0)` is a value; unavailable optimality is not zero. |
+| Transport | For a source class representative z, `P_t Jcur z` is its chosen target representative. Validate class preservation with a target-boundary preimage; do not demand that arbitrary representative complements commute as matrices. |
+| Borrow/move/cost | Borrow stages/incidence while extracting a requested window; an owned result must own enough basis/source descriptions to outlive the source. Window extraction, legality verification, solving, action and boundary-preimage checking have distinct future charges/costs. |
+
+Legality checks all four conditions: P squared equals P, AP=0, PD=0, and
+(I+P)z is in image(D) for every cycle z. P=0 passes the first three on a ring
+but fails the fourth. Feasible, independently verified legal, and globally
+optimal are separate claims. Preserve an independent cycle/boundary-rank check;
+do not promote selected mass to minimum-class mass or ordinary PH representatives
+to a validated projection family.
+
+The first declared sample is the triangle ring at s=1 and filling at t=2 from
+the interface guide. In its edge order (20,30),(10,30),(10,20), the F2 cycle is
+z=(1,1,1). Ring D:3-by-0; target D=z. Choose the hand projection P_s whose
+first column is z and other columns are zero; choose P_t=0. Jcur and Jprev are
+identity, while Jnext maps the zero source face space into the new face space.
+The two chain squares hold. Transport sends z to zero, with target preimage 1
+because D_t*1=z. Thus the class dies; this is not a transport failure. Costs
+(2,3,5) give source selected mass 10 and target selected mass 0. Although both
+matrices are legal, `P_t Jcur` does not equal `Jcur P_s`; legal projections choose
+complements, not a mandatory commuting matrix family.
+
+This exhaustive eight-chain check validates only the declared hand matrices,
+their class preservation and transport witness, without solving for a P:
+
+```python
+# Hand contract #90; declared F2 triangle ring/fill, not a solver invocation.
+from itertools import product
+a = [[1, 1, 0], [1, 0, 1], [0, 1, 1]]
+z = (1, 1, 1)
+ps = [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
+pt = [[0, 0, 0] for _ in range(3)]
+def action(matrix, x):
+    return tuple(sum(b * c for b, c in zip(row, x)) % 2 for row in matrix)
+zero = (0, 0, 0)
+cycles = [x for x in product((0, 1), repeat=3) if action(a, x) == zero]
+assert cycles == [zero, z]
+for p, boundaries in ((ps, (zero,)), (pt, (zero, z))):
+    for x in product((0, 1), repeat=3):
+        assert action(p, action(p, x)) == action(p, x)
+        assert action(a, action(p, x)) == zero
+    assert all(action(p, b) == zero for b in boundaries)
+    assert all(tuple(b ^ c for b, c in zip(x, action(p, x))) in boundaries
+               for x in cycles)
+assert action(ps, z) == z and action(pt, z) == zero
+assert tuple(b ^ c for b, c in zip(z, action(pt, z))) == z  # D_t * 1.
+costs = (2, 3, 5)
+assert sum(c * x for c, x in zip(costs, action(ps, z))) == 10
+assert sum(c * x for c, x in zip(costs, action(pt, z))) == 0
+assert z not in (zero,)  # False zero-P on the ring fails homology preservation.
+print("#90 F2 legality, class death and boundary transport hand contracts passed")
+```
+
+Wrong order/shape/domain, a noncycle class query, nonpositive costs, stale cost
+identity, cross-owner stages or an invalid chain square must fail. Explicit
+empty current degree n=0 permits a zero-size window and no costs; missing a
+required degree is a different state. Topology-equivalent or equal-sized
+windows do not identify their coordinates. An explicit basis permutation must
+transform A/D, all three maps, costs, actions and query keys consistently.
+
+Stage B remains future work: run actual single-scale and two-stage components
+once #75 supplies validated results, independently replay legality and boundary
+transport witnesses, check query/source associations and arithmetic errors, and
+separate feasible/optimal evidence and extraction/solve/action costs. The local
+Rust experiment or Python reference is not adopted into this production stack.
