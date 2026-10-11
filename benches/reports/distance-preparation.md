@@ -1,15 +1,28 @@
-# Diagram-distance preparation and allocation effects
+# Archived diagram-distance preparation and allocation effects
 
 [Benchmark reports](README.md) / [Distance protocol](../distances/README.md)
 
 ## Question and status
 
+**Archived: performance admission not passed; candidate code withdrawn on
+2026-10-11.** [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26)
+now retains this report and its index only. Its production sources, tests,
+examples, benchmark workers, controllers and CI are restored to main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. The logical-view preparation
+candidate is not adopted. Issue #14 is not completed by this archive.
+
+The last implementation snapshot is
+[`662ec16d0afc13a9f8b6009b32e6ce4f5f43027c`](https://github.com/Aequiludium/cocycle-rs/commit/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c).
+It remains in Git history for source inspection and isolated reproduction;
+raw measurements remain in their original local artifact directories. This
+withdrawal neither reruns nor relabels the historical measurements below.
+
 This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle-rs/issues/14).
 Implementation and replication discussion:
 [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
-The implementation removes the facade's intermediate finite/essential vectors
-and prepares algorithm-owned storage from logical diagram views. **Merge
-admission remains on hold:** the independent `distance-merge-v1` study retained
+The withdrawn implementation removed the facade's intermediate finite/essential
+vectors and prepared algorithm-owned storage from logical diagram views.
+**Performance admission was not passed:** the independent `distance-merge-v1` study retained
 below and in the PR disagrees with the preparation reproducer on N512 W1.
 Fewer copies, correctness checks and submission authorization do not establish
 the #14 no-significant-regression gate. No padding allocations or experimental
@@ -31,8 +44,8 @@ Before adoption, replay both worker shapes against the same full baseline/head,
 fixture and build identities; distinguish complete calls, preparation/cleanup,
 cold/warm repetitions and peak/retained memory. Retain all raw samples and
 negative controls. Explain the discrepancy or obtain an explicit cost tradeoff
-decision before claiming the gate passed. #49 remains dependent on #26; neither
-CI nor opt-in reuse evidence resolves the ordinary-entry concern.
+decision before proposing a new candidate. The dependent #49 candidate is also
+withdrawn; neither CI nor opt-in reuse evidence resolved the ordinary-entry concern.
 
 On 2026-10-01, the contributor reported that subsequent retesting with a
 collaborator found no performance anomaly and requested submission of the
@@ -48,7 +61,16 @@ intervals against 64, evaluated with W1 and L-infinity ground distance.
 Endpoints are f64 and multiplicity is retained. This is a before/after and
 allocation-intervention experiment, not a cross-library speed ranking.
 
-## Reproduce
+## Reproduce the archived snapshot
+
+The preparation worker and controller are no longer shipped by this branch.
+Use a separate checkout of the immutable implementation snapshot above before
+running the historical commands below. Its
+[controller](https://github.com/Aequiludium/cocycle-rs/blob/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c/tools/reproduce_distance_preparation.py)
+and
+[worker](https://github.com/Aequiludium/cocycle-rs/blob/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c/benches/distances/preparation.rs)
+retain their historical protocol; a new run must record fresh identities and
+must not overwrite the retained runs.
 
 Use Linux (including Ubuntu WSL), Git, Python 3.12 and Rust 1.91.0. No Python
 packages or external reference libraries are required for this experiment.
@@ -70,7 +92,7 @@ instrumentation. `--metric w2` provides a second metric control; `--size` change
 the 8:1 workload. Outputs must be fresh directories beneath ignored `target/`.
 
 For a build/protocol smoke check use `--samples 2 --iterations 3`; such runs do
-not support performance rankings. CI runs this smoke and uploads raw results,
+not support performance rankings. The archived CI ran this smoke and uploaded raw results,
 the fixture, identities and build logs for 14 days. A CI runner's timing is not
 substituted for local comparative measurements.
 
