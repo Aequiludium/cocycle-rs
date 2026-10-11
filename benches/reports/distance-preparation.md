@@ -8,16 +8,37 @@ This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle
 Implementation and replication discussion:
 [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
 The implementation removes the facade's intermediate finite/essential vectors
-and prepares algorithm-owned storage from logical diagram views. Fewer copies
-are not a performance guarantee. A fresh committed-harness comparison did not
-reproduce the earlier stable W1 regression or the earlier timing ordering of
-allocation interventions. It did reproduce differences in buffer relocation.
-No padding allocations or experimental selectors are added to the public crate.
+and prepares algorithm-owned storage from logical diagram views. **Merge
+admission remains on hold:** the independent `distance-merge-v1` study retained
+below and in the PR disagrees with the preparation reproducer on N512 W1.
+Fewer copies, correctness checks and submission authorization do not establish
+the #14 no-significant-regression gate. No padding allocations or experimental
+selectors are added to the public crate.
+
+| Retained protocol | Exact measured identity and repeated N512 W1 candidate/baseline ratios |
+| --- | --- |
+| `distance-merge-v1` | Harness `bc231af92111534a482afa535bbfe053331bab99`; baseline `7dc517d2cc8127c972ad0bee0fd2c681126c4815`, #26 `26866ac9223a7bd5cc7c35286e1090dc5759e509`: K1 1.077/1.153, K8 1.161/1.153, K64 1.147/1.140 |
+| Preparation reproducer | The same review investigation reports 14 fresh processes and 100 calls, ratios 0.987/0.981; its worker and boundaries differ from `distance-merge-v1`. This is retained contradictory evidence, not current-head admission. |
+
+The merge study includes shared finite f64 fixtures, all three metrics,
+N32/N512, K1/K8/K64, two repeats, 12 serial fresh processes per cell, three
+discarded scalar warmups and balanced backend positions on CPU 0. Host load and
+frequency are uncontrolled. All numerical outputs agree. These identities and
+ratios are historical measurements; this report update reruns neither protocol
+and does not assign their results to the current PR head or current main.
+
+Before adoption, replay both worker shapes against the same full baseline/head,
+fixture and build identities; distinguish complete calls, preparation/cleanup,
+cold/warm repetitions and peak/retained memory. Retain all raw samples and
+negative controls. Explain the discrepancy or obtain an explicit cost tradeoff
+decision before claiming the gate passed. #49 remains dependent on #26; neither
+CI nor opt-in reuse evidence resolves the ordinary-entry concern.
 
 On 2026-10-01, the contributor reported that subsequent retesting with a
 collaborator found no performance anomaly and requested submission of the
 existing implementation through PR 26. This collaborator-reported outcome
-resolves the submission hold; it is not a new measurement by this harness.
+resolved the submission hold at that date; it does not resolve the current merge
+performance hold and is not a new measurement by this harness.
 No additional timing values or environment metadata were supplied for that
 retest. The historical measurements below remain unchanged, and no universal
 speedup or allocator/cache mechanism is claimed.
