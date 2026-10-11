@@ -238,3 +238,26 @@ fn descriptors_distinguish_gaps_from_computed_empty_dimensions() -> cocycle::Res
     }
     Ok(())
 }
+
+#[test]
+fn cutoff_birth_preserves_multiplicity_without_inventing_finite_lifetimes() -> cocycle::Result<()> {
+    let diagram = PersistenceDiagram::new(
+        1,
+        Coverage::Through(1.0),
+        vec![interval(0, 1.0, IntervalEnd::RightCensored { through: 1.0 }); 2],
+    )?;
+    assert_eq!(betti_curve(&diagram, 0, &[0.0, 1.0])?, [0, 2]);
+    let summary = finite_lifetime_summary(&diagram, 0)?;
+    assert_eq!(summary.finite_count(), 0);
+    assert_eq!(summary.total_persistence(), 0.0);
+    assert_eq!(summary.max_persistence(), None);
+    assert_eq!(summary.entropy(), None);
+    assert_eq!(summary.excluded_censored_count(), 2);
+    assert_eq!(summary.excluded_essential_count(), 0);
+    assert_eq!(betti_curve(&diagram, 1, &[0.0, 1.0])?, [0, 0]);
+    assert!(matches!(
+        betti_curve(&diagram, 1, &[2.0]),
+        Err(Error::QueryOutsideCoverage { .. })
+    )); // Even computed-empty dimensions retain the source coverage.
+    Ok(())
+}

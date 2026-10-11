@@ -77,6 +77,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
 | [Data modeling](research/data-modeling.md) | Three first objects, stable borrowed reads, two-consumer entry and conditional Alpha/cubical/cellular expansion order |
 | [Result interpretation and comparison](research/result-contracts.md) | Four result families, consumer/conversion table, existing result migration, proposed spectral/projection reads and fixed-source discrepancies |
+| [Descriptor contracts and external handoff](research/analysis-learning.md) | Existing descriptor disposition, consumer regressions and future sample/basis/scale information |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
