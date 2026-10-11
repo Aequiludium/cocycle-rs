@@ -314,6 +314,30 @@ mod tests {
         );
     }
     #[test]
+    fn cache_vertex_limits_fall_back_before_preparation() {
+        for n in [
+            0,
+            1,
+            MIN_CACHE_VERTICES - 1,
+            MAX_CACHE_VERTICES,
+            MAX_CACHE_VERTICES + 1,
+        ] {
+            let graph = WeightedGraph::new(n, Vec::new()).unwrap();
+            let mut checkpoint = || panic!("ineligible graphs must not prepare a cache");
+            assert!(
+                BitsetFlag::new(&graph, 1., &mut checkpoint)
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                BitsetFlag::new_if_useful(&graph, 1., &mut checkpoint)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn adaptive_cache_avoids_easy_ranges_and_retains_costly_empty_scans() {
         for n in [64, 65, 129] {
             for pattern in 0..4 {

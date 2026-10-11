@@ -228,6 +228,33 @@ fn matrix_values(lower: &[f64], n: usize, layout: MatrixLayout) -> Vec<f64> {
 }
 
 #[test]
+fn direct_distance_indices_match_validated_layouts_at_vertex_boundaries() {
+    for n in [0_usize, 1, 2, 63, 64, 65, 127, 128, 129, 256] {
+        let lower: Vec<_> = (0..n * n.saturating_sub(1) / 2)
+            .map(|i| (i % 17) as f64 / 4.)
+            .collect();
+        for layout in [
+            MatrixLayout::LowerTriangle,
+            MatrixLayout::UpperTriangle,
+            MatrixLayout::Square,
+        ] {
+            let values = matrix_values(&lower, n, layout);
+            let input = DissimilarityMatrixView::new(&values, n, layout).unwrap();
+            let access =
+                OrderedCoboundaryAccess::new(input, 4., &mut WorkBudget::unlimited()).unwrap();
+            for b in 0..n {
+                for a in 0..b {
+                    let expected = lower[b * (b - 1) / 2 + a];
+                    assert_eq!(input.get(a, b), Some(expected));
+                    assert_eq!(access.distance(a, b), expected, "n={n} layout={layout:?}");
+                    assert_eq!(access.distance(b, a), expected, "n={n} layout={layout:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn ordered_cursors_and_lower_bound_seeks_match_independent_triangle_enumeration() {
     let extreme = [
         0.,
