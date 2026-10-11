@@ -35,6 +35,7 @@ src/
     metric.rs                    explicit metric policy and exhaustive triangle checks
     distance.rs                  checked scalar distance/cutoff operations
     euclidean.rs                 shared pair evaluation and dense conversion
+    hausdorff.rs                 direct finite point-set comparison and controls
   complex/
     filtered.rs                  public four-method FilteredComplex contract
     graph/
@@ -133,7 +134,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | Module | Responsibility | Dependencies within the crate |
 | --- | --- | --- |
 | `algebra` | Validated prime fields and private sparse arithmetic/reduction | Error utilities |
-| `geometry` | Input validation and distance access | Error utilities |
+| `geometry` | Input validation, distance access and direct Hausdorff comparison | Execution, error utilities |
 | `complex` | Checked graphs, simplicial incidence and filtered-cell contract | Geometry scalar validation, execution, error utilities |
 | `execution` | Immutable controls and private per-operation budget | Error utilities |
 | `filtration` | Construction, source context, coverage and private coface access | Geometry, complex, execution, error utilities |

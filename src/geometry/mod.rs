@@ -5,14 +5,18 @@
 //! explicit upper-triangle and full-square layouts. No view input is copied,
 //! deduplicated or modified. Finite coordinates and nonnegative dissimilarities
 //! do not, on their own, certify a metric.
+//! [`hausdorff_distance`] directly compares finite Euclidean point sets in a
+//! caller-established common coordinate system, without persistence.
 
 mod dissimilarity;
 mod euclidean;
+mod hausdorff;
 mod point_cloud;
 
 pub use dissimilarity::DissimilarityView;
 pub(crate) use dissimilarity::pair_count;
 pub(crate) use euclidean::{euclidean_distance, euclidean_distances, euclidean_distances_with};
+pub use hausdorff::{hausdorff_distance, hausdorff_distance_with};
 pub use point_cloud::PointCloudView;
 
 pub(crate) mod distance;

@@ -14,6 +14,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// batch. Counts depend on the selected algorithm and are not comparable across
 /// metrics or versions. These controls impose neither a memory quota nor a
 /// thread limit.
+/// Hausdorff distance charges a compatibility check and each compared coordinate
+/// across both directed scans, with one fresh budget per scalar call.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.

@@ -453,6 +453,121 @@ as reproduction limitations. Cocycle's corresponding full-endpoint behavior is
 covered by the Rust interface-guide doctests and existing distance tests; Persim's
 finite-point result above cannot replace that acceptance.
 
+## Direct point-set comparison and distance migration
+
+This 2026-10-11 increment completes the definition choice for [#81](https://github.com/Aequiludium/cocycle-rs/issues/81)
+and the existing-distance audit plus first non-diagram comparison for
+[#82](https://github.com/Aequiludium/cocycle-rs/issues/82). Implementation base is
+main `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. Earlier probes above retain
+their original versions and scope. Research completion, local verification,
+hosted CI, review, merge and release are separate states.
+
+### Sources, first purpose and choice
+
+The first purpose is to measure displacement or support sampling differences
+between finite point sets already expressed in a common survey coordinate frame.
+Reuse validated `PointCloudView`; the route does not use the pending #66 example,
+stage API, #73 spectral engine or PH. #61/#63/#65/#71 are closed at the live
+intake; the #71 report in PR #103 supplies migration decisions while remaining
+unmerged. No production spectral/operator capability is inferred from that report.
+
+Read SciPy `v1.14.1` [directed definition](https://github.com/scipy/scipy/blob/v1.14.1/scipy/spatial/distance.py#L299)
+and [Cython implementation](https://github.com/scipy/scipy/blob/v1.14.1/scipy/spatial/_hausdorff.pyx#L25),
+blobs `d57a0472953b4d91888bf0def7b6a3f007c4c3b7` and
+`01cfce9df3f3b8a6cc0c413fa2592cb87b8daca3`. The latter randomizes and copies
+rows, uses squared distances and early breaks, then takes one square root.
+Cocycle instead uses two plain borrowed scans and stable norms; no source code
+or claimed SciPy acceleration is incorporated. Extreme squared-norm cases are
+not a reliable SciPy oracle. Empty-input semantics are defined explicitly here.
+The earlier fixed Persim, TopoNetX and homology-operator readings above explain
+why a matching scalar, spectrum or feasible projector cannot inherit this contract.
+
+Three hand-derived one-dimensional cases compare support Hausdorff, empirical
+W1 with normalized equal point mass, and intrinsic pairwise-matrix difference:
+
+| Clouds A / B | Hausdorff | Empirical W1 | Intrinsic matrix comparison |
+| --- | --- | --- | --- |
+| `(0,2)` / `(0,1,2)` | 1: B's midpoint is one unit from A | 1/3: transport 1/6 mass in each half | Different sizes; requires an explicit alignment/definition |
+| `(0,2)` / `(3,5)` | 3 | 3 | Zero under the displayed ordered bijection; translation is invisible |
+| `(0,2)` / `(2,0,2)` | 0: identical supports | 1/3: duplicate mass changes the distribution | Different sizes; duplicate vertices change representation |
+
+**Continue:** Hausdorff, because it answers this common-frame support question
+and uses existing inputs with no alignment, probability or solver API. It is a
+metric on nonempty supports and only a pseudometric on records retaining duplicates.
+**Defer:** empirical transport until a use case supplies mass/normalization and
+ground cost; intrinsic geometry until a correspondence or an explicit
+Gromov-type definition and cost budget are chosen. **Defer:** spectrum comparison
+until #73 provides operator/eigenproblem/degree/Gram, units, selection and residuals;
+isospectral objects need not have identical topology or geometry. **Defer:**
+operator differences until aligned bases and Grams, and any F2 class comparison
+until #75 supplies a legal operator/query contract. Selected feasible class mass
+cannot be described as a shortest-class metric. No universal `Distance` trait
+or positive-semidefinite kernel claim is introduced.
+
+Prohibit or explicitly convert mismatched units, frames, dimensions and unknown
+coordinate conventions. Different datasets are allowed when coordinate conventions
+agree; labels preserve sample identity rather than certify equivalent sources.
+The scalar checks dimensions; the example additionally checks nonempty declarations
+and distinct sample labels. Equal declarations do not authenticate measurements.
+
+### Existing diagram-distance disposition and callers
+
+The #71 migration map calls for retaining the current mathematical owners. The
+following audit supplies #82-L's concrete no-move decisions. Paths are repository
+relative. The complete `src/diagram_distances/` tree, existing Euclidean kernel,
+diagram storage and the distance workers remain byte-identical to the base;
+shared execution receives documentation only. No proven dead private duplicate
+or misplaced new adapter requires extraction or compatibility forwarding.
+
+| Owner / symbols | Actual consumers and checks | Disposition and costs |
+| --- | --- | --- |
+| `src/diagram_distances/mod.rs`: bottleneck, W1-infinity, W2-Euclidean; raw, `_results`, `_with` | `tests/diagram_distances.rs`, `tests/execution.rs`, `examples/diagram_distances.rs`, contributor doctests | Retain public paths and definitions. `_results` borrows `AsRef<PersistenceData>`; it checks equal fields and declared edge-length scales, not physical units. Each scalar starts one budget. |
+| Same facade: `Kind`, `distance_with`, `distance_results_with`, `check_context`, `points`, `Points`, `distance` | All public terminals and standalone workers | Retain coverage/computed-degree checks, complete-only policy, finite/essential extraction, zero canonicalization and essential multiplicity. Per-call owned finite/essential vectors and sorting are real preparation costs; borrowing the result does not remove them. Unequal essential counts give infinity; numeric/resource errors give no scalar. |
+| `bottleneck.rs` and `bottleneck/{geometry,matching,flow,instrumentation,tests}.rs` | Facade and `benches/distances/cocycle.rs`; tiny matching oracle and controlled private tests | Retain candidate/search and geometric/capacity routes, scratch and scoped diagnostics. No workspace ownership or lifetime changes. |
+| `wasserstein.rs` and `wasserstein/{numeric,graph,dense,sparse,direct,instrumentation,tests}.rs` | Facade and instrumented distance worker; independent matching tests | Retain adaptive dispatch, checked scaling, graph/components, original-cost fallback and accumulation. Workspace remains local to the solve; no cache or allocation change. |
+| `src/diagram/{data,computation,persistence_diagram}.rs` | Result adapters, persistence consumers, tests and examples | Retain `AsRef` borrowing, `into_data`/`into_parts` moves and documented provenance loss. No new representation or result clone is inserted. #79-L owns any later result changes. |
+| `src/execution/mod.rs`, `src/error.rs`, `src/geometry/distance.rs` | Existing raw/contextual controlled operations and numerical kernels | Retain exact budget/error behavior and checked scalar helpers. Hausdorff uses the existing private budget independently; documentation states its own units. |
+| `benches/distances/cocycle.rs`, native references and `tools/compare_distances.py` | Public/instrumented outputs, standalone format checks and full supported comparison | Retain input protocol, compile-time instrumentation, input projection exclusions and solver calls. Topp/GUDHI evidence applies to diagrams, not to the new point-set formula. |
+
+Live PR #26 head `8dcc8d885d93c0133988a47865f0ea3aaba740b3` targets main;
+#49 head `c30ee1ad353c144dc9b415caeca3d7ffc9fd4b9f` targets #26's branch.
+Both remain open at intake. Preserve `main <- #26 <- #49`, their preparation
+ownership, review and cost gates. This increment does not copy logical preparation,
+`PreparedDiagram` or earlier experimental speed claims. Ordinary diagrams and
+the existing current-main solver remain the only diagram routes used here.
+
+For #87/#94's synchronous gate: public paths, stored diagram identities, endpoints,
+failure semantics, consumers and budgets have no implementation delta. The cost
+gate is an unchanged-source audit, not a benchmark or a no-regression theorem for
+future preparation changes. Hausdorff has a new O(n*m*d), O(1)-scratch contract;
+the example matrix uses `8*s*s` payload bytes plus Vec metadata, borrowed sample
+records and coordinates. A failed pair drops private partial storage. Its budget
+is fresh per scalar; no whole-matrix quota, parallelism, automatic cache or general
+batch API is claimed. Empty sample lists produce an empty matrix without pair calls.
+
+### Runnable acceptance and limits
+
+Run `cargo run --locked --example point_cloud_distances` for the two-object
+value 1 and labelled matrix `[[0,1,3],[1,0,3],[3,3,0]]` in metres. No PH is
+called. `cargo test --locked --test euclidean` covers hand cases, 225 nonempty
+subset pairs checked by independent integer squared-distance tables, dimensional
+rejection, empty/infinite results, signed zero, stable tiny/large norms, final
+overflow and irrelevant overflowing candidates. Private tests interrupt after
+actual work; retry starts fresh. `cargo test --locked --example point_cloud_distances`
+covers sample order, units/frame/ID/dimension rejection and late pair failure
+discarding the matrix. The mathematical contract is in
+[the specification](../reference/mathematics.md#20-euclidean-hausdorff-distance),
+and public ownership/error details are in `geometry` rustdoc.
+
+External acceptance uses independent GUDHI Euclidean edges and SciPy directed
+Hausdorff on ordinary finite cases, with exact hand/integer expectations taking
+priority. Numerical extremes and the specified empty extension are separate
+Rust tests. Existing diagram matching uses the full supported Topp/GUDHI protocol;
+these references do not implement the new Hausdorff API. Runtime versions and
+actual pass/fail results belong to the PR evidence, not the older probes above.
+No performance experiment, source authentication, alignment, weighted transport,
+spectral distance, minimum-class distance or learning kernel is delivered.
+
 [kernel]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/design/kernel.md
 [analysis]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/development/diagram-analysis.md
 [math]: https://github.com/Aequiludium/cocycle-rs/blob/9e6715f4c2e0118ab738486bd747ec3e361397de/docs/reference/mathematics.md

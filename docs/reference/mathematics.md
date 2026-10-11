@@ -807,3 +807,48 @@ has gradient 2(f-t). Chain rules, tie subgradients, face/coface closure and data
 updates are caller responsibilities; this heuristic is not a general descent
 or convergence theorem. Independent full inverses, pairing-only block swaps
 and hand-derived lower-star intervals test these discrete formulas.
+
+## 20. Euclidean Hausdorff distance
+
+For nonempty finite point sets A and B in the same Euclidean coordinate space,
+define h(A,B) = max over a in A of min over b in B of ||a-b||_2, and
+H(A,B) = max(h(A,B), h(B,A)). See the fixed [SciPy definition and implementation](https://github.com/scipy/scipy/blob/v1.14.1/scipy/spatial/distance.py#L299).
+This is a metric on finite nonempty supports, and a pseudometric on point clouds
+that distinguish order or duplicate multiplicity. Symmetry and the triangle
+inequality hold in real arithmetic; binary64 rounding is not an exact proof of
+those identities. Extend H(empty,empty) = 0 and H(empty,A) = infinity for
+nonempty A. Numerical overflow between nonempty inputs is an error, distinct
+from that mathematical infinity.
+
+Point counts may differ. Dimensions must agree even for empty inputs. Coordinates
+must use the same axes, origin, units and normalization, established by the caller;
+`PointCloudView` validates shape and finite numbers but stores no such metadata.
+Sample IDs distinguish records, rather than forcing pointwise correspondences.
+There is no rigid alignment, transport of mass, graph comparison, or inference of
+source equivalence. In particular a cloud and a translated copy can have a
+positive Hausdorff distance while their intrinsic pairwise metrics agree.
+
+`geometry::hausdorff_distance` uses two directed exhaustive scans with stable
+`hypot` norms, O(n*m*d) work and O(1) scratch, borrowing both clouds. Overflowing
+individual candidates participate as infinity in nearest-point selection; a
+finite result can therefore survive irrelevant distant candidates. If the final
+answer for two nonempty clouds is unrepresentable, it returns `NumericalFailure`.
+No algorithmic approximation, point reordering, deduplication, squared-unit result
+or tolerance-based identification is introduced. Very small representable norms
+are retained; floating-point subtraction and accumulation still round.
+
+The controlled call starts one fresh budget: one compatibility check plus one
+unit for each compared coordinate in both scans. Zero work rejects empty inputs;
+pre-set cancellation is checked first. No partial scalar is returned. The
+[sample matrix example](../../examples/point_cloud_distances.rs) validates every
+sample's ID, unit, frame and dimension before computing ordinary pairs. It retains
+the borrowed sample list alongside a row-major owned matrix, in the original order,
+and mirrors symmetric entries. Each pair, including each diagonal, has a fresh
+scalar budget; there is no aggregate matrix quota. Any pair error discards the
+private partial buffer. The matrix costs O(s^2) f64 storage in addition to the
+borrowed coordinates. Declarations are checked for equality, not authenticated;
+unknown units/frames and duplicate sample IDs are rejected in this example.
+This distance matrix has no promised positive-semidefinite kernel property.
+
+The [comparison study](../research/result-contracts.md#direct-point-set-comparison-and-distance-migration)
+records candidate choices and the unchanged diagram-distance consumers.

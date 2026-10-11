@@ -34,6 +34,10 @@ proposed APIs and remaining acceptance gates.
   diagrams with bottleneck, W1 or W2; run `cargo run --locked --example diagram_distances`.
   The [matching specification](reference/mathematics.md#16-diagram-matching-distances)
   defines the metrics, supported endpoints and context requirements.
+- [Direct point-set comparison](../examples/point_cloud_distances.rs): run
+  `cargo run --locked --example point_cloud_distances` for Hausdorff comparison
+  and a matrix retaining sample order, declared units and coordinate frames.
+  See the [definition](reference/mathematics.md#20-euclidean-hausdorff-distance).
 - [Runnable square example](../examples/square.rs): run
   `cargo run --locked --example square` from the repository root.
 - [Published API reference](https://docs.rs/cocycle): browse rustdoc for signatures
