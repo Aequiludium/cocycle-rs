@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-- Add direct Euclidean Hausdorff comparison of borrowed point clouds, including
-  cooperative execution controls and a sample-identified matrix example.
-  Comparisons require caller-established common axes and units, ignore duplicate
-  multiplicity, and do not align shapes or compute persistence.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

@@ -94,9 +94,6 @@ cargo run --locked --example complex_construction
 cargo test --locked --example complex_construction
 cargo test --locked --release --example complex_construction
 cargo run --locked --example diagram_distances
-cargo run --locked --example point_cloud_distances
-cargo test --locked --example point_cloud_distances
-cargo test --locked --release --example point_cloud_distances
 cargo run --locked --example critical_sets
 cargo test --locked --example critical_sets
 cargo test --locked --release --example critical_sets
@@ -104,7 +101,6 @@ RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
 cargo +1.91.0 test --locked --all-features
 cargo +1.91.0 check --locked --all-targets --all-features
 cargo +1.91.0 test --locked --example complex_construction
-cargo +1.91.0 test --locked --example point_cloud_distances
 cargo +1.91.0 test --locked --example critical_sets
 python3 tools/check_source.py
 python3 tools/check_artifacts.py

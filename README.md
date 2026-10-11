@@ -27,8 +27,6 @@ dependencies and no unsafe code.
   curves, computed directly from a diagram.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
-- **Direct point-set comparison** — Euclidean Hausdorff distance in a common
-  coordinate system, without computing persistence; duplicate counts are ignored.
 
 ![A square's Rips filtration: points, a loop at edge length 1, and filled triangles at sqrt(2).](assets/filtration.svg)
 
@@ -95,12 +93,6 @@ To compare two complete diagrams, run
 `cargo run --locked --example diagram_distances`. The [distance example](examples/diagram_distances.rs)
 demonstrates all three metrics; see the [matching contract](docs/reference/mathematics.md#16-diagram-matching-distances)
 for ground costs, essential intervals and error semantics.
-
-To compare point sets directly, run `cargo run --locked --example point_cloud_distances`.
-The [point-cloud example](examples/point_cloud_distances.rs) checks declared sample
-units, coordinate frames and dimensions, then prints a labelled distance matrix.
-See the [Hausdorff contract](docs/reference/mathematics.md#20-euclidean-hausdorff-distance)
-for empty inputs, multiplicity and numerical limits.
 
 Work and memory depend on the input and reduction fill-in. Rips comparisons
 use native GUDHI and upstream Ripser C++; see the maintained
