@@ -176,3 +176,94 @@ representation, independently check eigenpairs/nullity/Dirac grading, and record
 extraction versus solving costs. Current doctests and integer checks establish
 only the source/interface contract. The existing implicit PH fast path and its
 performance gates are untouched.
+
+## Persistent spectral handoff: #89
+
+Use #69's existing finite same-owner stages and identity inclusions as the
+available input, together with #73's spectral conventions. A list of ordinary
+stage spectra does not implement the pair's persistent spectrum. #109's future
+reader needs both stage identities and the actual persistent operator definition.
+
+The selected first mathematical contract is the real, ordinary nonaugmented
+persistent Laplacian for a weighted simplicial inclusion, following Mémoli,
+Wan and Wang, [arXiv:2012.02808v3](https://arxiv.org/html/2012.02808v3),
+section 2.2 equation (4), section 2.3 Theorem 2.7 and section 5.1. We read these
+definitions, including the requirement that source weights restrict from the
+target; this is theoretical reading, not execution of their algorithms.
+For K contained in L, use the subspace of target (q+1)-chains whose boundaries
+land in Cq(K), with the induced target inner product. If E is the restricted
+boundary and A is K's degree-q boundary, the operator on Cq(K) is
+`E E_adjoint + A_adjoint A`. Its nullity is the real persistent Betti number.
+The same-stage case reduces to ordinary Hodge. Independent stage nullities,
+row-deleting a target boundary, and F2 Betti numbers do not replace this contract.
+
+| Handoff | Requirement and current boundary |
+| --- | --- |
+| Pair identity | One owner/snapshot, inclusive scales s<=t, source coverage/skeleton and retained stage-to-owner keys; `inclusion_into` rejects different owners, including equal clones. |
+| Degree bases/maps | Ordered source/target bases and signed inclusion in every required adjacent degree; verify both chain-map squares. An ordinary barcode does not supply these maps. |
+| Domain/inner product | Explicit real coefficients; positive target degree inner products restrict to source. The restricted upper-domain basis needs its induced Gram, even when original simplex Grams are identity. Arbitrary incompatible Grams are outside the first contract. |
+| Operator/result | Degree q, pair (s,t), source basis, restricted domain and adjoints, normalization, arithmetic, requested eigenpairs/vectors and numerical evidence; no single-stage identity substituted. |
+| Ownership/cost | Stage/inclusion reads borrow the owner without allocation; finding the restricted subspace and its basis/Gram is new producer work. Its cost is distinct from eigen-solving or copying requested output. |
+
+This executable source check uses only the existing stage API. K has two
+vertices; L connects them by a new middle vertex and two edges. No PH or spectral
+terminal is called:
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![2], 0.)?,
+    Simplex::new(vec![1], 1.)?, Simplex::new(vec![0, 1], 1.)?,
+    Simplex::new(vec![1, 2], 1.)?,
+])?;
+let early = source.stage(0.)?;
+let later = source.stage(1.)?;
+assert_eq!((early.len(), later.len()), (2, 5));
+assert_eq!(early.simplices().iter().map(|s| s.vertices()).collect::<Vec<_>>(),
+           [vec![2], vec![0]]); // The source's tie order is retained, not resorted.
+assert_eq!(early.inclusion_into(&later)?.len(), 2);
+assert!(early.inclusion_into(&later)?.all(|(a, b)| a == b));
+# Ok::<(), cocycle::Error>(())
+```
+
+For the hand calculation, explicitly reorder target vertices as (0,1,2) and
+edges as (01,12), with standard Grams. The middle boundary row forces c01=c12.
+The upper-domain basis (1,1) has Gram 2, restricted boundary (-1,1), and
+persistent L0 is one half of [[1,-1],[-1,1]], with eigenvalues (0,1), nullity 1.
+Ordinary K has a zero 2-by-2 Laplacian and nullity 2; ordinary L has spectrum
+(0,1,3) on three vertices. Deleting the middle row gives I2, wrongly nullity 0.
+The following rational checks verify this example, including its induced Gram;
+they do not construct a production persistent Laplacian:
+
+```python
+# Hand contract #89; explicitly declared coordinate order and standard Grams.
+from fractions import Fraction as F
+b = [[-1, 0], [1, -1], [0, 1]]
+upper_basis = [1, 1]
+assert sum(x * y for x, y in zip(b[1], upper_basis)) == 0
+restricted = [sum(x * y for x, y in zip(b[r], upper_basis)) for r in (0, 2)]
+gram = sum(x * x for x in upper_basis)
+assert restricted == [-1, 1] and gram == 2
+persistent = [[F(x * y, gram) for y in restricted] for x in restricted]
+assert persistent == [[F(1, 2), F(-1, 2)], [F(-1, 2), F(1, 2)]]
+assert [sum(row) for row in persistent] == [0, 0]
+assert [row[0] - row[1] for row in persistent] == [1, -1]
+naive = [[sum(b[i][k] * b[j][k] for k in range(2)) for j in (0, 2)]
+         for i in (0, 2)]
+assert naive == [[1, 0], [0, 1]] and naive != persistent
+print("#89 restricted-domain Gram and persistent-nullity hand contract passed")
+```
+
+Empty source degree is a valid zero-size operator; absent required target degree
+is missing input unless the selected finite source explicitly has no such cells.
+Unknown coverage, changed weights, reverse scales, cross-owner IDs and incompatible
+maps must fail rather than silently compare equal shapes. The same-source
+integer inclusion can be reduced to F2, but a real spectral nullity concerns
+real homology; torsion may make a prime-field PH result different.
+
+Stage B remains unimplemented. Its future acceptance runs the restricted-domain
+construction on an actual producer, compares persistent zero multiplicity to an
+independent real boundary-rank/image calculation, checks the same-stage limit
+and eigenpair errors, and records source extraction/subspace/solver costs.
+The example above fixes a first nontrivial pair without reimplementing that
+producer or blocking the existing-code #94 exit.
