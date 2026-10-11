@@ -104,6 +104,23 @@ fn stages_borrow_closed_prefixes_with_original_ids_and_incidence() -> Result<()>
 }
 
 #[test]
+fn stage_trait_access_requires_a_cell_in_this_sublevel() {
+    let complex = alpha_triangle();
+    let stage = complex.stage(0.25).unwrap();
+    let triangle = complex.find(&[10, 30, 90]).unwrap();
+    assert!(!stage.cells().any(|id| id == triangle));
+    assert!(stage.simplex(triangle).is_none());
+    assert!(stage.boundary(triangle).is_none());
+    assert!(std::panic::catch_unwind(|| FilteredComplex::dimension(&stage, triangle)).is_err());
+    assert!(
+        std::panic::catch_unwind(|| FilteredComplex::filtration_value(&stage, triangle)).is_err()
+    );
+    assert!(
+        std::panic::catch_unwind(|| FilteredComplex::boundary(&stage, triangle).count()).is_err()
+    );
+}
+
+#[test]
 fn stage_inclusions_preserve_integer_boundaries_and_compose() -> Result<()> {
     let complex = alpha_triangle();
     let early = complex.stage(0.)?;
