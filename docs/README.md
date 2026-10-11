@@ -84,6 +84,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
+| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); algorithms remain future work |
 | [Performance reporting rules](../benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
 | [Changelog](../CHANGELOG.md) | Completed user-visible changes |
 
