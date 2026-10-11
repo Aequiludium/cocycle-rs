@@ -11,7 +11,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | Report | Scope |
 | --- | --- |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
-| [Adaptive F2 H1 kernels](f2-h1-adaptive.md) | Paired committed Rust baseline/candidate and native Ripser; complete repeated results, corrected evidence interpretation and merge limitations |
+| [Adaptive F2 H1 kernels](f2-h1-adaptive.md) | Historical matrix H1 gains and current graph/H2/H3 workflow no-go; complete source-bound repeats and retained regressions |
 | [Cocycle, dense reproduction and Oineus: critical-set comparison](critical-sets.md) | Complete U1/Q8/Q64 cold/warm costs, Partial/full U, repository paths, current-main rejected gates and selected integration |
 | [Exact F2 H2 foundation](h2-foundation.md) | Phase-3 baseline, counter schema and H1-to-H2 continuation evidence |
 | [H1-to-H2 lifetime and scratch evidence](h2-workspace.md) | M1 ownership contract, lifetime-only and same-type scratch ablations, retained regressions and experimental decision |
