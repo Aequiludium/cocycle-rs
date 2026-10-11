@@ -138,6 +138,23 @@ Do not equate a real Hodge Laplacian with F2 `I+P`, force Mayer
 as a persistent Laplacian. Those rejected shortcuts lack the required
 mathematical definitions and implemented consumers.
 
+## Computation-family interface supplement
+
+At main `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`, the 2026-10-11 current
+stage of #73–#76 is interface preparation and model investigation. The
+[input supplement](input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
+records exact source reading, retained owners, narrow proposed operations,
+coefficient/Gram/cost conditions and independent hand examples. The
+[output supplement](result-contracts.md#computation-family-outputs-and-resources)
+records ownership, selections, numeric evidence, feasibility/optimality,
+errors and resource scope. No production API/kernel or pending PR changes.
+
+Laplacian/Dirac/F2 algorithms remain unimplemented on that main. The generalized
+comparison selects a one-edge real sheaf as the next investigation and defers
+path, embedded hypergraph and Mayer implementations with model-specific reasons.
+The candidate choice completes a research decision, not a generalized engine.
+Stage-B source, independent checks, costs and running integration remain separate.
+
 ## Follow-up source and validation checklist
 
 | Task | Read before implementation | Establish / preserve |
