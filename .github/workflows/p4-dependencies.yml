@@ -1,0 +1,22 @@
+name: P4 dependency maintenance
+on:
+  push:
+    branches: [maintenance/p4-dependencies-20261011]
+    paths: [.github/workflows/p4-dependencies.yml]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: p4-dependency-maintenance-20261011
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    if: github.repository == 'Aequiludium/cocycle-rs' && github.ref == 'refs/heads/maintenance/p4-dependencies-20261011'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconcile guarded native dependencies and scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/p4_dependency_maintenance.py
