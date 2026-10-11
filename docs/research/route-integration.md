@@ -104,3 +104,75 @@ on the PR's exact head. The integration-specific command is
 Generated command logs remain under ignored `target/p4-c-spr/`; no raw artifacts
 enter the crate or PR. Later stack entries add only interface documentation and
 finite hand checks, with their own evidence and no algorithm acceptance claim.
+
+## Single-scale spectral and Dirac handoff: #88
+
+Stage A is an interface contract. The real Laplacian/Dirac producers remain
+#73/#74, and new result readers remain #109. No numerical solver, manufactured
+spectral result or mandatory persistence call is introduced here. Existing
+`SimplicialComplex`, `SimplicialStage`, signed incidence and `FilteredComplex`
+stay in their original owners. The runnable
+[stage extraction](../guides/interface-contracts.md#read-a-signed-stage-for-a-matrix-consumer)
+and construction example exercise the available source-to-basis part.
+
+| Handoff field | Existing read / caller declaration | Future validation and consumer |
+| --- | --- | --- |
+| Snapshot and selection | Borrow one owner; select all stored topology or an inclusive `stage(scale)`; retain source coverage/skeleton facts | Owned output retains source/selection descriptions; counts or equal `SimplexId` indices do not authenticate another owner. |
+| Ordered bases | Restrict source traversal by degree; keep position-to-original-cell keys | A columns and D rows use exactly the same current basis. Empty bases retain 0-by-n/n-by-0 shapes. |
+| Domain and incidence | Read integer boundary signs; explicitly choose real/complex coefficients | Check AD=0 in that domain. PH's F2 check does not certify a naive real lift. Complex adjoints conjugate. |
+| Inner products and weights | Explicit positive-definite degree Grams, including the choice G=I | Validate shape/finiteness/positivity, units and adjoints. Filtration values and F2 costs are different quantities. |
+| Operation and output | Degree, full/lower/upper Hodge choice; Dirac degree range/offsets; numeric policy and requested eigenpairs/vectors | Preserve operator/eigenproblem identity, multiplicity, value/vector pairing and actual residual/orthogonality evidence. Partial eigenpairs do not certify nullity. |
+| Costs and ownership | Borrow incidence/bases during extraction; materialize only a requested owned layout | Dense export costs mn+np entries, with independent shapes; sparse consumers can traverse incidence. No source clone, explicit Rips expansion or PH rerun is required by this contract. |
+
+The [family proposals](input-contracts.md#laplacian-input-and-operation-proposal)
+define `L=A_adjoint A + D D_adjoint`, weighted adjoints and descriptive calls;
+the [Dirac proposal](input-contracts.md#dirac-input-grading-and-truncation-proposal)
+defines the graded `K=d+d_adjoint`. Result readers use the
+[spectral contract](result-contracts.md#spectral-values-and-vectors), rather than
+importing a diagram or treating small residual as a complete eigensystem.
+
+For the guide's signed triangle, the unfilled edge window has
+A=[[1,1,0],[-1,0,1],[0,-1,-1]], D:3-by-0. Under standard real Grams its
+edge Hodge expectation has eigenvalues (0,3,3), with kernel (1,-1,1).
+Adding the face D=(1,-1,1)^T gives 3I and no H1 kernel. An ordinary edge Dirac,
+in basis (v0,v1,e01), squares to the ordinary H0/H1 blocks; restricting to C1
+instead gives zero Dirac, not the full L1=[2]. These are hand expectations.
+
+The following exact integer checks reproduce the chain/kernel and Dirac-square
+claims without constructing a spectral result or invoking an eigensolver:
+
+```python
+# Hand contract #88; standard real Grams, ordinary nonaugmented degrees.
+a = [[1, 1, 0], [-1, 0, 1], [0, -1, -1]]
+z = [1, -1, 1]
+lower = [[sum(row[i] * row[j] for row in a) for j in range(3)]
+         for i in range(3)]
+assert [sum(x * y for x, y in zip(row, z)) for row in a] == [0, 0, 0]
+assert [sum(x * y for x, y in zip(row, z)) for row in lower] == [0, 0, 0]
+assert [[lower[i][j] + z[i] * z[j] for j in range(3)] for i in range(3)] == [
+    [3, 0, 0], [0, 3, 0], [0, 0, 3]]
+assert sum(lower[i][i] for i in range(3)) == 6
+assert [[sum(lower[i][k] * lower[k][j] for k in range(3))
+         for j in range(3)] for i in range(3)] == [
+             [3 * x for x in row] for row in lower]
+k = [[0, 0, -1], [0, 0, 1], [-1, 1, 0]]
+assert [[sum(k[i][r] * k[r][j] for r in range(3)) for j in range(3)]
+        for i in range(3)] == [[1, -1, 0], [-1, 1, 0], [0, 0, 2]]
+assert k[2][2] == 0  # C1-only Dirac loses the adjacent-degree contribution.
+print("#88 signed chain/kernel and Dirac-square hand contracts passed")
+```
+
+A computed empty degree uses explicit zero shapes and a valid zero-size Gram;
+an omitted required degree is missing input. Nonfinite scales/coefficients,
+unidentified basis changes, singular/indefinite Grams and unsupported complex
+arithmetic must fail, not yield empty or zero spectra. Unknown source completion
+cannot be promoted by a matrix export. Weighted generalized and normalized
+operators retain their separate definitions; an ordinary Euclidean solver is
+not valid for an arbitrary G-self-adjoint coordinate matrix.
+
+Stage B stays open: after the actual #73/#74/#109 producers exist, run a small
+direct input-to-operator-to-reader workflow, compare action and requested
+representation, independently check eigenpairs/nullity/Dirac grading, and record
+extraction versus solving costs. Current doctests and integer checks establish
+only the source/interface contract. The existing implicit PH fast path and its
+performance gates are untouched.
