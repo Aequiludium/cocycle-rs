@@ -73,6 +73,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Rips implementation scope](design/rips-implementation.md) | Stage-specific new directories, source moves, code/tooling changes and review units |
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
 | [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
+| [Route integration](research/route-integration.md) | Same-version legacy acceptance and current handoffs versus future running goals for #86 |
 | [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
 | [Data modeling](research/data-modeling.md) | Three first objects, stable borrowed reads, two-consumer entry and conditional Alpha/cubical/cellular expansion order |
