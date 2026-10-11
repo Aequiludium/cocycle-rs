@@ -291,6 +291,165 @@ replayed; arbitrary custom query content without supported parameter binding is
 not thereby mathematically certified. Supported recovery is not proof that every
 external provenance claim or format is trustworthy.
 
+## Result readers and migration decision on main a7ee9e9
+
+This 2026-10-11 follow-up completes the result-representation research in
+[#78](https://github.com/Aequiludium/cocycle-rs/issues/78) and the existing-result
+review in [#79](https://github.com/Aequiludium/cocycle-rs/issues/79). Its fixed
+production base is `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`, after #59-#63.
+The current task covers existing code and future interface information.
+Laplacian/eigensolver and F2 projection implementations remain future work;
+the proposed reads below are not callable Rust APIs or computed spectral output.
+
+The source review uses this base's `diagram/`, PH assembly, contextual distance
+facades, descriptors, examples and standalone workers. It also rereads the pinned
+Persim bottleneck/Wasserstein and TopoNetX spectrum functions and the pinned
+homology-operator result/readout implementation identified above. The earlier
+112-condition probe remains historical; it is not rerun or relabeled here.
+
+### Four consumers and the information they require
+
+| Output / concrete consumer | Minimum read and display | Authority, precision and retained identity |
+| --- | --- | --- |
+| Barcode / `betti_curve`, lifetime summary and diagram matching | Declared dimension membership, logical interval multiset, endpoint kind/value and coverage; borrow `PersistenceData` when field/source checks are required | Diagram owns dimensions/coverage; context owns field, source and construction/analysis ranges. Scales are finite binary64; declared scale convention is not physical-unit authentication. Manual diagrams have no inferred producer context. |
+| Representative basis / cycle or cocycle inspector in `rips_representatives` | Request ordinal, interval ordinal, degree, field, query scale, kind and borrowed oriented simplex terms | Terms use increasing original vertex labels and exact prime-field residues. The query scale uses source units. Duplicate bars have separate local ordinals. Cycles/cocycles have different equations; neither is a shortest representative or a canonical vector across runs. |
+| Spectrum / future value-only spectral summary or harmonic-subspace consumer | Operator/eigenproblem, degree, ordered coordinate basis, coefficient arithmetic, Grams/adjoints, units, requested/returned selection and values; paired vectors only when needed | Preserve actual method, source snapshot, convergence, residual/tolerance and normalization evidence. Full/partial selection and numerical zero thresholds are explicit. A residual alone proves neither completeness nor orthogonality. No production spectrum exists at this base. |
+| Projection / future class-action and selected-mass consumer | Window/basis/field, selected P identity, source, coordinate costs/units, query availability/value and independently established feasibility/objective/certificate | F2 action is exact in its declared coordinates; floating costs can remain numerical. A valid zero action on a boundary is computed, not missing. Feasibility, current objective, global optimality and minimum-class mass are distinct. No production homology projector exists at this base. |
+
+Reading owns mathematical interpretation. Plotting chooses labels/axes and
+layout; feature extraction chooses a specified statistic and its domain. Neither
+responsibility requires exposing reducer arrays or rerunning PH. Computation
+may directly feed comparison or analysis without first exporting a display form.
+The two implemented result families here are diagrams and representatives;
+future spectrum/projection descriptions do not count as runnable consumers.
+
+### Selected conversions and their losses
+
+| Conversion / consumer | Semantics and cost | Lost information / decision |
+| --- | --- | --- |
+| `dimension(k)` and its iterator / one-degree reader | Borrow logical view; O(log(n+1)) lookup, O(k) traversal and O(1) auxiliary space; interval values are Copy | No full buffer copy. Retain the owning diagram/context for coverage/source. Selected degree alone does not describe the whole computed domain. Use existing API. |
+| `AsRef<PersistenceData>` / contextual comparison | Borrow already stored data, O(1); no clone, sorting or context reconstruction | Does not add provenance or certificates. Keep existing data/wrapper boundary. |
+| `into_parts()` / diagram plus witness consumer | Move existing data and optional witness vector; no clone or reordering | Keeps canonical interval ordinals. Borrow both moved outputs together when interpreting witnesses. Use existing API. |
+| `into_data()` / context-aware consumer without witnesses | Move data and drop representatives | Witnesses and their associations are intentionally discarded. Use existing explicit operation. |
+| `into_diagram()` / diagram-only statistic | Move diagram and drop context/witnesses | Field, source, approximation and request facts cannot be reconstructed from endpoints. Use only when those facts are not needed. |
+| Finite birth/death array / external plot or feature tool | Explicit selected-degree export, O(k) owned entries plus caller-retained ordinal map | Dropping essential/censored points changes the represented result. Preserve endpoint tags/coverage separately; never convert censoring into a death. Defer a general exporter until an actual external consumer needs it. |
+| Independent interval sorting / witness-aware external tool | An owned permutation/map costs O(k); sorting costs O(k log k) | Old interval ordinals require an explicit bijection. Deduplicating bars is not a bijection and loses witness identity. Do not add automatic reordering. |
+| Spectral value slice / future value-only consumer | Borrow stored values; requested optional vectors do not force a full eigenbasis | Discarding vectors loses coordinate/subspace information; a partial spectrum cannot establish full nullity or a gap. Keep selection and problem metadata. |
+| Eigenvectors to subspace projector / repeated-eigenvalue comparison | Explicit materialization in the aligned coordinate/Gram convention, generally quadratic output storage | Rotation/sign information is discarded deliberately; source basis and eigenspace selection remain necessary. Defer this helper until the concrete comparison is implemented. |
+| Projection action versus full P / future class query or external matrix consumer | Prefer a requested action; dense n-by-n export allocates O(n squared) entries. Actual action cost belongs to the adopted representation | A bare matrix loses basis, costs, query states and certificate binding. Do not impose dense export, the Python snapshot schema or serialization on every Rust result. |
+
+For example, two copies of H1 `[-2,0)` are two intervals, with independently
+addressable witnesses. A set of pairs loses multiplicity. Encoding both
+`Finite(1)` and `RightCensored { through: 1 }` as `(-2,1)` loses the difference
+between death and last observation. Pinned Persim's removal of infinite deaths
+is explicitly a finite-point projection, not a complete result conversion.
+
+For the repeated eigenvalue of `3I`, two valid orthonormal bases may differ by
+any rotation. Raw column equality is not an appropriate comparison. A dictionary
+keyed only by eigenvalue can overwrite vectors, as in the pinned TopoNetX source.
+Use paired values/vectors and, when required, a coordinate-aligned subspace
+comparison. Ordinary `L v = lambda v` and generalized `L v = lambda G v` cannot
+share an unexplained value-only label. Basis changes must also transform the
+operator/Gram; coordinate-cost changes can change a projection objective even
+when F2 homology is unchanged.
+
+### Existing source disposition and caller coverage
+
+Paths below are relative to `src/` unless otherwise stated. Each row retains a
+single existing implementation; no new result container or compatibility copy
+is introduced. The migration map in
+[PR #103](https://github.com/Aequiludium/cocycle-rs/pull/103) permits a
+source-supported no-op for these result boundaries.
+
+| File / symbols | Actual producers and consumers / regression | Disposition and reason |
+| --- | --- | --- |
+| `diagram/mod.rs` exports and filtration compatibility reexports | All public callers and standalone workers | Retain paths. These are thin forwards, not duplicate ownership or an algorithm facade. |
+| `diagram/persistence_diagram.rs`: `PersistenceDiagram`, `DiagramDimension`; `dimensions.rs`: `ComputedDimensions`; `interval.rs`: `PersistenceInterval`, `IntervalEnd` | PH assembly; distances/descriptors; `tests/contracts.rs`, `tests/descriptors.rs` | Retain logical reads and validation. Gaps, computed-empty, multiset order and censored endpoints already have public contracts. No physical slice/row API is added. |
+| `diagram/data.rs`: `PersistenceData` | `PersistenceResult`, contextual distance adapters and compatible downstream wrappers; `tests/diagram_distances.rs` | Retain shared owned diagram/context and borrowed `AsRef`. One common implementation already exists. |
+| `diagram/computation.rs`: `ComputationContext`, `PersistenceResult`, borrow/move/drop methods | `persistence/{source,filtered}.rs`, flag and Rips producers; `tests/{rips_api,diagram_distances,prime_fields}.rs` | Retain interpreted output and private constructors. Source lifetime and optional-witness distinctions remain explicit. Construction facts stay out of algebra. |
+| `diagram/representative.rs`: `Representative`, `RepresentativeKind`, `RepresentativeTerm` | `persistence/simplicial/representatives/{basis,dual}.rs`; example and independent closure/duality tests in `tests/prime_fields.rs` | Retain result-local ordinals and owned oriented terms. Extend the existing duplicate-interval test to consume moved outputs after source release. |
+| `persistence/mod.rs`: `assemble_diagram`, `RawIntervals`; `boundary/mod.rs` and Rips/simplicial call sites | Pairing kernels, reference tests and witness assembly | Keep assembly with computations; it interprets unpaired deaths using established coverage. Source-adapter relocation and any later assembly extraction belong to #72, not a second implementation in #79. |
+| `diagram_distances/mod.rs`: raw/contextual facades and `points` | `tests/{diagram_distances,execution}.rs`, matching example and standalone distance worker | Retain current conversion and validation. `points` allocates matching buffers; only borrowing common data is allocation-free. Logical/prepared changes remain PR #26/#49. |
+| `descriptors/{betti_curve,lifetime_statistics}.rs` | `diagram_analysis`, guide doctests, `tests/descriptors.rs` | Retain diagram-only consumers; no producer calls. Descriptor output/work allocations retain their own existing costs. |
+| `examples/rips_representatives.rs`, representative guide | Public paths and owned-output consumer | Adapt the existing example to release source buffers, borrow data, move witnesses and call a consumer with only interpreted outputs. Preserve the original F3 square's hand-derived H1 `[1,2)`. |
+| `tools/{diagram_dump,benchmark_driver}.rs`, `tools/reference/{rips_cocycle,sparse_cocycle}.rs`, `benches/{native,pipeline,distances,optimization}/cocycle.rs` | Logical interval iteration, public result/context access and explicit output protocols | Retain worker imports and formats. No stale result caller or dead private duplicate was found. Native comparisons retain their existing supported-case limits. |
+
+Pending #104 at `e0e294a209d731db29589bfb61760c334568f021` moves source adapters;
+it does not change diagram/result access. This follow-up uses main directly and
+touches none of its production files. #100/#102 retain stage/modeling ownership.
+No prepared-distance or adaptive-kernel candidate is adopted. Reverting this
+follow-up restores only an example, test and documentation; no data migration
+is required.
+
+### Future reading signatures and explicit unavailable states
+
+These are **interface sketches only**, to refine with #73/#75 before adopting
+concrete names, storage or numeric algorithms. They add no trait, placeholder
+method or universal status enum to the crate. A successful producer returns
+owned interpreted output or a diagnostic error; it cannot return an empty
+success to hide invalid input, unsupported requests or failed convergence.
+
+```text
+// Proposed spectrum reads, not existing cocycle symbols:
+values(&self) -> &[f64]
+vectors(&self) -> Option<borrowed paired vectors in the recorded ordered basis>
+// Read degree, field, basis/Gram, problem, source, units, requested/returned
+// selection and convergence/residual evidence from the same result.
+
+// Proposed projection reads/actions, not existing cocycle symbols:
+apply(&self, coordinates: &[u8]) -> Result<owned F2 coordinates>
+selected_mass(&self, cycle: &[u8]) -> Result<value in recorded cost arithmetic>
+// Bind action/readout to the same validated window, basis, P and costs.
+// Read actual feasibility and objective/certificate evidence separately.
+```
+
+For a computed zero-dimensional operator, the spectral domain has size zero
+and a complete spectrum can be empty. A requested empty partial selection still
+records its selection; omitted vectors mean not requested, not a zero-rank
+eigenspace. Missing residual estimates remain missing. A numerical eigenvalue
+threshold does not certify exact homology. The solver determines supported
+coefficient/eigenproblem cases and reports unsupported ones explicitly.
+
+For F2 projection, empty previous/next bases retain the A/D shapes. A boundary
+can have computed zero action and zero selected mass. Unread objectives,
+unavailable minimum-class-mass queries and failed construction retain different
+states in the concrete adopted interface. No class query accepts a noncycle.
+`P squared=P`, `AP=0`, `PD=0` and homology preservation need independent evidence;
+a feasible projection is not automatically optimal. Budget/cancellation errors
+carry no result unless a future solver explicitly defines a separately validated
+retained candidate. The actual producer owns that policy and its cost bounds.
+
+### Migration acceptance and limits
+
+[#87](https://github.com/Aequiludium/cocycle-rs/issues/87) G0/G1 and
+[#94](https://github.com/Aequiludium/cocycle-rs/issues/94) A/B apply to the output,
+ownership and downstream-consumption rows here. The fixed base's full debug
+suite passed 216 tests/doctests with four ignored diagnostics before editing.
+The follow-up changes no production source, public signature, runtime dependency,
+dispatch, sorting, allocation site or reducer lifetime. The read and move bodies
+are retained; the example performs one PH computation and uses the existing
+borrowed/moved payload. This is a source-level cost audit, not a timing/RSS
+measurement or a whole-pipeline zero-allocation claim.
+
+Regression scope includes interval multiplicity, gaps/computed-empty,
+finite/essential/censored coverage, fields/source context, independent cycle
+closure/duality and moved witness ordinals. The runnable representative example
+checks H1 Betti `[1,0]` at scales `[1,2]`, finite lifetime 1 and contextual
+self-distance 0 after releasing the source. Relevant descriptor/distance tests
+keep their own error and control semantics. New spectral/projection algorithms,
+plotters, serialization and bindings remain unimplemented future work. Local
+checks, hosted CI, merge and release remain separate evidence.
+
+Pre-submission Windows validation passed the full debug/release and Rust 1.91
+tests/checks (216 tests/doctests, four ignored diagnostics), Clippy, formatting,
+strict rustdoc, ten examples, construction/critical-set example tests, eleven
+Markdown doctest pages, source/docs/local-collaboration checks and the 183-file
+package build. Pinned source hash/archive checks passed. The unchanged Python
+tools ran 98 tests with two Windows platform failures (missing `resource` and
+slash/backslash diagnostics) and five skips; Linux hosted tool/reference checks
+remain separate. No new local native oracle or performance run is claimed for
+this example/test/documentation change.
+
 ## Finite validation and acceptance
 
 The standalone Rust probe was compiled against the fixed inventory-baseline library.
