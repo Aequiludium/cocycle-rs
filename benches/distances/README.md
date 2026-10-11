@@ -5,6 +5,10 @@
 The separate [preparation investigation](../reports/distance-preparation.md)
 provides a deterministic public-API counterexample and runtime allocation
 controls. Its warmed-call protocol differs from this suite; do not pool samples.
+The preparation worker rejects incomplete headers, count/length overflow,
+truncated or trailing payloads and invalid finite intervals with errors before
+timing begins. Its colocated parser tests run in the preparation CI smoke job;
+parsing and typed input construction remain outside the measured calls.
 
 Use this suite to check bottleneck, W1 and W2 against independent references,
 then compare memory and search choices within Rust and C++. Protocol
