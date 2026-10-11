@@ -2,17 +2,6 @@
 
 ## Unreleased
 
-- Prepare diagram distances directly from borrowed logical dimension views.
-  Remove the facade's finite/essential point arrays; Wasserstein builds its
-  scaled points directly and Bottleneck owns its coordinate preparation.
-  Essential matching streams in birth order. Public signatures, numeric rules
-  and context checks are unchanged; repeated scans count toward execution work.
-- Add opt-in `diagram_distances::PreparedDiagram` for scoped reuse of immutable
-  operand preparation in repeated bottleneck, W1 and W2 comparisons. Each value
-  binds a source, dimension, metric and optional result context, with fresh
-  execution controls per construction/query. Matching scratch and Wasserstein
-  pair normalization remain local to each query. Ordinary scalar APIs are
-  unchanged and remain the default for single or low-reuse comparisons.
 - Add the opt-in F2 `optimization::CriticalSetWorkspace` for Big Steps on
   frozen simplicial complexes: sparse primal R/V, lazy dual reduction,
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals

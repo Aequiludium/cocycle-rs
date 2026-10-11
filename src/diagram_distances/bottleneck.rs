@@ -1,8 +1,8 @@
 //! Native exact bottleneck kernel, adapted from Topp 1.0.1 (MIT).
 //!
 //! The adaptive gates match Topp commit ffa1da051ca7ac5e313c74cc9fb92a2bcb20c234.
-//! The kernel materializes its own finite coordinates from a logical dimension
-//! view. The facade validates coverage/context and streams essential matching.
+//! Inputs here contain validated finite, strictly off-diagonal points only.
+//! The facade owns essential points and input/provenance validation.
 //!
 //! Copyright (c) 2026 Topp contributors
 //!
@@ -31,7 +31,6 @@ mod geometry;
 #[path = "bottleneck/matching.rs"]
 mod matching;
 
-use crate::diagram::{DiagramDimension, IntervalEnd};
 use crate::execution::WorkBudget;
 use crate::{Error, Result};
 
@@ -45,7 +44,7 @@ pub(crate) use instrumentation::{Diagnostics, Options, Search};
 struct Options {}
 #[cfg(not(any(test, cocycle_distance_bench)))]
 #[derive(Default)]
-pub(crate) struct Diagnostics {}
+struct Diagnostics {}
 
 const NONE: usize = usize::MAX;
 
@@ -121,8 +120,8 @@ fn diagonal(point: [f64; 2]) -> Result<f64> {
     Ok(result)
 }
 
-pub(super) struct Prepared<'a> {
-    points: std::borrow::Cow<'a, [[f64; 2]]>,
+struct Prepared<'a> {
+    points: &'a [[f64; 2]],
     diagonals: Vec<f64>,
     order: Vec<usize>,
     representatives: Vec<usize>,
@@ -179,7 +178,7 @@ impl<'a> Prepared<'a> {
             }
         }
         Ok(Self {
-            points: std::borrow::Cow::Borrowed(points),
+            points,
             diagonals,
             order,
             representatives,
@@ -208,42 +207,6 @@ impl<'a> Prepared<'a> {
             .saturating_add(bytes(&self.representatives))
             .saturating_add(bytes(&self.multiplicities))
     }
-}
-
-pub(super) fn prepare_owned<const CONTROLLED: bool>(
-    points: Vec<[f64; 2]>,
-    budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<Prepared<'static>> {
-    let Prepared {
-        points: _,
-        diagonals,
-        order,
-        representatives,
-        multiplicities,
-        max_diagonal,
-    } = Prepared::new(&points, budget)?;
-    Ok(Prepared {
-        points: std::borrow::Cow::Owned(points),
-        diagonals,
-        order,
-        representatives,
-        multiplicities,
-        max_diagonal,
-    })
-}
-
-pub(super) fn distance_prepared<const CONTROLLED: bool>(
-    first: &Prepared<'_>,
-    second: &Prepared<'_>,
-    budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<f64> {
-    solve_prepared(
-        first,
-        second,
-        Options::default(),
-        &mut Diagnostics::default(),
-        budget,
-    )
 }
 
 struct Pair<'a, 'p> {
@@ -281,9 +244,9 @@ impl<'a, 'p> Pair<'a, 'p> {
                 .checked_mul(second.points.len())
                 .ok_or_else(size_overflow)?;
             reserve(&mut result.dense, count)?;
-            for &a in first.points.iter() {
+            for &a in first.points {
                 budget.step_by(second.points.len())?;
-                for &b in second.points.iter() {
+                for &b in second.points {
                     result.dense.push(cross(a, b));
                 }
             }
@@ -387,42 +350,6 @@ fn prefer_mandatory(first: &Prepared<'_>, second: &Prepared<'_>, total: usize, u
     span > 0.0 && upper <= cutoff
 }
 
-pub(crate) fn from_dimensions<const CONTROLLED: bool>(
-    first: &DiagramDimension<'_>,
-    second: &DiagramDimension<'_>,
-    counts: (usize, usize),
-    stats: &mut Diagnostics,
-    budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<f64> {
-    // Coordinates and all indexes stay owned by this kernel. The borrowed
-    // Prepared state below never outlives these private coordinate buffers.
-    let first = coordinates(first, counts.0, budget)?;
-    let second = coordinates(second, counts.1, budget)?;
-    let value = solve(&first, &second, Options::default(), stats, budget)?;
-    record! {
-        stats.preparation_bytes += bytes(&first).saturating_add(bytes(&second));
-        stats.preparation_buffers += usize::from(!first.is_empty()) + usize::from(!second.is_empty());
-    }
-    Ok(value)
-}
-
-fn coordinates<const CONTROLLED: bool>(
-    view: &DiagramDimension<'_>,
-    count: usize,
-    budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<Vec<[f64; 2]>> {
-    let mut points = Vec::new();
-    points.try_reserve_exact(count).map_err(|_| allocation())?;
-    for interval in view.iter() {
-        budget.step()?;
-        if let IntervalEnd::Finite(death) = interval.end() {
-            points.push([interval.birth(), death]);
-        }
-    }
-    Ok(points)
-}
-
-#[cfg(test)]
 pub(crate) fn distance<const CONTROLLED: bool>(
     first: &[[f64; 2]],
     second: &[[f64; 2]],
@@ -463,39 +390,25 @@ fn solve<const CONTROLLED: bool>(
     record! { *_stats = Diagnostics::default(); }
     let first = Prepared::new(first, budget)?;
     let second = Prepared::new(second, budget)?;
-    solve_prepared(&first, &second, _options, _stats, budget)
-}
-
-fn solve_prepared<const CONTROLLED: bool>(
-    first: &Prepared<'_>,
-    second: &Prepared<'_>,
-    _options: Options,
-    _stats: &mut Diagnostics,
-    budget: &mut WorkBudget<'_, CONTROLLED>,
-) -> Result<f64> {
     let total = first
         .points
         .len()
         .checked_add(second.points.len())
         .ok_or_else(size_overflow)?;
     record! { _stats.workspace(first.bytes().saturating_add(second.bytes())); }
-    record! {
-        _stats.preparation_bytes = first.bytes().saturating_add(second.bytes());
-        _stats.preparation_buffers = 4 * (usize::from(!first.points.is_empty()) + usize::from(!second.points.is_empty()));
-    }
     if first.points.is_empty() || second.points.is_empty() {
         return Ok(first.max_diagonal.max(second.max_diagonal));
     }
     budget.step_by(total)?;
-    let duplicates = prefer_multiplicity(first, second, total);
-    if duplicates && identical(first, second) {
+    let duplicates = prefer_multiplicity(&first, &second, total);
+    if duplicates && identical(&first, &second) {
         record! { _stats.route = Route::Identity; }
         return Ok(0.0);
     }
     let (first, second) = if total >= 128 && first.points.len() > second.points.len() {
-        (second, first)
+        (&second, &first)
     } else {
-        (first, second)
+        (&first, &second)
     };
     let upper = first.max_diagonal.max(second.max_diagonal);
     let mut route = Route::Quickselect;

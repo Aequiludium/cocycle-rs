@@ -12,9 +12,6 @@ pub(crate) struct Options {
 
 #[derive(Debug, Default)]
 pub(crate) struct Stats {
-    /// Capacity of the two prepared Point vectors, excluding grouping and graphs.
-    pub(crate) preparation_bytes: usize,
-    pub(crate) preparation_buffers: usize,
     pub(crate) candidate_pairs: usize,
     pub(crate) positive_edges: usize,
     pub(crate) dense_solves: usize,

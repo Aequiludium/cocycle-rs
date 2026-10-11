@@ -1,15 +1,28 @@
-# Diagram-distance preparation and allocation effects
+# Archived diagram-distance preparation candidates
 
 [Benchmark reports](README.md) / [Distance protocol](../distances/README.md)
 
 ## Question and status
 
+**Archived: performance admission not passed; candidate code withdrawn on
+2026-10-11.** [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26)
+now retains this report and its index only. Its production sources, tests,
+examples, benchmark workers, controllers and CI are restored to main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. The logical-view preparation
+candidate is not adopted. Issue #14 is not completed by this archive.
+
+The last implementation snapshot is
+[`662ec16d0afc13a9f8b6009b32e6ce4f5f43027c`](https://github.com/Aequiludium/cocycle-rs/commit/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c).
+It remains in Git history for source inspection and isolated reproduction;
+raw measurements remain in their original local artifact directories. This
+withdrawal neither reruns nor relabels the historical measurements below.
+
 This investigation accompanies [Issue 14](https://github.com/Aequiludium/cocycle-rs/issues/14).
 Implementation and replication discussion:
 [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26).
-The implementation removes the facade's intermediate finite/essential vectors
-and prepares algorithm-owned storage from logical diagram views. **Merge
-admission remains on hold:** the independent `distance-merge-v1` study retained
+The withdrawn implementation removed the facade's intermediate finite/essential
+vectors and prepared algorithm-owned storage from logical diagram views.
+**Performance admission was not passed:** the independent `distance-merge-v1` study retained
 below and in the PR disagrees with the preparation reproducer on N512 W1.
 Fewer copies, correctness checks and submission authorization do not establish
 the #14 no-significant-regression gate. No padding allocations or experimental
@@ -31,8 +44,8 @@ Before adoption, replay both worker shapes against the same full baseline/head,
 fixture and build identities; distinguish complete calls, preparation/cleanup,
 cold/warm repetitions and peak/retained memory. Retain all raw samples and
 negative controls. Explain the discrepancy or obtain an explicit cost tradeoff
-decision before claiming the gate passed. #49 remains dependent on #26; neither
-CI nor opt-in reuse evidence resolves the ordinary-entry concern.
+decision before proposing a new candidate. The dependent #49 candidate is also
+withdrawn; neither CI nor opt-in reuse evidence resolved the ordinary-entry concern.
 
 On 2026-10-01, the contributor reported that subsequent retesting with a
 collaborator found no performance anomaly and requested submission of the
@@ -48,7 +61,68 @@ intervals against 64, evaluated with W1 and L-infinity ground distance.
 Endpoints are f64 and multiplicity is retained. This is a before/after and
 allocation-intervention experiment, not a cross-library speed ranking.
 
-## Reproduce
+## Scoped preparation: archived without adoption
+
+The dependent [PR 49](https://github.com/Aequiludium/cocycle-rs/pull/49)
+candidate for [Issue 31](https://github.com/Aequiludium/cocycle-rs/issues/31)
+is also withdrawn on 2026-10-11 because performance admission was not passed.
+Its final proposal retains documentation only; all production sources, tests,
+examples, tools and CI match main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. There is no public
+`PreparedDiagram` in the resulting crate. This archive does not complete
+Issue #31 or waive the prerequisite #14 gate.
+
+The last implementation snapshot is
+[`eb9496f16bc3e288cbae65b215c8ca89b5dc2217`](https://github.com/Aequiludium/cocycle-rs/commit/eb9496f16bc3e288cbae65b215c8ca89b5dc2217).
+Its
+[source contract](https://github.com/Aequiludium/cocycle-rs/blob/eb9496f16bc3e288cbae65b215c8ca89b5dc2217/src/diagram_distances/mod.rs)
+and
+[former usage example](https://github.com/Aequiludium/cocycle-rs/blob/eb9496f16bc3e288cbae65b215c8ca89b5dc2217/examples/diagram_distances.rs)
+are historical references, not APIs or examples available on this branch.
+The candidate borrowed an immutable source diagram while retaining owned
+metric-specific preparation, bound dimension/metric/optional result context,
+and applied fresh execution controls to each query. Matching, normalization,
+graphs and scratch remained pair-local. Those contracts and earlier correctness
+checks do not establish a performance benefit.
+
+The historical `distance-merge-v1` comparison used harness
+`bc231af92111534a482afa535bbfe053331bab99`, baseline
+`7dc517d2cc8127c972ad0bee0fd2c681126c4815`, prerequisite #26
+`26866ac9223a7bd5cc7c35286e1090dc5759e509` and #49
+`5bb77b4b624580fe3cede4c8d538d06518de1a5d`. All 1,728 outputs agreed.
+Across its two repeats, N32 single-use prepared/ordinary time ratios were
+**1.187 / 1.460 for W1** and **1.159 / 1.286 for W2**. N512 ordinary W1
+also inherited the prerequisite's contradictory timing evidence above.
+These adverse outcomes remain bound to those historical sources and boundaries;
+they are not measurements of the restored main implementation.
+
+Earlier gains on some reused operands do not clear the full adoption gate.
+The missing acceptance evidence includes matched final
+baseline/candidate/harness/build/fixture identities; Linux and Windows tuning
+plus holdout; at least 12 paired measured processes; at least 5% full-sequence
+savings and 10/12 wins; stable later reuse counts with joint K* <=64;
+build/residence/destruction and retained-capacity/RSS accounting; single-use
+and solve-heavy negative controls; and an independent repeat. The ordinary-entry
+contradiction in #26 also remained a prerequisite blocker. The disposition is
+**no adoption of this candidate**, not proof that every possible prepared
+representation is slower. Any future candidate requires a new performance
+decision on comparable evidence.
+
+The original implementation commits and local raw artifacts are retained.
+No new measurement was run for this withdrawal; the recent local all-PR
+regression screen does not replace these adoption gates.
+
+## Reproduce the archived snapshot
+
+The preparation worker and controller are no longer shipped by this branch.
+Use a separate checkout of #26 snapshot
+`662ec16d0afc13a9f8b6009b32e6ce4f5f43027c` before running the historical
+commands below. Its
+[controller](https://github.com/Aequiludium/cocycle-rs/blob/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c/tools/reproduce_distance_preparation.py)
+and
+[worker](https://github.com/Aequiludium/cocycle-rs/blob/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c/benches/distances/preparation.rs)
+retain their historical protocol; a new run must record fresh identities and
+must not overwrite the retained runs.
 
 Use Linux (including Ubuntu WSL), Git, Python 3.12 and Rust 1.91.0. No Python
 packages or external reference libraries are required for this experiment.
@@ -70,7 +144,7 @@ instrumentation. `--metric w2` provides a second metric control; `--size` change
 the 8:1 workload. Outputs must be fresh directories beneath ignored `target/`.
 
 For a build/protocol smoke check use `--samples 2 --iterations 3`; such runs do
-not support performance rankings. CI runs this smoke and uploads raw results,
+not support performance rankings. The archived CI ran this smoke and uploaded raw results,
 the fixture, identities and build logs for 14 days. A CI runner's timing is not
 substituted for local comparative measurements.
 

@@ -1,8 +1,7 @@
 //! Compare complete diagrams using three distinct matching metrics.
 use cocycle::diagram::{Coverage, IntervalEnd, PersistenceDiagram, PersistenceInterval};
 use cocycle::diagram_distances::{
-    PreparedDiagram, bottleneck_distance, bottleneck_distance_with, wasserstein_1_infinity,
-    wasserstein_2_euclidean,
+    bottleneck_distance, bottleneck_distance_with, wasserstein_1_infinity, wasserstein_2_euclidean,
 };
 use cocycle::execution::Execution;
 
@@ -25,14 +24,5 @@ fn main() -> cocycle::Result<()> {
         bottleneck_distance_with(&first, &second, 1, &execution)?,
         bottleneck
     );
-    // Explicit preparation is for a finite loop reusing the same operands.
-    // Tiny inputs like these illustrate the API, not a performance benefit.
-    {
-        let left = PreparedDiagram::bottleneck_with(&first, 1, &execution)?;
-        let right = PreparedDiagram::bottleneck_with(&second, 1, &execution)?;
-        for _ in 0..64 {
-            assert_eq!(left.distance_with(&right, &execution)?, bottleneck);
-        }
-    } // Preparation capacity is released; query scratch never survives a call.
     Ok(())
 }
