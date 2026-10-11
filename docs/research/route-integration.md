@@ -502,3 +502,119 @@ external call. Then both routes must actually execute, check complete input/outp
 key joins and failure propagation, record fixed tool/runtime/input identities,
 and distinguish export success from external execution and training quality.
 This local roundtrip is interface evidence, not either running route.
+
+## Optional feedback and invalidation decision: #93
+
+Current decision: defer automatic/differentiable learning feedback. Retain an
+application's explicit parameter-update-and-recompute route as the compatibility
+boundary. There is no selected external training/loss/derivative producer yet,
+and ties can change topology, pairing and result ordinals. This is a reasoned
+deferral of optional research, not deletion of its later scientific goal or a
+proof that all differentiable TDA is impossible. It does not block #94.
+
+| Update | Applicable invalidation and ownership |
+| --- | --- |
+| Coordinates, topology or sampling/model choice | New source snapshot/owner; rebuild affected construction, stage maps, bases and all downstream results. Old borrowed IDs cannot identify the new owner even if numeric indices coincide. |
+| Filtration values/cutoff | Revalidate face monotonicity and source coverage; stages, ordering, pairings and witness ordinals can change. Discard cache entries depending on those selections. Do not silently reinterpret old owned results. |
+| Field, degree range or representative request | New mathematical request/result domain or witnesses; check actual context and availability. Reuse only proven compatible source preparation. |
+| Grams, projection costs or normalization | New operator/cost meaning and corresponding result/queries. Unchanged topology does not keep old spectral values, selected masses or certificates valid. |
+| Solver/numerical policy | New method/evidence identity; a changed tolerance is not a stronger theorem or optimality certificate. |
+| Execution/cancellation limits | Fresh terminal controls, not a mathematical update or cumulative counter. Retry may reproduce the same result but must report its actual success/failure. |
+| Labels, sample selection or loss | Application-owned experimental record and data partition; cached predictions/loss must join by the new declared sample/source keys. The Rust mathematical core does not own training state. |
+
+No global cache/identity service is required. The application owns any feedback
+loop and its dependency-aware invalidation. Frozen sources and owned results
+retain their prior meaning; a recomputation produces a new result. New values
+must not overwrite old experiment evidence. `CriticalSetWorkspace` remains an
+opt-in endpoint-proposal operation with its own source/algorithm assumptions,
+not a gradient runtime, learning controller or homology projection.
+
+A minimal actual PH fixture detects a nonsmooth point without a trainer. Take
+two vertices at 0 and one edge at `max(0,theta)`, over F2. Ordinary persistence
+has one essential H0 bar; for theta>0 it also has [0,theta), while at theta<=0
+the zero-lifetime pair is omitted. Total finite persistence is max(0,theta).
+This example computes existing PH and its existing descriptor, not gradients:
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::descriptors::finite_lifetime_summary;
+use cocycle::persistence::PersistenceExt;
+for (theta, expected_mass, expected_finite) in [(-1., 0., 0), (0., 0., 0), (1., 1., 1)] {
+    let edge_birth = f64::max(0., theta);
+    let source = SimplicialComplex::new(vec![
+        Simplex::new(vec![0], 0.)?, Simplex::new(vec![1], 0.)?,
+        Simplex::new(vec![0, 1], edge_birth)?,
+    ])?;
+    let result = source.persistence().max_homology_dimension(0).compute()?;
+    let summary = finite_lifetime_summary(result.diagram(), 0)?;
+    assert_eq!(summary.total_persistence(), expected_mass);
+    assert_eq!(summary.finite_count(), expected_finite);
+}
+# Ok::<(), cocycle::Error>(())
+```
+
+The exact one-sided slopes at theta=0 differ. At theta=1 the same toy loss has
+slope 1 from either side for perturbations staying positive:
+
+```python
+# Hand contract #93; scalar loss from the declared two-vertex fixture only.
+from fractions import Fraction as F
+def loss(theta):
+    return max(F(0), theta)
+for h in (F(1, 2), F(1, 4), F(1, 8)):
+    assert (loss(h) - loss(0)) / h == 1
+    assert (loss(0) - loss(-h)) / h == 0
+    assert (loss(1 + h) - loss(1)) / h == 1
+    assert (loss(1) - loss(1 - h)) / h == 1
+print("#93 tie nondifferentiability and fixed-region slope contract passed")
+```
+
+This bounded counterexample rules out an unconditional smooth-gradient promise
+for the chosen loss at the tie. It does not establish derivatives of arbitrary
+filtrations, diagrams, spectral degeneracies, matching optima or F2 projections.
+Cache invalidation cannot be replaced by a finite-difference number. Persist
+selected parameters/source IDs and the actual mathematical question with each
+run; errors or missing outputs must not feed a fabricated loss.
+
+Stage A is complete with this invalidation contract and deferral decision.
+If optional stage B is selected later, first choose the actual model/parameter
+map and loss, justify differentiability on its stated domain or an explicit
+nonsmooth method, and check gradients against independent finite differences
+away from ties and dedicated degeneracy cases. Run one fixed input through the
+actual update/export/compute loop with old/new identities and cost boundaries.
+The current fixture is existing PH plus a hand slope check, not an implemented
+learning feedback loop or production gradient API.
+
+## Current route coverage and later running goals
+
+| Issue | Current delivered evidence in this stack | Later running gate |
+| --- | --- | --- |
+| #87 | Closed fixed-main baseline, reused inputs/expectations and consumer/cost boundaries | Each migration's own review; not a future algorithm prerequisite. |
+| #88 | Signed source/basis/Gram/Dirac contract; exact triangle/edge expectations | Real #73/#74 producers and #109 reader; action/result/error/cost checks. |
+| #89 | Existing stage/inclusion doctest; persistent-pair definition and exact induced-Gram counterexample | Actual restricted-domain persistent spectrum; independent real persistent rank/nullity. |
+| #90 | Three-degree F2/maps/cost/query contract; exhaustive declared-matrix legality and fill witness | Actual #75 class/query and transport workflows; legal versus optimal evidence. |
+| #91 | Existing diagram comparison/scalar-consumer doctest and direct-object comparability table | #110's selected non-diagram data/result comparison and relevant analysis. |
+| #92 | Ordered topology/stage/feature exchange contract and local JSON roundtrip | #111 real export plus external call on both routes, with complete key joins. |
+| #93 | Invalidation/ownership contract; actual PH tie fixture and exact slope counterexample; defer automatic feedback | Optional justified model/loss and real experiment, or separately reviewed deferral. |
+| #94 | Fixed combined source disposition/cost audit; owned-stage/F3/witness/consumer regression and full local checks | Approved main integration and exact-head hosted/native acceptance; no release claim. |
+
+The table covers the planned direct edges: topology-to-single-scale computation,
+stage-pair-to-persistent computation, class-to-transport, data/result-to-comparison,
+comparison-to-analysis, topology/stage-to-external learning and optional feedback
+to model/filtration/compute parameters. Existing PH-to-diagram-to-comparison or
+analysis is independently runnable. No route is forced through PH or distance.
+Unknown/new algorithms remain explicitly unimplemented; interface completion
+does not mark their long-term issues closed or revive the retired #95-#97 tasks.
+
+Reproduce this report's three Rust blocks with:
+
+```sh
+cargo build --locked
+rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+```
+
+Each Python block is standalone and uses only the standard library; save a block
+under a fresh ignored `target/` path and run it with Python 3.10+. All five exact
+hand blocks and all three existing-API Rust blocks pass on the final stack tree.
+These route checks add interface evidence to the root's full runtime validation;
+they do not run any future producer, external trainer or performance benchmark.
