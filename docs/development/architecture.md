@@ -74,7 +74,8 @@ src/
       cliques.rs                 dense/sparse clique enumeration
       expansion.rs               shared explicit clique construction
   persistence/
-    mod.rs                       public exports and result normalization
+    mod.rs                       public exports and private computation wiring
+    assembly.rs                  shared raw intervals and endpoint normalization
     execution.rs                 compatibility control imports
     builder.rs                   borrowed analysis settings and validated execution
     source.rs                    sealed extension wiring to source-owned adapters

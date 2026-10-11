@@ -56,7 +56,7 @@ pub(super) fn compute(
                 .unwrap_or_else(|| source.max_filtration_value().unwrap_or(0.)),
         };
         (
-            super::assemble_diagram(
+            super::assembly::assemble_diagram(
                 options.max_homology_dimension(),
                 coverage,
                 cohomology::compute(
@@ -93,14 +93,14 @@ pub(super) fn finish_zero_born(
     requests: &[RepresentativeRequest],
     coverage: Coverage,
     budget: &mut WorkBudget<'_>,
-    implicit: impl FnOnce(&mut WorkBudget<'_>) -> Result<super::RawIntervals>,
+    implicit: impl FnOnce(&mut WorkBudget<'_>) -> Result<super::assembly::RawIntervals>,
 ) -> Result<(
     crate::diagram::PersistenceDiagram,
     Option<Vec<crate::diagram::Representative>>,
 )> {
     let result = if requests.is_empty() {
         (
-            super::assemble_diagram(
+            super::assembly::assemble_diagram(
                 options.max_homology_dimension(),
                 coverage,
                 implicit(budget)?,

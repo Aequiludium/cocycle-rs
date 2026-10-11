@@ -2,7 +2,7 @@ use super::*;
 use crate::diagram::{Coverage, IntervalEnd};
 use crate::persistence::reference::FilteredBoundary;
 use crate::persistence::rips::resolve_rips_range;
-use crate::persistence::{RipsOptions, assemble_diagram, reference};
+use crate::persistence::{RipsOptions, assembly::assemble_diagram, reference};
 
 // H2 expectations use explicit vertex subsets and a forward F2 boundary
 // matrix. No production clique visitor, tuple ordering or parity heap is used.

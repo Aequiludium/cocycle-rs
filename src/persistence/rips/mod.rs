@@ -4,7 +4,7 @@
 //! edge-length filtration and a closed cutoff. H1 uses implicit persistent
 //! cohomology; H0-only requests use an independent union-find path.
 
-use super::assemble_diagram;
+use super::assembly::assemble_diagram;
 use crate::diagram::{ComputationContext, Coverage, PersistenceDiagram, PersistenceResult};
 use crate::geometry::{DissimilarityView, PointCloudView, euclidean_distances};
 use crate::{Error, Result};

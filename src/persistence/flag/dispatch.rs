@@ -5,7 +5,7 @@ use crate::complex::WeightedGraph;
 use crate::execution::WorkBudget;
 use crate::filtration::flag::{CliqueAccess, DenseFlag, SparseFlag};
 use crate::geometry::DissimilarityMatrixView;
-use crate::persistence::{RawIntervals, simplicial};
+use crate::persistence::{assembly::RawIntervals, simplicial};
 use crate::{Error, Result};
 
 pub(in crate::persistence) fn compute_dense(
@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use crate::diagram::Coverage;
     use crate::geometry::DissimilarityView;
-    use crate::persistence::assemble_diagram;
+    use crate::persistence::assembly::assemble_diagram;
 
     #[test]
     fn sparse_continuation_and_odd_prime_fallback_keep_their_routes() {
