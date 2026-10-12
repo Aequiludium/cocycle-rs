@@ -14,6 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// batch. Counts depend on the selected algorithm and are not comparable across
 /// metrics or versions. These controls impose neither a memory quota nor a
 /// thread limit.
+/// F2 homology-operator construction, batch queries, transport and barcode
+/// `_with` operations charge coordinate and arithmetic visits across the whole
+/// operation. Exhaustive stretch charges each visited cycle. Their counts are
+/// also version-dependent and do not establish a memory quota or deadline.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.

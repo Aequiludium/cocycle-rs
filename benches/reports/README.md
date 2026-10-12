@@ -10,6 +10,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 
 | Report | Scope |
 | --- | --- |
+| [Cocycle and homology-operator: feasible F2 projections](homology-operators.md) | Exact reference agreement, scoped Rust before/after and cross-library measurements, finite barcode readout and retained limits |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
 | [Archived diagram-distance preparation candidates](distance-preparation.md) | Performance admission not passed; logical and scoped candidates withdrawn, adverse scalar/prepared results and missing adoption evidence retained |
 | [Cocycle, dense reproduction and Oineus: critical-set comparison](critical-sets.md) | Complete U1/Q8/Q64 cold/warm costs, Partial/full U, repository paths, current-main rejected gates and selected integration |

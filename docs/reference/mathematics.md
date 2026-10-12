@@ -835,3 +835,137 @@ truncation. Explicitly treating K_t as the entire supplied topology changes that
 source and can instead make those classes essential. See the
 [stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions) and
 [fixed-source decisions](../research/filtration-stages.md).
+
+## 21. Feasible F2 homology projections
+
+### Window and quotient
+
+Fix three ordered bases over F2 and column maps A:C_k -> C_(k-1), D:C_(k+1) ->
+C_k with shapes m-by-n and n-by-p. Require AD=0. Cycles Z=ker(A) and boundaries
+B=im(D) then satisfy B subset Z, and H=Z/B has dimension
+beta=n-rank(A)-rank(D). Ordinary H0 uses C_(-1)=0, without augmentation.
+Empty maps retain their declared shapes. A supplied simplicial adapter reduces
+signed integer incidence modulo two; this field check does not prove integer
+boundary validity or completeness of omitted cofaces.
+
+A legal representative-selection map P:C_k -> C_k satisfies all four conditions:
+
+```text
+P^2 = P,       A P = 0,       P D = 0,
+z + P z is in im(D) for every z in ker(A).
+```
+
+The first three alone are insufficient: P=0 satisfies them on a triangle ring
+but destroys its nonzero H1 class. Idempotence and cycle image are checked on
+coordinate generators, boundary killing on D's columns, and class preservation
+on a full cycle basis. Linearity extends these finite checks to the whole
+spaces. Independent cycle/image reductions use the actual A/D rather than
+trusting the solver's generalized inverses. This is feasibility, not optimality.
+
+### Factorized construction and proof
+
+Choose generalized inverses G and U with AGA=A and DUD=D. Define R=I+GA and
+B=DU, then P=(I+B)R. Addition is XOR throughout. These relations give:
+
+```text
+R^2 = I + GAGA = I + GA = R,      A R = A + AGA = 0,
+R z = z for z in ker(A),         R D = D,
+B^2 = DUDU = DU = B,             B D = D,
+R B = B,                        (I+B)B = 0.
+```
+
+Consequently P^2=(I+B)(R+B)R=P, AP=0, and PD=(I+B)D=0. For every cycle z,
+Pz=z+Bz, so z+Pz=Bz is a boundary. Thus P kills boundaries and induces the
+identity on H, while im(P) lies in Z. Its restriction to Z has kernel B:
+if Pz=0, class preservation gives z in B; the converse follows from PD=0.
+Hence Z=B direct-sum im(P), rank(P)=beta, and every homology class has exactly
+one representative in im(P). The complement depends on G/U and the bases.
+
+The deterministic implementation follows stable elimination of [M|I], including
+pivots in the full right block. A different valid generalized inverse can select
+a different complement/action; matching Betti numbers alone does not establish
+exact reference agreement. L=I+P also satisfies L^2=L and ker(L)=im(P). This
+finite-field operator is not a real/complex Hodge Laplacian and supplies no
+positive-definite energy, real spectrum or Hodge-theoretic certificate.
+
+### Positive costs and the limit of feasibility
+
+For positive coordinate costs w_i, define mass_w(x)=sum of w_i over the support
+of x. The selected class mass is mass_w(Pz), and the selected difference-class
+cost is delta([z],[y])=mass_w(P(z+y)). It is well-defined on H because P kills
+boundaries. Under exact arithmetic it is a metric for this fixed complement:
+positivity and class preservation make delta=0 exactly for equal classes,
+symmetry follows over F2, and mass_w(x+y) <= mass_w(x)+mass_w(y) proves the
+triangle inequality. This is not the minimum mass over all representatives.
+The bounded implementation may return overflow rather than a metric value.
+
+For an explicit counterexample, let A be 0-by-2, D=(1,1) transpose and w=(9,2).
+The legal P with both columns (1,0) transpose selects mass 9 for the nonzero
+class, even though (0,1) represents that class with mass 2. Its stretch is 9/2;
+the legal projection onto the second coordinate has stretch 1. Thus legality
+alone cannot certify minimum stretch or shortest-class mass.
+
+The implemented readout is lambda(P,w)=max mass_w(Pz)/mass_w(z) over nonzero
+cycles z. It searches all 2^dim(Z)-1 inputs, not only a homology basis. When
+Z=0 the maximum is absent; when Z is nonzero but P=0 the computed value is zero.
+For beta>0, a nonzero fixed vector of P has ratio 1, so lambda(P,w)>=1.
+`stretch_with` evaluates one P, not a minimization over legal projections.
+Mass sums use checked u64 addition; comparing two u64/u64 ratios uses exact
+u128 cross products. Positive weights make nonzero denominators positive.
+The first maximum in the deterministic binary enumeration is retained on ties.
+
+### Chain inclusions and a transport witness
+
+For stages s <= t, let Jprev/Jcur/Jnext identify their three ordered bases.
+Require A_t Jcur=Jprev A_s and D_t Jnext=Jcur D_s. Then Jcur maps cycles to
+cycles and boundaries to boundaries, giving an induced map H_s -> H_t.
+`from_stages` obtains these coordinate inclusions only after checking the actual
+same-owner/certificate relation of borrowed simplicial stages. Abstract-window
+source labels remain caller assertions and do not authenticate physical owners.
+
+For a source representative z, choose the target representative z_t=P_t Jcur z.
+Legality gives Jcur z+z_t=D_t c for some next-degree coordinate vector c.
+`boundary_preimage` returns such a c for independently replaying this identity.
+A missing preimage is a failed membership statement; an empty preimage can be a
+valid witness. Costs change geometry but not the underlying F2 chain-map identity.
+
+In the triangle edge order (20,30),(10,30),(10,20), A has rows (1,1,0), (1,0,1),
+(0,1,1). The ring has D:3-by-0 and Z spanned by z=(1,1,1). Its filling has
+D_t=z, hence H1 changes from dimension 1 to 0. Costs (2,3,5) give source selected
+mass 10 and target mass 0; the unique target face coefficient c=(1) satisfies
+D_t c=z. An independent legal source choice has first column z and other columns
+zero, while P_t=0. This hand choice is not the claimed deterministic solver
+matrix. P_t Jcur and Jcur P_s need not agree as chain matrices; their class-level
+transport is the relevant invariant. General linear maps remain outside the
+implemented coordinate-inclusion interface.
+
+### Composition and finite stage intervals
+
+Choose deterministic bases E_i for im(P_i). The transport matrix T(s,t) solves
+E_t T(s,t)=P_t Jcur E_s in those bases. It composes: the difference between
+J(s,t)z and P_t J(s,t)z is a target boundary, which the next chain map sends to
+a boundary killed by P_u. Therefore T(s,u)=T(t,u)T(s,t), even when the P_i do
+not commute as chain matrices. Adjacent coordinate transports suffice for ranks.
+
+For N observed stages, let r(i,j)=rank T(i,j) for i<=j<N. The finite-dimensional
+one-parameter module has interval multiplicities, with half-open stage indices:
+
+```text
+mu[b,d) = r(b,d-1) - r(b-1,d-1) - r(b,d) + r(b-1,d),  0<=b<d<=N.
+```
+
+Set r(-1,j)=0 and use r(i,N)=0 only as a finite-end bookkeeping convention.
+Each interval contributes one to r(i,j) exactly when it contains both stages;
+the displayed finite difference isolates its birth and death. The usual
+field-valued interval classification is discussed in [ZC05](bibliography.md#zc05).
+For d=N the public death is `None`, meaning unknown continuation beyond the
+observed stages, not essentiality of an unobserved infinite filtration.
+Repeated numeric scales retain distinct stage indices and multiplicity.
+
+The implementation prepares coordinate solves per request, retains only two
+stage bases during adjacent preparation, then forms the rank table. Explicit
+maps and the rank table have quadratic worst-case storage costs; this is not an
+RSS bound. No persistent family cache or streaming barcode is introduced.
+The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
+cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
+separates finite implementation checks from these algebraic derivations.

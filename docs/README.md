@@ -17,10 +17,10 @@ proposed APIs and remaining acceptance gates.
 <a id="version-and-capability-status"></a>
 
 Usage pages describe this checkout, including **Unreleased** borrowed stages,
-critical sets and source/interval assembly integration. The README dependency
+critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
 and [architecture](development/architecture.md) for candidate additions.
-Laplacian/Dirac solvers, persistent spectra, F2 homology projection, non-diagram
+Laplacian/Dirac solvers, persistent spectra, optimal F2 projections, non-diagram
 similarity, external learning and automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
@@ -38,6 +38,9 @@ H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timin
 do not supply its unmeasured direct-graph and H2/H3 performance gates.
 
 ## Use the library
+
+- [F2 homology operators](guides/homology-operators.md): owned chain windows,
+  selected class costs and controlled finite transport from borrowed stages.
 
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
   bounded partial U and a lower-star simplification step.

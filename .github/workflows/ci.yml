@@ -16,6 +16,52 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  operator-reference:
+    name: F2 operator reference comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: proffitteoy/homology-operator
+          ref: 3daff9bd69033d1ee9c5cba5026bfff94df8d6ac
+          path: target/operator-reference-source
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.98.1
+      - run: python -m pip install gudhi==3.11.0 maturin==1.15.0
+      - run: maturin build --locked --release --manifest-path target/operator-reference-source/native/Cargo.toml --interpreter python --out target/operator-wheels
+      - run: python -m pip install target/operator-wheels/*.whl
+      - name: Isolate the actual native extension
+        run: |
+          python - <<'PY'
+          import _homology_native
+          from pathlib import Path
+          import shutil
+          source = Path(_homology_native.__file__)
+          target = Path('target/operator-extension')
+          target.mkdir()
+          if source.suffix == '.py':
+              shutil.copytree(source.parent, target / '_homology_native')
+          else:
+              shutil.copy2(source, target / source.name)
+          PY
+      - run: cargo build --locked --release
+      - run: rustc --edition 2024 -C opt-level=3 tools/reference/homology_operator.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/homology-worker
+      - run: python tools/check_homology_operators.py --reference target/operator-reference-source --worker target/homology-worker --native-dir target/operator-extension --oracle-python python --samples 0 --output target/operator-correctness
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: operator-correctness-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: target/operator-correctness/
+
   quality:
     name: Format, lint and docs
     runs-on: ubuntu-latest
@@ -34,7 +80,7 @@ jobs:
       - run: python tools/check_docs.py
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
-      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
@@ -45,6 +91,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
@@ -82,6 +129,7 @@ jobs:
       - run: cargo test --locked --release --example complex_construction
       - run: cargo run --locked --example diagram_distances
       - run: cargo run --locked --example critical_sets
+      - run: cargo run --locked --example homology_operators
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
 
@@ -121,7 +169,7 @@ jobs:
           package = metadata["packages"][0]
           print("{}/package/{}-{}/Cargo.toml".format(metadata["target_directory"], package["name"], package["version"]))')"
           python3 tools/check_docs.py --root "$(dirname "$package_manifest")"
-          for example in square diagram_analysis diagram_distances complex_construction critical_sets; do
+          for example in square diagram_analysis diagram_distances complex_construction critical_sets homology_operators; do
             cargo run --locked --manifest-path "$package_manifest" --example "$example"
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
