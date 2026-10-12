@@ -807,3 +807,31 @@ has gradient 2(f-t). Chain rules, tie subgradients, face/coface closure and data
 updates are caller responsibilities; this heuristic is not a general descent
 or convergence theorem. Independent full inverses, pairing-only block swaps
 and hand-derived lower-star intervals test these discrete formulas.
+
+## 20. Finite single-parameter stages and inclusions
+
+For a frozen filtered simplicial complex (K, f) and finite scalar t, define
+K_t = {sigma in K : f(sigma) <= t}. Face monotonicity makes K_t a subcomplex.
+The total filtration order places K_t in a prefix; all tied values enter
+together, with faces preceding cofaces. A stage borrows that prefix, keeping
+source-local IDs and increasing-vertex orientation.
+
+For s <= t, inclusion I_q sends each oriented q-simplex in K_s to the identical
+simplex in K_t with coefficient +1. Thus D_q(t) I_q = I_(q-1) D_q(s) over the
+integers and every prime field; successive inclusions compose. Equal numeric
+indices from different owners establish no map. Reversing stages or mixing
+construction certificates is outside this identity inclusion contract.
+
+General degree-preserving chain maps F_q require explicit bases, coefficient
+arithmetic and the identity D_q(B) F_q = F_(q-1) D_q(A). Merely preserving dimensions
+or giving an index permutation does not establish this. Such maps and coordinatewise
+multi-parameter filtrations are deferred; scalarizing incomparable parameter
+vectors defines a different single-parameter problem.
+
+A selected stage limits observation of the original filtration. Its contextual
+persistence keeps later classes right-censored whenever original source coverage
+is incomplete at t. Certified dimension truncation remains independent of scale
+truncation. Explicitly treating K_t as the entire supplied topology changes that
+source and can instead make those classes essential. See the
+[stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions) and
+[fixed-source decisions](../research/filtration-stages.md).

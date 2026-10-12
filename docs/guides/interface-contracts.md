@@ -16,7 +16,7 @@ that constructs one lower-star circle and reads it both ways.
 
 ## Read a signed stage for a matrix consumer
 
-Borrow a frozen complex and select cells with value <= scale. Preserve its
+Borrow a frozen complex and its `stage(scale)` with cells of value <= scale. Preserve
 degree-specific basis order, owner-local IDs and increasing-vertex orientation.
 The explicit conversion below returns owned dense matrices only because the
 small external consumer needs them. It is tutorial code, not a new public API.
@@ -34,6 +34,10 @@ let complex = SimplicialComplex::new(vec![
 ])?;
 let source = &complex;
 let scale = 1.;
+let stage = source.stage(scale)?;
+let filled = source.stage(2.)?;
+assert_eq!(stage.len(), 6);
+assert_eq!(stage.inclusion_into(&filled)?.len(), 6);
 let bases: [Vec<SimplexId>; 3] = std::array::from_fn(|degree| {
     source.cells()
         .filter(|&id| {
@@ -114,6 +118,13 @@ and derive vertex-edge incidence. Its interpretation as a one-dimensional
 complex is explicit: a graph triangle is not automatically a filled clique.
 Filtration values, spectral Grams and F2 coordinate costs remain separate.
 This prepares inputs; it implements no Laplacian, Dirac or F2 projection solver.
+
+The stage borrow checks the inclusion into the filled triangle; the matrix
+reader selects the same source-local IDs with the explicit scale predicate.
+Stage selection itself allocates no storage. See the
+[stage guide](filtered-complexes.md#read-stages-and-their-inclusions) for checked
+inclusions and for the distinction between analyzing the original source through
+a stage and choosing its stored topology as a new complete supplied source.
 
 ## Move persistence data while retaining its meaning
 

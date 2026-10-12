@@ -23,7 +23,7 @@ pub use rips::approximation::{ApproximationTarget, RipsApproximation, RipsApprox
 pub(crate) mod expansion;
 pub(crate) mod simplicial;
 pub use rips::{RipsBuilder, RipsCallbackBuilder};
-pub use simplicial::SimplicialFiltration;
+pub use simplicial::{SimplicialFiltration, SimplicialStage};
 mod context;
 pub use context::{FiltrationContext, FiltrationScale, FiltrationSource};
 /// Owned exact preparation; compatibility name is [`ThresholdRips`].
