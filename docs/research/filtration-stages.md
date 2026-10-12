@@ -47,10 +47,12 @@ inclusions. General chain maps, generic-cell stage owners, relabeling,
 multi-parameter invariants and persistent spectral operators remain separate
 research work. #69's implementation and runnable examples are in
 [PR #100](https://github.com/Aequiludium/cocycle-rs/pull/100); its declared #66
-modeling prerequisite has a runnable delivery in
-[PR #102](https://github.com/Aequiludium/cocycle-rs/pull/102), independently awaiting
-review and merge. Research acceptance does not merge either implementation or
-publish a release.
+modeling prerequisite was delivered by
+[PR #102](https://github.com/Aequiludium/cocycle-rs/pull/102), now merged through
+[PR #122](https://github.com/Aequiludium/cocycle-rs/pull/122) into main
+`c85ef24853fb19d510602e7339f82065a3dafdba`. PR #100 remains a separate,
+unmerged stage capability; research acceptance does not merge it or publish a
+release.
 
 ## Scales, ties and what is complete
 
