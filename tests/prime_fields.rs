@@ -582,6 +582,42 @@ fn duplicate_intervals_and_selections_keep_local_identity() {
             .map(|r| (r.interval_index(), r.kind(), r.terms()))
             .collect::<Vec<_>>()
     );
+    drop(repeated);
+    // Duplicate bars must retain distinct identities after moving owned outputs
+    // and releasing every mathematical source. No new computation is available.
+    let common: &cocycle::diagram::PersistenceData = result.as_ref();
+    assert!(std::ptr::eq(common.diagram(), result.diagram()));
+    assert!(std::ptr::eq(common.context(), result.context()));
+    let (data, representatives) = result.into_parts();
+    drop(filtration);
+    drop(graph);
+    assert_eq!(data.context().characteristic(), 5);
+    assert_eq!(
+        data.diagram().coverage(),
+        cocycle::diagram::Coverage::Complete
+    );
+    let representatives = representatives.unwrap();
+    assert_eq!(representatives.len(), 30);
+    for representative in &representatives {
+        let interval = data
+            .diagram()
+            .interval(representative.interval_index())
+            .unwrap();
+        assert_eq!(
+            interval.end(),
+            expected_ends[representative.interval_index()]
+        );
+        assert_eq!(
+            representative.characteristic(),
+            data.context().characteristic()
+        );
+    }
+    let ordinals: Vec<_> = representatives
+        .iter()
+        .filter(|r| r.request_index() == 2 && r.kind() == RepresentativeKind::Cycle)
+        .map(|r| r.interval_index())
+        .collect();
+    assert_eq!(ordinals, [0, 1, 2, 3, 4]);
 }
 #[test]
 fn empty_requests_and_point_inputs_preserve_ownership() {

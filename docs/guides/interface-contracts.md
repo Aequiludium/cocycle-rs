@@ -8,6 +8,12 @@ source trait or a universal result container. The
 [interface compatibility report](../design/interface-compatibility.md) records
 the decisions and the remaining spectral/operator boundaries.
 
+The [data-modeling decision](../research/data-modeling.md) selects existing
+point, graph and simplex owners. The two readers below share one frozen complex:
+signed single-scale boundary export and ordinary persistence. Run
+`cargo run --locked --example complex_construction` for another runnable version
+that constructs one lower-star circle and reads it both ways.
+
 ## Read a signed stage for a matrix consumer
 
 Borrow a frozen complex and its `stage(scale)` with cells of value <= scale. Preserve
