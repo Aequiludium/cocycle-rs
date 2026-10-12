@@ -24,6 +24,7 @@ fn main() -> Result<()> {
     let summary = finite_lifetime_summary(&complete, 1)?;
     assert_eq!(counts, [0, 2, 3, 1, 1]);
     assert_eq!(summary.total_persistence(), 4.0);
+    assert!((summary.entropy().unwrap() - 2.0_f64.ln()).abs() < 1e-14);
     assert_eq!(summary.excluded_essential_count(), 1);
     println!("Complete H1 Betti curve at {grid:?}: {counts:?}");
     println!("Observed finite H1 lifetimes: {summary:?}");
@@ -47,6 +48,10 @@ fn main() -> Result<()> {
         "Computed empty H0: {:?}",
         betti_curve(&truncated, 0, &[0.0])?
     );
+    let empty = finite_lifetime_summary(&truncated, 0)?;
+    assert_eq!(empty.finite_count(), 0);
+    assert_eq!(empty.max_persistence(), None);
+    assert_eq!(empty.entropy(), None);
     // An H1-only algorithm must not declare H0 computed merely by omitting bars.
     let h1_only = PersistenceDiagram::with_dimensions(
         ComputedDimensions::new(vec![1])?,

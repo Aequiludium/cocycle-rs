@@ -74,10 +74,11 @@ src/
       cliques.rs                 dense/sparse clique enumeration
       expansion.rs               shared explicit clique construction
   persistence/
-    mod.rs                       public exports and result normalization
+    mod.rs                       public exports and private computation wiring
+    assembly.rs                  shared raw intervals and endpoint normalization
     execution.rs                 compatibility control imports
     builder.rs                   borrowed analysis settings and validated execution
-    source.rs                    sealed extension and private source dispatch
+    source.rs                    sealed extension wiring to source-owned adapters
     options.rs                   compatibility options and signed-scale validation
     filtered.rs                  external filtered-cell validation and source adaptation
     boundary/
@@ -86,7 +87,7 @@ src/
       tests.rs                   hand-derived pairs and independent transformation checks
     union_find.rs                connectivity shared by specialized H0/H1 paths
     simplicial/
-      mod.rs                     explicit analysis and certified range handling
+      mod.rs                     frozen source adapters, analysis and certified ranges
       input.rs                   selected boundary columns from frozen incidence
       cohomology.rs              zero-born prime-field coface reduction with clearing
       representatives/
@@ -95,10 +96,10 @@ src/
         complex.rs               zero-born implicit skeleton materialization
         dual.rs                  scale-specific dual cocycle basis
     rips/
-      mod.rs                     legacy/new Rips entry points and source coverage
+      mod.rs                     legacy/new Rips entry points, builder adapter and coverage
       options.rs                 compatible RipsOptions
       expanded.rs                explicit incidence computation and dimension checks
-      approximation.rs           sparse Rips computation and context assembly
+      approximation.rs           sparse builder/prepared computation and context assembly
     flag/
       mod.rs                     supplied-graph entry points and context
       dispatch.rs                default exact H0/F2 H1/general algorithm selection
@@ -206,7 +207,12 @@ The worker links the ordinary public crate for its separate `public` checks.
 an owned `SimplicialFiltration`; only expanded topology exposes simplex queries.
 Alternatively, importing `persistence::PersistenceExt` enables `.persistence()`
 and the returned request's `.compute()`. The extension is implemented entirely
-in the consumer module, so filtration never calls persistence.
+in the consumer module, so filtration never calls persistence. Source extension wiring
+in `persistence/source.rs` selects private adapters in the existing `rips/` and
+`simplicial/` computation owners. Those adapters interpret source range, prepare
+input and assemble source-specific context using the terminal's current budget;
+the extension module contains no preparation or mathematical computation.
+The public free functions retain their existing entry paths and budget scope.
 
 Advanced `prepare()` returns an owned exact/approximate source for reuse. Callback
 builders are consumed by preparation or explicit construction; analyses never

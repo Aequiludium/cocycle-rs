@@ -75,12 +75,15 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
 | [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
-| [Result interpretation and comparison](research/result-contracts.md) | Four result families, availability, units, certificates, ownership/import losses and fixed-source spectral/distance discrepancies |
+| [Data modeling](research/data-modeling.md) | Three first objects, stable borrowed reads, two-consumer entry and conditional Alpha/cubical/cellular expansion order |
+| [Result interpretation and comparison](research/result-contracts.md) | Four result families, consumer/conversion table, existing result migration, proposed spectral/projection reads and fixed-source discrepancies |
+| [Descriptor contracts and external handoff](research/analysis-learning.md) | Existing descriptor disposition, consumer regressions and future sample/basis/scale information |
 | [GUDHI C++ study](research/gudhi-cpp.md) | Pinned upstream source map and reading plan; excludes Python wrappers |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
+| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); algorithms remain future work |
 | [Performance reporting rules](../benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
 | [Changelog](../CHANGELOG.md) | Completed user-visible changes |
 
