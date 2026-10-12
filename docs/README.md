@@ -1,5 +1,8 @@
 # Documentation
 
+[Website home](index.md) · [Installation](getting-started/installation.md) ·
+[Quickstart](getting-started/quickstart.md) · [API reference](reference/api.md)
+
 Cocycle is a native Rust TDA library. It computes dimension-generic ordinary Rips
 persistence over prime fields, constructs exact threshold graphs and frozen
 simplicial complexes, and accepts supplied flag filtrations. Sparse Rips
@@ -19,21 +22,20 @@ proposed APIs and remaining acceptance gates.
 Usage pages describe this checkout, including **Unreleased** borrowed stages,
 critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
-and [architecture](development/architecture.md) for candidate additions.
+and [architecture](development/architecture.md) for source additions.
 Laplacian/Dirac solvers, persistent spectra, optimal F2 projections, non-diagram
 similarity, external learning and automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
 
-This revision is prepared from [#119 at
-`a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
-observed open on 2026-10-11, including the later accessor-contract clarification.
-The original audit used `64ab5fdc`. The [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
-lists the migration/source/contract inputs. Those hashes, PR states and checks
-remain historical evidence after integration; they are not a live release status.
-Main integration and release follow the [release procedure](../CONTRIBUTING.md#release-procedure).
+The website follows main. Versioned APIs are documented on docs.rs; main
+integration does not publish a crate version. The
+[route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
+retains the dated #119 audit, migration/source/contract inputs and their checks.
+Those historical hashes and PR states do not describe the current branch or
+release. Releases follow the [release procedure](../CONTRIBUTING.md#release-procedure).
 
-The candidate excludes #26/#49's paused preparation and #56's experimental adaptive
+The adopted scope excludes #26/#49's paused preparation and #56's experimental adaptive
 H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
 do not supply its unmeasured direct-graph and H2/H3 performance gates.
 
@@ -56,7 +58,7 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
   sampling provenance and implicit/explicit computation.
 - [Fields and representatives](guides/rips-representatives.md): select a prime
   field and request owned cycle/cocycle bases associated with intervals.
-- [Diagram-distance example](../examples/diagram_distances.rs): compare complete
+- [Diagram-distance guide](guides/diagram-distances.md): compare complete
   diagrams with bottleneck, W1 or W2; run `cargo run --locked --example diagram_distances`.
   The [matching specification](reference/mathematics.md#16-diagram-matching-distances)
   defines the metrics, supported endpoints and context requirements.
@@ -124,6 +126,7 @@ the performance of unmeasured code.
 
 | Directory | Owns |
 | --- | --- |
+| `getting-started/` | Installation and a minimal released-crate calculation |
 | `guides/` | Task-oriented usage of implemented capabilities |
 | `reference/` | Mathematical contracts, derivations, and bibliography |
 | `development/` | Current architecture, coding conventions, and validation strategy |
@@ -131,6 +134,8 @@ the performance of unmeasured code.
 | `research/` | Upstream investigations tied to a source revision and scope |
 
 Add a document to the directory matching its purpose and link it from this index.
+Also add it to the website navigation in [index.md](index.md); the strict Sphinx
+build checks that every maintained page belongs to the navigation.
 Use descriptive capability names such as `guides/rips.md`; add subdirectories
 when a subject has multiple documents that need their own navigation. Do not
 create empty sections for unimplemented capabilities or duplicate the source tree
