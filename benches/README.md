@@ -13,6 +13,12 @@ warmup, export and memory boundaries; their samples must not be pooled.
 
 ## Choose a suite
 
+The [F2 operator protocol](homology-operators.md) checks exact P/actions against
+the pinned homology-operator Python/native reference and supported GUDHI topology.
+Its public-workflow timings remain separate from native persistence rankings.
+The [operator report](reports/homology-operators.md) records pinned correctness,
+Windows Python/native comparisons and separate Linux timing/RSS measurements.
+
 | Question | Tool and contract | Evidence |
 | --- | --- | --- |
 | How does precomputed F2 H0/H1 compare, including GUDHI edge collapse? | [Native setup](native/README.md), [H0/H1 protocol](protocol.md); `tools/benchmark_native.py` | Time to owned intervals and process memory |

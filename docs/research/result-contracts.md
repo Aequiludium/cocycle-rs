@@ -238,6 +238,12 @@ that repository or broad claim about other versions is part of this task.
 
 ### F2 projections, actions and query records
 
+The [native feasible operator guide](../guides/homology-operators.md) documents
+the implemented bounded-integer subset: owned windows, independently checked P,
+run-bound queries, same-owner stage transport and boundary-preimage readout.
+The broader solver/certificate proposal below remains separate; this producer
+does not establish shortest-class mass, global optimality or Python wire schemas.
+
 The pinned reference supports direct reads without exporting a whole matrix:
 
 ```python

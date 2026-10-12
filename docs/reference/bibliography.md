@@ -130,3 +130,14 @@ states its `(1, 1/(1-epsilon))` convention; its pinned
 defines the compared edge/blocker algorithm. Theorem statements do not certify
 floating-point implementations; native agreement and mathematical guarantees
 are separate forms of evidence.
+
+## HO
+
+[homology-operator](https://github.com/proffitteoy/homology-operator/tree/3daff9bd69033d1ee9c5cba5026bfff94df8d6ac),
+MIT source revision `3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`. The feasible
+generalized-inverse construction and deterministic packed native route are the
+implementation reference. The [specification](mathematics.md#21-feasible-f2-homology-projections)
+gives the algebraic proof and finite-stage convention used in Cocycle. Source
+agreement is not a global-optimality proof; Python result schemas and global
+optimization solvers are not ported. This is a source citation, not a claimed
+peer-reviewed algorithm publication or a Rust runtime dependency.

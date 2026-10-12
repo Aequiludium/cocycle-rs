@@ -137,6 +137,7 @@ src/
     computation.rs               owned PersistenceResult and source context
     representative.rs            owned chain/cochain terms and local interval IDs
   descriptors/                   diagram-only lifetimes and Betti curves
+  homology_operators/             ordered F2 windows, feasible P, integer costs and finite maps
   diagram_distances/              complete-diagram bottleneck, W1 and W2 matching
     bottleneck/                  geometric decisions, matching and capacity flow
     wasserstein.rs               adaptive routing and component solves
@@ -160,6 +161,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `persistence` | Algorithms, options, interval and representative assembly | Algebra, geometry, filtration, diagram, execution |
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
 | `descriptors` | Read diagrams without recomputing persistence | Diagram, error utilities |
+| `homology_operators` | Validate ordered F2 windows, construct feasible projections and read integer class costs/finite maps | Complex/stage access, execution and error utilities; no persistence engine dependency |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
 | `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
 
@@ -431,7 +433,7 @@ public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
 
-Future Laplacian/Dirac, true persistent spectral pairs and F2 homology projection
+Future Laplacian/Dirac, true persistent spectral pairs and optimal F2 projections
 need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
 and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
 Non-diagram similarities need defined coordinates and units; exporters, external

@@ -21,6 +21,18 @@ for the integration provenance and separate future capability contracts.
   dimension-specific V transposes and bounded partial U rows. Endpoint proposals
   combine by maximum absolute displacement with first-proposal ties. Includes
   a lower-star simplification example; updates and differentiation remain caller-owned.
+- Add native F2 feasible homology operators on validated ordered chain windows,
+  positive integer class costs, checked query identities and finite coordinate
+  transport. Preserve existing persistence interfaces and Rust 1.91 support.
+  Feasibility and selected mass do not certify globally optimal representatives.
+- Connect feasible operators to borrowed simplicial stages with checked same-owner
+  inclusions, one extraction/solve budget, run-bound query transport and replayable
+  boundary preimages. Negative/repeated scales and owned-result lifetimes persist.
+- Synchronize the feasible F2 core with merged homology-operator PR #93: adaptive
+  sparse/packed rows, reusable coordinate solves, packed factor actions,
+  incremental stretch readout and adjacent transport composition. Independent
+  legality checks and complete noncycle action remain required.
+
 - Retain specialized F2 H0/H1 for exact diagram-only Rips and supplied flag
   requests computing H2+, with complete ordinary/emergent/virtual death-triangle
   clearing passed to the generic continuation. Preserve full generic fallback

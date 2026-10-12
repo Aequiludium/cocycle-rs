@@ -120,6 +120,8 @@ Run `cargo run --locked --example diagram_analysis` to analyze supplied interval
 without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
+The unreleased source API also provides [F2 homology operators](docs/guides/homology-operators.md):
+run `cargo run --locked --example homology_operators` for class queries and finite transport.
 
 Read the [published API reference](https://docs.rs/cocycle), or build it locally
 with `cargo doc --no-deps --open`. From a repository
@@ -142,7 +144,7 @@ produces concrete results that comparison and analysis can borrow independently.
 See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
 [roadmap](docs/design/roadmap.md#phase-4-priorities) and
 [interface guide](docs/guides/interface-contracts.md). Laplacian/Dirac solvers,
-persistent spectra, F₂ homology projection, non-diagram similarity and external
+persistent spectra, optimal F₂ projections, non-diagram similarity and external
 learning remain future contracts, described in the [route report](docs/research/route-integration.md).
 
 Work and memory depend on the input and reduction fill-in. Rips comparisons

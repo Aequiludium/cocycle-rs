@@ -45,6 +45,7 @@ mod error;
 pub mod execution;
 pub mod filtration;
 pub mod geometry;
+pub mod homology_operators;
 pub mod optimization;
 pub mod persistence;
 

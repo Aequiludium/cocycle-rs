@@ -290,7 +290,7 @@ producer or blocking the existing-code #94 exit.
 ## F2 class and transport handoff: #90
 
 The existing source producer is #69's same-owner stage/incidence access;
-#75's window/legality/query contract is the future projection producer. The
+#75's window/legality/query contract defines the projection producer. The
 [F2 family proposal](input-contracts.md#f2-window-legality-and-query-proposal)
 and [result readouts](result-contracts.md#f2-projections-actions-and-query-records)
 own those definitions. This route integrates their identities and maps, not a
@@ -361,11 +361,17 @@ required degree is a different state. Topology-equivalent or equal-sized
 windows do not identify their coordinates. An explicit basis permutation must
 transform A/D, all three maps, costs, actions and query keys consistently.
 
-Stage B remains future work: run actual single-scale and two-stage components
-once #75 supplies validated results, independently replay legality and boundary
-transport witnesses, check query/source associations and arithmetic errors, and
-separate feasible/optimal evidence and extraction/solve/action costs. The local
-Rust experiment or Python reference is not adopted into this production stack.
+The [native feasible producer](../guides/homology-operators.md) supplies the
+bounded-integer, same-owner inclusion subset of stage B in this checkout.
+`OperatorFamily::from_stages` checks the real source/certificate association
+and shares one extraction/validation/solve budget. `track_query` rejects foreign
+runs; `boundary_preimage` returns next-basis coefficients for independent replay
+against target D. The triangle example executes class death and its filling,
+while tests also cover empty/repeated scales, source-drop lifetimes and costs.
+Global optimization, arbitrary linear maps and unobserved continuation remain
+future work. The fixed reference is an external oracle, not a runtime dependency;
+frozen public-workflow timings do not measure this new composed stage terminal.
+Main merge, hosted acceptance and release remain separate from local validation.
 
 ## Direct comparison and consumption handoff: #91
 
