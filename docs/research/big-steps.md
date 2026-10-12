@@ -170,7 +170,7 @@ reductions; incremental vineyard updates are not a production dependency.
 Algorithm 3 provides maximum-displacement target combination, while callers
 provide data derivatives and valid filtration reconstruction.
 
-The [performance and integration report](../../benches/reports/critical-sets.md)
+The [performance and integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md)
 records scoped native measurements, sparse/dense regressions, Partial/full U
 tradeoffs and the selected merge boundaries. No user-selectable dense backend
 or adaptive threshold is established by the finite benchmark fixtures.

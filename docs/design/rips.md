@@ -46,7 +46,7 @@ promise to finish every finite input.
 
 ## Three-project baseline
 
-Compare the pinned sources in [sources.json](../../benches/native/sources.json):
+Compare the pinned sources in [sources.json](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/sources.json):
 GUDHI `cba915e3ab8e1f5b1fe26eb44b407285f7af4e78` and upstream Ripser
 `01add51ff64aaf40889483260cc5c3b7d0f2a1e7`. GUDHI's integrated Ripser is a
 separate implementation from the upstream executable. Source observations below
@@ -390,7 +390,7 @@ No automatic switch may change the filtration, field, precision or approximation
 ## Verification and native comparison
 
 Use the [testing policy](../development/testing.md) and
-[native protocol](../../benches/protocol.md). The matrix below specifies new
+[native protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/protocol.md). The matrix below specifies new
 obligations across all stages. Implemented coverage and remaining release gates are mapped in the
 [acceptance audit](rips-acceptance.md). Cover meaningful interactions between
 axes, not only one happy-path example per feature.

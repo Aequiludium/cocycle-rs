@@ -4,7 +4,7 @@
 
 Tests protect mathematical and public API contracts. Run commands and review
 requirements are in [CONTRIBUTING.md](../../CONTRIBUTING.md#verification); measurement
-protocols belong in the [benchmark guide](../../benches/README.md).
+protocols belong in the [benchmark guide](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md).
 
 Algorithm authors can start with the
 [focused domain checks](../../CONTRIBUTING.md#focused-algorithm-checks).
@@ -20,6 +20,14 @@ commands; platform jobs run their examples and explicitly execute the constructi
 example's colocated tests in debug/release. MSRV also runs those example tests.
 
 ## Test layers
+
+CI's quality job runs Rust doctests from the README, usage guides, contributor
+walkthroughs and `docs/research/route-integration.md`. The route report's three
+Rust blocks exercise actual public APIs; its Python hand calculations describe
+finite future contracts and are not spectral/projection/learning executions.
+The package job also runs `tools/check_docs.py --root` on the extracted Cargo
+package, checking its own Markdown targets and fragments. Verification commands
+and the release documentation gate remain in CONTRIBUTING.
 
 | Location | Purpose |
 | --- | --- |
@@ -124,7 +132,7 @@ oracle; its instrumented timings do not rank production performance.
 
 ## External comparison
 
-The [native comparison](../../benches/native/README.md) runs GUDHI C++ and upstream
+The [native comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/README.md) runs GUDHI C++ and upstream
 Ripser C++ workers against the Rust API. It checks every measured diagram,
 including multiplicities, dimensions, coverage, and endpoint kinds, using exact
 shared filtration values. Hand-derived cases and analytic bipartite counts
@@ -135,13 +143,13 @@ Shared precomputed values isolate persistence from distance construction. When a
 reference uses lower precision, quantize the same input for every backend instead
 of hiding differences behind larger tolerances. Independent point-cloud norm
 comparisons use an explicit tolerance. The H0/H1 native protocol measures only
-precomputed distances. The separate [pipeline suite](../../benches/pipeline/README.md)
+precomputed distances. The separate [pipeline suite](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/pipeline/README.md)
 also measures Rust point construction, but its precomputed native references are
-correctness-only for those rows. The [historical tools](../../tools/legacy-benchmarks.md)
+correctness-only for those rows. The [historical tools](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/legacy-benchmarks.md)
 retain the optional 512-case Ripser.py correctness check and wrapper benchmarks;
 their timings are not the native performance baseline.
 
-Diagram distances have a separate [native protocol](../../benches/distances/README.md).
+Diagram distances have a separate [native protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/distances/README.md).
 Independent partial-injection enumeration checks finite, diagonal and essential
 matching costs; public tests exercise the ordinary uninstrumented crate, while
 kernel tests exercise private counters and forced routes. The external suite
@@ -168,8 +176,8 @@ GUDHI/POT references. Record the exact tested SHA and retained summary; a quick
 CI pass does not establish that the full suite ran.
 
 Performance evidence is indexed by measured revision and associated PR under
-[benchmarks](../../benches/README.md); execution dates are metadata.
-The [reporting rules](../../benches/reporting.md) distinguish correctness checks,
+[benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md); execution dates are metadata.
+The [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) distinguish correctness checks,
 resource snapshots and comparative studies, with separate execution protocols.
 Its source hashes identify the measured implementation. A directory refactor
 changes those hashes even when behavior is preserved; old measurements must not
@@ -195,7 +203,7 @@ and independent subset enumeration. Higher-dimensional fixtures include
 H2/H3/H4 spheres and deterministic random weighted graphs. Separate f64 fixtures use
 GUDHI only; Ripser float32 precision and tiny-input exclusions are recorded, not
 counted as successful comparisons. The suite writes fixtures, source/binary/header
-hashes and results. See [tools](../../tools/README.md#native-rips-correctness-checks).
+hashes and results. See [tools](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md#native-rips-correctness-checks).
 
 ## Prime fields and representative bases
 
@@ -254,7 +262,7 @@ this suite. Exact Rips still has independent GUDHI/Ripser C++ comparisons.
 
 ## Workflow resource evidence
 
-The [pipeline protocol](../../benches/pipeline/README.md) measures the implemented
+The [pipeline protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/pipeline/README.md) measures the implemented
 public paths in fresh processes, including representation preparation and result
 export. Native references execute C++ directly. Timed runs compare every diagram
 before accepting measurements, retain failures/timeouts and distinguish missing

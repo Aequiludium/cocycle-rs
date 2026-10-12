@@ -114,7 +114,7 @@ Record source revisions and numerical protocol for comparisons. Store generated
 outputs under ignored `target/` or in external artifact storage. Do not commit
 logs, raw results or archives, and do not reformat downloaded third-party sources.
 Run `tools/check_artifacts.py` after staging to check artifact admission. Follow
-the [reporting rules](../../benches/reporting.md) for comparison contracts,
+the [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) for comparison contracts,
 measurement claims and retained evidence.
 
 ## Tests and documentation

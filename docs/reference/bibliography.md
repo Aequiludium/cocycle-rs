@@ -85,8 +85,8 @@ These are design references, not a statement that Cocycle implements their APIs.
 
 ## External validation tools
 
-Current comparisons use [pinned GUDHI and upstream Ripser C++ sources](../../benches/native/sources.json)
-through [native workers](../../benches/native/README.md). Source versions, adapter
+Current comparisons use [pinned GUDHI and upstream Ripser C++ sources](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/sources.json)
+through [native workers](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/README.md). Source versions, adapter
 changes and precision are recorded with each run.
 
 [GUDHI](https://gudhi.inria.fr/python/latest/) and
@@ -100,7 +100,7 @@ input path converts distances to float32; the comparison suite uses shared
 float32-exact inputs while retaining Cocycle/GUDHI f64 arithmetic. The
 [online source](https://ripser.scikit-tda.org/en/latest/_modules/ripser/ripser.html)
 helps locate this behavior but may describe a different version. See the
-[benchmark protocol](../../benches/README.md) and recorded artifacts for actual runs.
+[benchmark protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) and recorded artifacts for actual runs.
 
 ## RP2
 

@@ -123,6 +123,12 @@ one and satisfy boundary-of-boundary zero over the integers. Coefficients are
 signed `i32` incidence numbers, reduced into the selected prime field. Accessors
 and iteration borrow stable storage and must honor this mathematical contract.
 
+Call `FilteredComplex::dimension`, `filtration_value` and `boundary` only with
+IDs returned by `cells()` on that instance. An ID from another owner or a later
+stage violates this precondition; implementations may panic. Inherent simplicial
+`simplex`/`boundary` reads return `None` for out-of-range IDs, but numeric IDs alone
+cannot authenticate an owner. See the trait's rustdoc for the full contract.
+
 The generic computation checks unique IDs, finite ordered values, and the
 retained skeleton's boundary references, dimensions and boundary-square zero in
 the selected field. This last check does not certify integer validity or validity
@@ -138,6 +144,10 @@ Iteration/validation/reduction share the execution budget; controls cannot
 interrupt the interior of a custom accessor or iterator call.
 
 ## Read stages and their inclusions
+
+Stage access and inclusions are **Unreleased** additions in this checkout.
+See the [version status](../README.md#version-and-capability-status) before using
+these calls with a registry dependency.
 
 `SimplicialComplex::stage(scale)` and `SimplicialFiltration::stage(scale)` borrow
 the closed sublevel set of stored simplices with value <= scale. Every tie is
@@ -241,7 +251,7 @@ higher-simplex values through stored cofaces. Other inputs use boundary reductio
 and representative requests retain their separate transformation work. Generic
 `PersistenceBuilder::from_complex` always uses the boundary contract. Native
 workers preserve their protocol; performance claims require measurements bound
-to the measured source commit. The [integration report](../../benches/reports/critical-sets.md)
+to the measured source commit. The [integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md)
 records the current-main gate that rejected automatic boundary rerouting.
 
 [g-complex]: https://gudhi.inria.fr/doc/latest/group__simplex__tree.html

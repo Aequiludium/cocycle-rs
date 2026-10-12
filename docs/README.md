@@ -14,6 +14,29 @@ analysis and explicit simplicial construction.
 Start with a task below; design pages distinguish implemented decisions from
 proposed APIs and remaining acceptance gates.
 
+<a id="version-and-capability-status"></a>
+
+Usage pages describe this checkout, including **Unreleased** borrowed stages,
+critical sets and source/interval assembly integration. The README dependency
+selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
+and [architecture](development/architecture.md) for candidate additions.
+Laplacian/Dirac solvers, persistent spectra, F2 homology projection, non-diagram
+similarity, external learning and automatic feedback remain future contracts.
+The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
+reports retain the proposals.
+
+This revision is prepared from [#119 at
+`a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
+observed open on 2026-10-11, including the later accessor-contract clarification.
+The original audit used `64ab5fdc`. The [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
+lists the migration/source/contract inputs. Those hashes, PR states and checks
+remain historical evidence after integration; they are not a live release status.
+Main integration and release follow the [release procedure](../CONTRIBUTING.md#release-procedure).
+
+The candidate excludes #26/#49's paused preparation and #56's experimental adaptive
+H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
+do not supply its unmeasured direct-graph and H2/H3 performance gates.
+
 ## Use the library
 
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
@@ -73,7 +96,8 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Rips implementation scope](design/rips-implementation.md) | Stage-specific new directories, source moves, code/tooling changes and review units |
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
 | [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
-| [Interface inventory](research/interface-inventory.md) | Six-framework capability map, borrow/move/copy costs, fixed PR stacks and subsequent main changes |
+| [Route integration](research/route-integration.md) | Same-version legacy acceptance and current handoffs versus future running goals for #86 |
+| [Interface inventory](research/interface-inventory.md) | Historical source audit, borrow/move/copy costs and fixed PR stacks; use the architecture for current capabilities |
 | [Shared input contracts](research/input-contracts.md) | Ordered bases, signed incidence, fields, weights/Grams, source identity, chain maps and reproducible finite examples |
 | [Data modeling](research/data-modeling.md) | Three first objects, stable borrowed reads, two-consumer entry and conditional Alpha/cubical/cellular expansion order |
 | [Result interpretation and comparison](research/result-contracts.md) | Four result families, consumer/conversion table, existing result migration, proposed spectral/projection reads and fixed-source discrepancies |
@@ -82,11 +106,11 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
-| [Benchmarks](../benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
-| [Rips comparison](../benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
+| [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
+| [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
 | [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); algorithms remain future work |
-| [Performance reporting rules](../benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
-| [Changelog](../CHANGELOG.md) | Completed user-visible changes |
+| [Performance reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
+| [Changelog](../CHANGELOG.md) | Unreleased implemented changes and versioned release notes |
 
 For future capabilities, use the GUDHI study as evidence, the kernel design to
 evaluate boundaries, and the roadmap to select the next operation. A source map
@@ -115,3 +139,16 @@ documentation is in English. Paths in prose and shell commands are relative to
 the repository root unless stated otherwise; Markdown links resolve relative to
 their document. See [documentation maintenance](../CONTRIBUTING.md#documentation-ownership)
 for checks to run when adding or moving pages.
+
+Use this index for version status, the architecture for current owners/routes,
+rustdoc and guides for callable behavior, the roadmap for future priorities,
+input/result reports for proposed contracts, and the route report for composed
+handoffs and dated acceptance. The inventory retains the original audit rather
+than a second current capability table. Keep historical headings, hashes and
+measurements intact; prepend a scope label and link to the current owner instead
+of rewriting old evidence.
+
+Guides and reference pages are included in the Cargo package. Benchmark reports,
+controllers and repository CI configuration remain repository resources; links
+to those excluded files use GitHub URLs. CI checks local targets and headings in
+the actual package as well as in the checkout; external URLs are not fetched.

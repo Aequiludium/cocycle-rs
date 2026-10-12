@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+These entries describe implemented candidate changes and documentation, not a
+published version. See the [version status](docs/README.md#version-and-capability-status)
+for the integration provenance and separate future capability contracts.
+
+- Separate source preparation from shared ordinary interval assembly while
+  preserving existing public paths, kernels, result ownership and execution controls.
+- Consolidate stage usage, the six-responsibility architecture and Phase-4
+  priorities. Label historical reports, retain input/result contract owners and
+  add route Rust doctests and packaged-document checks to CI.
+- Record future spectral, Dirac, F2 projection, non-diagram comparison and learning
+  handoffs. These are interface proposals and finite examples, not new solvers.
 - Add borrowed `SimplicialStage` sublevel access and checked same-source
   inclusions for supplied and certified explicit simplicial filtrations. Stage
   persistence retains original context, coverage and skeleton sufficiency.

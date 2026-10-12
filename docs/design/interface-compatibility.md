@@ -2,6 +2,12 @@
 
 [Documentation](../README.md) / Design
 
+**Historical preparation gate.** Baseline checks and original PR states below
+certify their recorded revisions. They do not certify a later integration or
+release. Use the [version status](../README.md#version-and-capability-status),
+[current architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+and [executable guide](../guides/interface-contracts.md) for this checkout.
+
 Technical report, 2026-10-09, connecting the full #59–#63 interface preparation
 delivery. This page records the #62 reuse decision and #63 compatibility gate;
 the linked research reports supply the inventory and complete input/result

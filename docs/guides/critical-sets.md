@@ -2,6 +2,10 @@
 
 [Documentation](../README.md) / Guides
 
+Critical-set access is an **Unreleased** opt-in addition in this checkout.
+See the [version status](../README.md#version-and-capability-status) for release scope.
+Endpoint proposals do not implement a spectral or homology-projection solver.
+
 Use `optimization::CriticalSetWorkspace` to propose finite birth/death or
 essential-birth moves on a frozen `SimplicialComplex` over F2. It retains sparse
 primal R/V, lazily reduces the anti-transposed boundary for birth queries, and
@@ -10,7 +14,7 @@ critical-set operation; ordinary persistence requests retain their own storage
 policy. No foreign runtime or optimizer dependency is required.
 
 The [paper framework and three algorithms](../research/big-steps.md) explain the
-reduction and critical-set method. The [performance and integration report](../../benches/reports/critical-sets.md)
+reduction and critical-set method. The [performance and integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md)
 records measured costs and why the public API exposes one sparse workspace.
 
 ## Query a finite point

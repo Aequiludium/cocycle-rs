@@ -135,7 +135,7 @@ but reduction fill-in and repeated enumeration can still be substantial. Triangl
 indices must fit `usize`, even for sparse input. Optional cooperative controls
 cover the full builder operation; they are not hard process resource caps.
 Rust allocation failures are not uniformly
-recoverable. Read the [benchmarks](../../benches/README.md) for measured input-specific
+recoverable. Read the [benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) for measured input-specific
 behavior rather than a universal point-count limit.
 
 ## Graph construction and additional matrix layouts

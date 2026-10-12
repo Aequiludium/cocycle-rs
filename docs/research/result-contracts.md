@@ -2,6 +2,14 @@
 
 [Documentation](../README.md) / Research / [#61](https://github.com/Aequiludium/cocycle-rs/issues/61)
 
+**Result decisions and future proposals with historical evidence.** This report
+owns proposed output/interpretation contracts; dated main/PR states, including
+`a7ee9e9`, are preserved snapshots. Spectral and F2 examples are not production
+result APIs. Use the [version status](../README.md#version-and-capability-status)
+and [architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+for current capabilities, rustdoc for callable behavior and the
+[input report](input-contracts.md) for future inputs.
+
 Technical report, 2026-10-09, following the [interface inventory](interface-inventory.md)
 and [shared input contracts](input-contracts.md). This publishes the full result
 decision behind the [interface compatibility report](../design/interface-compatibility.md).

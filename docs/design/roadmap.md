@@ -3,8 +3,10 @@
 [Documentation](../README.md) / Design
 
 This document records priorities, not a delivery schedule. Supported behavior is
-listed in the [user guide](../guides/rips.md); completed user-visible work belongs in the
-[changelog](../../CHANGELOG.md).
+listed in the [architecture](../development/architecture.md) and usage guides;
+the [changelog](../../CHANGELOG.md) records versioned and Unreleased work.
+Use the [version status](../README.md#version-and-capability-status) to
+distinguish candidate implementation from releases and dated research.
 
 ## Direction
 
@@ -13,6 +15,11 @@ specialized Rips computation where appropriate. Prioritize coherent input and
 result contracts, composable analysis operations, ownership, and resource
 behavior. Runnable Rust examples demonstrate the kernel; language bindings and
 application frameworks are not first-stage deliverables.
+
+Phase 4 extends this direction across data, filtration, computation, results,
+comparison and analysis. Keep specialized persistence and concrete consumers;
+filtration, diagrams and distances are optional when a route does not need them.
+The six responsibilities do not require six crates or a runtime registry.
 
 The [GUDHI C++ study](../research/gudhi-cpp.md) maps upstream capabilities and remaining
 reading work. The [kernel design](kernel.md) defines responsibility boundaries
@@ -46,7 +53,45 @@ is a teaching example, not an additional production API. The
 [persistence algorithm walkthrough](../development/persistence-reduction.md)
 now covers direct column work, implicit alternatives and default integration.
 
+Borrowed stages and same-source inclusions, opt-in Big Steps critical sets and
+source/interval assembly integration are implemented Unreleased additions. Use
+the [stage guide](../guides/filtered-complexes.md#read-stages-and-their-inclusions),
+[critical-set guide](../guides/critical-sets.md) and
+[interface guide](../guides/interface-contracts.md) for calls and limits.
+The [input](../research/input-contracts.md) and [result](../research/result-contracts.md)
+reports and [route record](../research/route-integration.md) prepare future handoffs;
+they do not implement spectral/Dirac, F2 projection or learning algorithms.
+
 ## Next priorities
+
+<a id="phase-4-priorities"></a>
+
+The [Phase-4 plan #57](https://github.com/Aequiludium/cocycle-rs/issues/57) sets the
+next capability priorities. Complete reviewed integration and coherent documents,
+then advance concrete families through narrow implementations and independent
+acceptance. Interface preparation does not complete algorithm delivery.
+
+1. **Data.** Extend an existing owner only for a concrete Alpha, cubical/cellular
+   or generalized consumer, following the [modeling decisions](../research/data-modeling.md).
+2. **Filtration.** Retain finite same-owner stages; research general chain maps and
+   multiparameter transport separately under the [stage decisions](../research/filtration-stages.md).
+3. **Computation.** Implement single-scale Laplacian/Dirac, true persistent spectral
+   pairs and F2 homology operations in separate review units, following the
+   [family inputs](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
+   and [output/resource contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
+4. **Results.** Add a concrete interpretable result owner with its actual producer;
+   preserve ordered bases, availability and certificates under the [result decisions](../research/result-contracts.md).
+5. **Comparison.** Define one useful non-diagram similarity, coordinate alignment,
+   units and incompatible cases before adding an [API](../research/result-contracts.md#future-comparison-interface-information-only).
+6. **Analysis.** Preserve existing descriptors; validate a minimal exporter and
+   actual external consumer under the [handoff requirements](../research/analysis-learning.md#future-external-input-information-84-to-92).
+
+After actual producers exist, the [route record](../research/route-integration.md)
+guides their composition. Separate stage spectra are not a persistent Laplacian;
+legal F2 projections are not automatically optimal or matrix-commuting. Feedback
+remains application-owned and deferred until invalidation and derivative/tie
+behavior have concrete evidence. The implemented API and kernel revisions below
+provide the existing foundation for this work.
 
 The [API design](rips-api.md) is implemented with a compatibility stage:
 `RipsBuilder::build_complex` creates inspectable topology and `.persistence()`
@@ -81,7 +126,7 @@ generic cellular witnesses are separate workstreams, not prerequisites for an
 algorithm contribution. Mathematical optimizations and legacy-API removal also
 remain separate changes.
 
-The broader Rips capability and evidence priorities remain:
+Rips maintenance and evidence priorities remain within this broader plan:
 
 1. **Complete the Rips subsystem.** Follow the
    [delivery sequence and exit gates](rips.md#delivery-sequence-and-exit-gates):
@@ -96,12 +141,12 @@ The broader Rips capability and evidence priorities remain:
    The [implementation scope](rips-implementation.md) identifies exact directories,
    existing-file edits and review units for the first stage and later additions.
 2. **Extend native evidence with each capability.** The
-   [native suites](../../benches/README.md) compare pinned GUDHI and upstream
+   [native suites](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) compare pinned GUDHI and upstream
    Ripser C++ workers. Exact and sparse correctness suites now cover construction,
    higher dimensions, fields and approximation; the pipeline records phase and
    end-to-end resource snapshots. Extend those fixtures with each new contract,
    following the [verification matrix](rips.md#verification-and-native-comparison)
-   and [reporting rules](../../benches/reporting.md). Stronger performance claims
+   and [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md). Stronger performance claims
    need a fresh comparative study with externally retained evidence.
 3. **Retain focused H1 performance work.** The scoped sequence below can improve
    the existing path while broader capabilities arrive. Include nonmetric and
@@ -110,11 +155,10 @@ The broader Rips capability and evidence priorities remain:
    Review enumeration/reduction optimizations separately from API and storage
    refactors.
 
-This Rips-first direction supersedes the earlier suggestion to add a diagram
-representation or scalar-line operation next. Those remain future library
-capabilities; they are not substitutes for completing Rips. The selected target
-includes ownership, resources, reproducibility and result interpretation, not only
-an expanded constructor list. See [R1-R10](rips.md#required-capability-matrix).
+The earlier Rips-first plan remains the subsystem's design and evidence record.
+Phase 4 broadens the next priorities without relaxing its ownership, resource,
+reproducibility or result-interpretation requirements. See
+[R1-R10](rips.md#required-capability-matrix).
 
 Each crates.io release requires hosted CI for the exact release commit and
 inspection of the packaged crate, following the
@@ -122,12 +166,23 @@ inspection of the packaged crate, following the
 [changelog](../../CHANGELOG.md) describe delivered capabilities; this roadmap
 does not commit to dates for future work.
 
+After reviewed code integration, a separate focused documentation consolidation
+must align README, changelog, index, architecture and guides before release.
+Run the fixed Markdown doctests and check the actual Cargo package's local links.
+Keep #26/#49's paused preparation and #56's experimental adaptive H1 adoption gates
+independent. Corrected matrix-H1 measurements do not supply #56's unmeasured
+direct-graph/H2/H3 performance gates; documentation acceptance does not admit it.
+
 Performance-only changes to existing paths must preserve pivot order, F2 parity,
 multiplicity, and public coverage. New fields and generalized algorithms establish
 their own documented invariants. Check each optimization against the reference and external
 implementations; do not remove hard cases or use point count as a universal limit.
 
 ## H1 implementation sequence
+
+**Historical subsystem sequence.** This table preserves the earlier Rips-focused
+plan, not the Phase-4 queue. Recheck source and revision-bound reports before
+resuming a step; the changelog owns subsequent production changes.
 
 Keep maintenance refactors separate from changes to enumeration, reduction, or
 storage. The current baseline has a single result-normalization path, named

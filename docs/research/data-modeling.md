@@ -2,6 +2,11 @@
 
 [Documentation](../README.md) / Research / [#65](https://github.com/Aequiludium/cocycle-rs/issues/65)
 
+**Dated modeling decision.** Source hashes and validation below apply to the
+recorded baseline. The [version status](../README.md#version-and-capability-status)
+and [architecture](../development/architecture.md#six-responsibilities-and-data-routes)
+own this checkout's implemented scope; this report retains the research reasoning.
+
 Research decision, 2026-10-10. The goal is to let independently validated data
 serve filtration and direct single-scale consumers with the same cell meanings.
 This selects the first modeling entry for

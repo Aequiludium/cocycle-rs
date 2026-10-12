@@ -887,3 +887,120 @@ fn generic_work_budget_cancellation_and_recovery() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn staged_results_keep_witnesses_and_consumers_after_source_release() -> Result<()> {
+    use cocycle::descriptors::{betti_curve, finite_lifetime_summary};
+    use cocycle::diagram::{PersistenceDiagram, RepresentativeKind};
+    use cocycle::diagram_distances::{
+        bottleneck_distance, bottleneck_distance_results, wasserstein_1_infinity,
+        wasserstein_2_euclidean,
+    };
+
+    let result = {
+        let source = SimplicialComplex::new(vec![
+            simplex(&[10], -2.),
+            simplex(&[30], -2.),
+            simplex(&[90], -2.),
+            simplex(&[10, 30], 0.),
+            simplex(&[10, 90], 0.),
+            simplex(&[30, 90], 0.),
+            simplex(&[10, 30, 90], 2.),
+        ])?;
+        let ring = source.stage(0.)?;
+        let filled = source.stage(2.)?;
+        for (id, image) in ring.inclusion_into(&filled)? {
+            assert_eq!(id, image);
+            assert_eq!(ring.boundary(id), filled.boundary(image));
+        }
+        let truncated = ring.persistence().field(PrimeField::new(3)?).compute()?;
+        assert_eq!(truncated.diagram().coverage(), Coverage::Through(0.));
+        assert_eq!(truncated.context().requested_cutoff(), Some(0.));
+        assert_eq!(
+            truncated
+                .diagram()
+                .dimension(1)?
+                .iter()
+                .next()
+                .unwrap()
+                .end(),
+            IntervalEnd::RightCensored { through: 0. }
+        );
+        // A supplied ring is a different mathematical source: no later filling.
+        let supplied = PersistenceBuilder::from_complex(&ring)
+            .field(PrimeField::new(3)?)
+            .compute()?;
+        assert_eq!(supplied.diagram().coverage(), Coverage::Complete);
+        assert_eq!(
+            supplied
+                .diagram()
+                .dimension(1)?
+                .iter()
+                .next()
+                .unwrap()
+                .end(),
+            IntervalEnd::Essential
+        );
+        assert!(bottleneck_distance(truncated.diagram(), supplied.diagram(), 1).is_err());
+        let requests = [RepresentativeRequest::new(
+            1,
+            0.,
+            RepresentativeSelection::Both,
+        )?];
+        filled
+            .persistence()
+            .field(PrimeField::new(3)?)
+            .representatives(&requests)
+            .compute()?
+    }; // Every source, stage and request is released before any result consumer.
+    let (data, witnesses) = result.into_parts();
+    assert_eq!(data.context().characteristic(), 3);
+    assert_eq!(data.diagram().coverage(), Coverage::Complete);
+    let interval = data.diagram().dimension(1)?.iter().next().unwrap();
+    assert_eq!(
+        (interval.birth(), interval.end()),
+        (0., IntervalEnd::Finite(2.))
+    );
+    assert_eq!(
+        betti_curve(data.diagram(), 1, &[-1., 0., 1., 2.])?,
+        [0, 1, 1, 0]
+    );
+    assert_eq!(
+        finite_lifetime_summary(data.diagram(), 1)?.total_persistence(),
+        2.
+    );
+    assert!(matches!(
+        bottleneck_distance_results(&data, &data, 1),
+        Err(Error::IncompatibleDiagramContext { .. })
+    )); // Supplied signed scales have no declared edge-length convention.
+    assert_eq!(bottleneck_distance(data.diagram(), data.diagram(), 1)?, 0.);
+    let empty = PersistenceDiagram::new(1, Coverage::Complete, vec![])?;
+    assert_eq!(bottleneck_distance(data.diagram(), &empty, 1)?, 1.);
+    assert_eq!(wasserstein_1_infinity(data.diagram(), &empty, 1)?, 1.);
+    assert!((wasserstein_2_euclidean(data.diagram(), &empty, 1)? - 2_f64.sqrt()).abs() < 1e-14);
+    let witnesses = witnesses.unwrap();
+    assert_eq!(witnesses.len(), 2);
+    for witness in &witnesses {
+        assert_eq!(
+            data.diagram().interval(witness.interval_index()),
+            Some(interval)
+        );
+        assert_eq!(witness.characteristic(), 3);
+        assert_eq!(witness.scale(), 0.);
+    }
+    let cycle = witnesses
+        .iter()
+        .find(|w| w.kind() == RepresentativeKind::Cycle)
+        .unwrap();
+    // Independently expand the oriented edge boundaries using original labels.
+    let mut boundary = std::collections::BTreeMap::<usize, i64>::new();
+    for term in cycle.terms() {
+        let vertices = term.vertices();
+        assert_eq!(vertices.len(), 2);
+        let coefficient = i64::from(term.coefficient());
+        *boundary.entry(vertices[0]).or_default() -= coefficient;
+        *boundary.entry(vertices[1]).or_default() += coefficient;
+    }
+    assert!(boundary.values().all(|x| x.rem_euclid(3) == 0));
+    Ok(())
+}

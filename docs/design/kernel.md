@@ -387,8 +387,8 @@ topology, fields and approximation blockers. Validate witness equations and
 associations rather than requiring arbitrary bases to match.
 
 Native comparisons use pinned GUDHI/Ripser C++ paths with compatible capabilities
-and timing boundaries. Update the existing [performance report](../../benches/reports/rips-comparison.md)
-against full commits under the [reporting rules](../../benches/reporting.md).
+and timing boundaries. Update the existing [performance report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md)
+against full commits under the [reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md).
 Generated evidence stays outside Git; unit tests do not assert machine timings.
 A documentation revision makes no new performance or algorithm-correctness claim.
 

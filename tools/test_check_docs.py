@@ -116,6 +116,39 @@ class DocumentationTests(unittest.TestCase):
         status, _, stderr = self.run_check()
         self.assertEqual(status, 0, stderr)
 
+    def test_package_root_does_not_use_checkout_targets(self):
+        self.write("README.md", "# Checkout\n")
+        self.write("benches/report.md", "# Report\n")
+        self.write("package/README.md", "[Report](benches/report.md)\n")
+        stdout, stderr = StringIO(), StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = check_docs.main(self.root / "package")
+        self.assertEqual(status, 1)
+        self.assertIn("README.md:1: missing local target benches/report.md", stderr.getvalue())
+        self.write("package/README.md", "[Outside](../benches/report.md)\n")
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = check_docs.main(self.root / "package")
+        self.assertEqual(status, 1)
+        self.assertIn("local target outside documentation root", stderr.getvalue())
+
+    def test_package_root_checks_local_fragments_and_allows_repository_urls(self):
+        self.write("package/README.md", "[Guide](docs/guide.md#coverage)\n"
+                   "[Report](https://github.com/example/repo/blob/main/benches/report.md)\n")
+        self.write("package/docs/guide.md", "# Coverage\n[Home](../README.md)\n")
+        stdout, stderr = StringIO(), StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = check_docs.main(self.root / "package")
+        self.assertEqual(status, 0, stderr.getvalue())
+        self.assertIn("2 Markdown files", stdout.getvalue())
+
+    def test_missing_or_empty_package_root_fails(self):
+        stdout, stderr = StringIO(), StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(check_docs.main(self.root / "missing"), 1)
+            self.assertEqual(check_docs.main(self.root), 1)
+        self.assertIn("not a directory", stderr.getvalue())
+        self.assertIn("No Markdown documents", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

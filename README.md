@@ -15,6 +15,8 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
+- **Unreleased stage access** — borrowed sublevel stages and checked inclusions
+  between increasing scales of the same frozen source, preserving IDs and signs.
 - **Sparse approximation** — deterministic sampling, modified edges and higher-simplex
   blockers, with explicit metric hypotheses and approximation provenance.
 - **Optional representatives** — owned persistent cycle bases and query-scale dual
@@ -27,6 +29,8 @@ dependencies and no unsafe code.
   curves, computed directly from a diagram.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
+- **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
+  with bounded Partial U; updates and differentiation remain caller-owned.
 
 ![A square's Rips filtration: points, a loop at edge length 1, and filled triangles at sqrt(2).](assets/filtration.svg)
 
@@ -62,14 +66,52 @@ The [0.1.1 release notes](CHANGELOG.md#011) describe the latest maintenance fixe
 the [initial release notes](CHANGELOG.md#010) describe the supported scope,
 limitations and migration from development Git revisions. See the
 [version policy and release procedure](CONTRIBUTING.md#release-procedure) for
-compatibility and publishing.
+compatibility and publishing. The dependency above selects 0.1.1;
+this checkout's Unreleased additions are identified in the
+[version status](docs/README.md#version-and-capability-status).
+
+**Unreleased stage access.** This example requires the candidate API. A stage
+borrows
+all stored simplices with value <= scale, including ties. An inclusion preserves
+owner-local IDs and signed incidence; equal IDs from separate owners are not a map.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::diagram::{Coverage, IntervalEnd};
+use cocycle::persistence::PersistenceExt;
+
+let complex = SimplicialComplex::new(vec![
+    Simplex::new(vec![10], -1.)?, Simplex::new(vec![20], -1.)?,
+    Simplex::new(vec![30], -1.)?, Simplex::new(vec![10, 20], 1.)?,
+    Simplex::new(vec![10, 30], 1.)?, Simplex::new(vec![20, 30], 1.)?,
+    Simplex::new(vec![10, 20, 30], 2.)?,
+])?;
+let ring = complex.stage(1.)?;
+let filled = complex.stage(2.)?;
+assert_eq!((ring.len(), filled.len()), (6, 7));
+for (id, image) in ring.inclusion_into(&filled)? {
+    assert_eq!(id, image);
+    assert_eq!(ring.boundary(id), filled.boundary(image));
+}
+let result = ring.persistence().max_homology_dimension(1).compute()?;
+assert_eq!(result.diagram().coverage(), Coverage::Through(1.));
+assert_eq!(result.diagram().dimension(1)?.iter().next().unwrap().end(),
+    IntervalEnd::RightCensored { through: 1. });
+# Ok::<(), cocycle::Error>(())
+```
+
+Reading a stage does not compute persistence. Analyzing the ring as a stage of
+its source retains the cutoff; its surviving loop is censored. Re-importing its
+cells as a standalone supplied complex makes a different coverage claim. See the
+[stage guide](docs/guides/filtered-complexes.md#read-stages-and-their-inclusions)
+for certified sources, errors and the distinction from general chain maps.
 
 ## Explore
 
 [API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
 [Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
-[Architecture](docs/development/architecture.md) · [Benchmarks](benches/README.md) ·
-[Rips comparison](benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)
+[Architecture](docs/development/architecture.md) · [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) ·
+[Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)
 
 Contributing an algorithm? Start with the [research-area navigation](docs/development/algorithm-contributions.md)
 and the [diagram-analysis](docs/development/diagram-analysis.md) or
@@ -94,9 +136,18 @@ To compare two complete diagrams, run
 demonstrates all three metrics; see the [matching contract](docs/reference/mathematics.md#16-diagram-matching-distances)
 for ground costs, essential intervals and error semantics.
 
+Phase 4 connects six responsibilities: data, filtration, computation, results,
+comparison and analysis. Filtration selects scales when needed; computation
+produces concrete results that comparison and analysis can borrow independently.
+See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
+[roadmap](docs/design/roadmap.md#phase-4-priorities) and
+[interface guide](docs/guides/interface-contracts.md). Laplacian/Dirac solvers,
+persistent spectra, F₂ homology projection, non-diagram similarity and external
+learning remain future contracts, described in the [route report](docs/research/route-integration.md).
+
 Work and memory depend on the input and reduction fill-in. Rips comparisons
 use native GUDHI and upstream Ripser C++; see the maintained
-[Rips comparison](benches/reports/rips-comparison.md) for tested scope, correctness
+[Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) for tested scope, correctness
 and performance observations. Generated measurements and logs stay outside source Git.
 
 [Issue tracker](https://github.com/Aequiludium/cocycle-rs/issues) ·

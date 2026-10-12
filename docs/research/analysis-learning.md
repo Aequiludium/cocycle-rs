@@ -2,6 +2,12 @@
 
 [Documentation](../README.md) / Research / [#84](https://github.com/Aequiludium/cocycle-rs/issues/84) and [#85](https://github.com/Aequiludium/cocycle-rs/issues/85)
 
+**Historical baseline and future handoff record.** The `a7ee9e9` source/status
+observations below remain dated evidence. Current descriptors are described by
+their guide/rustdoc and the [architecture](../development/architecture.md#six-responsibilities-and-data-routes).
+The [version status](../README.md#version-and-capability-status) owns release scope;
+the [route record](route-integration.md) links future learning/feedback handoffs.
+
 Current-scope decision, 2026-10-11. Baseline main is
 `a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. The current issues cover existing
 descriptors and interface information only. #61 and #71 are closed;

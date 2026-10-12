@@ -4,6 +4,7 @@ Uses only the standard library. External URLs are not fetched; dated raw artifac
 and generated output are not documentation sources. Run from any directory.
 """
 
+import argparse
 from pathlib import Path
 import re
 import sys
@@ -88,14 +89,15 @@ def anchors(text):
     return result
 
 
-def check(path):
+def check(path, root=None):
+    root = ROOT if root is None else root
     text = path.read_text(encoding="utf-8")
     errors = []
     for line, content in enumerate(text.splitlines(), 1):
         if CJK.search(content):
-            errors.append(f"{path.relative_to(ROOT)}:{line}: project documentation must be English")
+            errors.append(f"{path.relative_to(root).as_posix()}:{line}: project documentation must be English")
     for offset, destination, error in links(text):
-        location = f"{path.relative_to(ROOT)}:{text.count(chr(10), 0, offset) + 1}"
+        location = f"{path.relative_to(root).as_posix()}:{text.count(chr(10), 0, offset) + 1}"
         if error:
             errors.append(f"{location}: {error}")
             continue
@@ -103,7 +105,9 @@ def check(path):
         if link.scheme or link.netloc:
             continue
         target = (path.parent / unquote(link.path)).resolve() if link.path else path
-        if not target.exists():
+        if not target.is_relative_to(root):
+            errors.append(f"{location}: local target outside documentation root {destination}")
+        elif not target.exists():
             errors.append(f"{location}: missing local target {destination}")
         elif link.fragment and target.suffix == ".md":
             if unquote(link.fragment) not in anchors(target.read_text(encoding="utf-8")):
@@ -111,9 +115,16 @@ def check(path):
     return errors
 
 
-def main():
-    paths = sorted({p for pattern in PATTERNS for p in ROOT.glob(pattern) if p.is_file()})
-    errors = [error for path in paths for error in check(path)]
+def main(root=None):
+    root = (ROOT if root is None else root).resolve()
+    if not root.is_dir():
+        print(f"Documentation root is not a directory: {root}", file=sys.stderr)
+        return 1
+    paths = sorted({p for pattern in PATTERNS for p in root.glob(pattern) if p.is_file()})
+    if not paths:
+        print(f"No Markdown documents found in {root}", file=sys.stderr)
+        return 1
+    errors = [error for path in paths for error in check(path, root)]
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
@@ -122,4 +133,7 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=ROOT,
+                        help="documentation root, including an unpacked Cargo package")
+    raise SystemExit(main(parser.parse_args().root))

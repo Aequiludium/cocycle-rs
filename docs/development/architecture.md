@@ -2,8 +2,10 @@
 
 [Documentation](../README.md) / Development
 
-This page describes implemented code. Proposed responsibilities and type boundaries
-belong in the [kernel design](../design/kernel.md).
+This page owns the implemented architecture for this checkout, including
+Unreleased additions. The [version status](../README.md#version-and-capability-status)
+separates that scope from releases and dated research. Proposed type boundaries
+belong in the [kernel design](../design/kernel.md) and the input/result reports.
 
 Cocycle is one Rust crate with a small public API. Modules follow mathematical
 responsibilities without requiring each computation to construct every possible
@@ -13,6 +15,23 @@ defines invariants; rustdoc defines public signatures and error behavior.
 Algorithm authors can start with the [contribution paths](algorithm-contributions.md)
 for focused descriptor, diagram-distance and explicit-construction workflows. This page owns
 the broader dependency map used for kernel integration.
+
+<a id="six-responsibilities-and-data-routes"></a>
+
+Phase 4 connects six responsibilities within these existing owners. `geometry`
+and `complex` supply data; `filtration` constructs scale-dependent sources and
+exposes stages; `persistence` computes ordinary PH; `diagram` owns results;
+`diagram_distances` compares diagrams; `descriptors` supplies analysis. Concrete
+results preserve context, coverage and optional witnesses. These responsibilities
+do not require six crates or a common source/result registry.
+
+Filtration is optional for single-scale consumers; diagrams and distances are
+optional for direct consumers. Signed incidence can already be read without PH,
+and supplied diagrams can already be compared/analyzed without a source owner.
+The [interface guide](../guides/interface-contracts.md) exercises current calls;
+the [route report](../research/route-integration.md) records composed handoffs and
+future requirements. Proposed producers and output types remain outside the
+implemented source tree below.
 
 ## Production code
 
@@ -41,7 +60,7 @@ src/
       mod.rs                     owned WeightedGraph, edges and queries
       adjacency.rs               compact sorted adjacency construction
     simplicial/
-      mod.rs                     validated SimplicialComplex, lookup and stored incidence
+      mod.rs                     validated SimplicialComplex, incidence, stages and inclusions
       simplex.rs                 canonical vertices, IDs and shared filtration order
       incidence.rs               oriented codimension-one boundary terms
   filtration/
@@ -173,7 +192,7 @@ No backend registry or Alpha/cubical construction is implied. See the
 The generic filtered-cell path is the common boundary-reduction optimization
 owner. Existing zero-born concrete requests retain the shared coface kernel,
 which also serves implicit flag/Rips continuation and fallback. The
-[integration report](../../benches/reports/critical-sets.md) records why both
+[integration report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/critical-sets.md) records why both
 uniform boundary routing and an H2+-only change were rejected on current main.
 The public interfaces, prime fields, coverage and result ownership are preserved.
 No dense production critical-set backend, engine option or adaptive size threshold
@@ -411,6 +430,18 @@ Keep public paths stable when splitting a file into private submodules. Add a ne
 public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
+
+Future Laplacian/Dirac, true persistent spectral pairs and F2 homology projection
+need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
+and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
+Non-diagram similarities need defined coordinates and units; exporters, external
+learning and automatic feedback need the [handoff contracts](../research/analysis-learning.md).
+None of these algorithms is implemented by the current interfaces.
+
+IDs belong to one owner; ordered bases retain signs and associations. Filtration
+values, spectral Grams and F2 class costs are distinct. Ordinary stage spectra
+would not establish a persistent Laplacian, and critical-set proposals do not
+compute F2 homology projections. Applications own feedback and recomputation.
 
 Current integration has specific limits. `PersistenceExt` is sealed, its Builder
 compute hook is private, and column arithmetic and work budgets are crate-internal.
