@@ -37,7 +37,7 @@ pub(super) fn diagram<I>(
             ));
         }
     }
-    super::assemble_diagram(dimension, coverage, intervals)
+    super::assembly::assemble_diagram(dimension, coverage, intervals)
 }
 
 #[cfg(test)]

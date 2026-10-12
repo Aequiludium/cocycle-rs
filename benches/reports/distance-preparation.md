@@ -6,10 +6,11 @@
 
 **Archived: performance admission not passed; candidate code withdrawn on
 2026-10-11.** [PR 26](https://github.com/Aequiludium/cocycle-rs/pull/26)
-now retains this report and its index only. Its production sources, tests,
-examples, benchmark workers, controllers and CI are restored to main
-`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. The logical-view preparation
-candidate is not adopted. Issue #14 is not completed by this archive.
+retains this report and its index only. At withdrawal commit
+`527d361971deb8129af587a3d4655a088d6b5fd5`, all other paths matched main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. Subsequent main synchronization
+preserves the documentation-only scope. The logical-view preparation candidate
+is not adopted. Issue #14 is not completed by this archive.
 
 The last implementation snapshot is
 [`662ec16d0afc13a9f8b6009b32e6ce4f5f43027c`](https://github.com/Aequiludium/cocycle-rs/commit/662ec16d0afc13a9f8b6009b32e6ce4f5f43027c).
@@ -66,10 +67,11 @@ allocation-intervention experiment, not a cross-library speed ranking.
 The dependent [PR 49](https://github.com/Aequiludium/cocycle-rs/pull/49)
 candidate for [Issue 31](https://github.com/Aequiludium/cocycle-rs/issues/31)
 is also withdrawn on 2026-10-11 because performance admission was not passed.
-Its final proposal retains documentation only; all production sources, tests,
-examples, tools and CI match main
-`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`. There is no public
-`PreparedDiagram` in the resulting crate. This archive does not complete
+Its proposal retains documentation only. At withdrawal commit
+`b0562bd67be8d8ef1537c9af21222397e2bcf44a`, all non-archive paths matched main
+`a7ee9e911dcdeaea137b682bf383f7c2e1d090d5`; subsequent main synchronization
+preserves that documentation-only scope. There is no public `PreparedDiagram`
+in the resulting crate. This archive does not complete
 Issue #31 or waive the prerequisite #14 gate.
 
 The last implementation snapshot is

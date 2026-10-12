@@ -8,6 +8,12 @@ source trait or a universal result container. The
 [interface compatibility report](../design/interface-compatibility.md) records
 the decisions and the remaining spectral/operator boundaries.
 
+The [data-modeling decision](../research/data-modeling.md) selects existing
+point, graph and simplex owners. The two readers below share one frozen complex:
+signed single-scale boundary export and ordinary persistence. Run
+`cargo run --locked --example complex_construction` for another runnable version
+that constructs one lower-star circle and reads it both ways.
+
 ## Read a signed stage for a matrix consumer
 
 Borrow a frozen complex and select cells with value <= scale. Preserve its
@@ -16,7 +22,9 @@ The explicit conversion below returns owned dense matrices only because the
 small external consumer needs them. It is tutorial code, not a new public API.
 
 ```rust
-use cocycle::complex::{Simplex, SimplexId, SimplicialComplex};
+use cocycle::complex::{FilteredComplex, Simplex, SimplexId, SimplicialComplex};
+use cocycle::diagram::IntervalEnd;
+use cocycle::persistence::PersistenceExt;
 
 let complex = SimplicialComplex::new(vec![
     Simplex::new(vec![10], 0.)?, Simplex::new(vec![20], 0.)?,
@@ -27,9 +35,11 @@ let complex = SimplicialComplex::new(vec![
 let source = &complex;
 let scale = 1.;
 let bases: [Vec<SimplexId>; 3] = std::array::from_fn(|degree| {
-    source.simplices().iter()
-        .filter(|s| s.dimension() == degree && s.value() <= scale)
-        .map(|s| source.find(s.vertices()).unwrap()).collect()
+    source.cells()
+        .filter(|&id| {
+            let s = source.simplex(id).unwrap();
+            s.dimension() == degree && s.value() <= scale
+        }).collect()
 });
 let keys: Vec<_> = bases[1].iter()
     .map(|id| source.simplex(*id).unwrap().vertices()).collect();
@@ -60,6 +70,22 @@ assert_eq!(d, vec![Vec::<i32>::new(); 3]);
 let a_f2: Vec<Vec<_>> = a.iter()
     .map(|row| row.iter().map(|x| x.rem_euclid(2)).collect()).collect();
 assert_eq!(a_f2, [[1, 1, 0], [1, 0, 1], [0, 1, 1]]);
+
+// A direct calculation at scale 1, with standard real inner products.
+// The signed edge cycle x has B1*x=0. No persistence request was needed.
+let x = [1, -1, 1];
+let energy: i32 = a.iter()
+    .map(|row| row.iter().zip(x).map(|(b, x)| b * x).sum::<i32>().pow(2))
+    .sum();
+assert_eq!(energy, 0); // x^T B1^T B1 x; C2 is empty at this scale.
+
+// The other reader uses this exact owner and its stored filtration values.
+let ids_before: Vec<_> = source.cells().collect();
+let result = source.persistence().max_homology_dimension(1).compute()?;
+let h1 = result.diagram().dimension(1)?.iter().next().unwrap();
+assert_eq!((h1.birth(), h1.end()), (1., IntervalEnd::Finite(2.)));
+assert_eq!(source.cells().collect::<Vec<_>>(), ids_before);
+assert_eq!(source.simplex(bases[1][0]).unwrap().vertices(), &[20, 30]);
 # Ok::<(), cocycle::Error>(())
 ```
 
@@ -69,6 +95,13 @@ matrix coordinate and uses linear basis lookups; it is a deliberately small
 example, not a recommended large-complex representation. Sparse consumers can
 iterate signed incidence instead. The source is unchanged, and no persistence
 request is needed for this conversion.
+
+`FilteredComplex::cells()` already supplies the stored IDs without vertex-key
+lookups. A direct read of the entire object can omit the scale predicate, as the
+construction example does. The stage selection above includes all ties, while
+the PH query reads the full filtration and obtains H1 `[1,2)`. A scale-1 truncated
+PH query would instead retain a right-censored endpoint; the direct stage's
+cycle does not certify essentiality of that truncated query.
 
 For an ordinary nonaugmented H0 consumer, the previous space is empty and its
 boundary has shape 0-by-n. Export that shape explicitly. Simplex IDs belong to

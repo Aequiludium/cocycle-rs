@@ -9,8 +9,9 @@ mod explicit;
 pub(super) mod reduction;
 mod rips;
 
+use super::RipsOptions;
+use super::assembly::assemble_diagram;
 use super::rips::resolve_rips_range;
-use super::{RipsOptions, assemble_diagram};
 use crate::Result;
 use crate::diagram::PersistenceDiagram;
 use crate::geometry::DissimilarityView;

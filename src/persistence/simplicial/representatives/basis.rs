@@ -5,7 +5,7 @@ use crate::diagram::{
     Coverage, PersistenceDiagram, Representative, RepresentativeKind, RepresentativeTerm,
 };
 use crate::filtration::simplicial::ZeroBornSimplicialAccess;
-use crate::persistence::{PersistenceOptions, assemble_diagram, execution::WorkBudget};
+use crate::persistence::{PersistenceOptions, assembly::assemble_diagram, execution::WorkBudget};
 use crate::{Error, Result};
 
 pub(in crate::persistence) fn compute(

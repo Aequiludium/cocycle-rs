@@ -97,6 +97,17 @@ not a single point. Cocycles form the dual basis at the query scale: their
 pairing with the corresponding cycle is one, and with the other active cycles
 is zero. This association holds even for repeated intervals.
 
+Use `result.as_ref()` to borrow its existing `PersistenceData`, or
+`result.into_parts()` to move diagram/context and representatives together.
+Resolve each moved witness with `data.diagram().interval(witness.interval_index())`;
+matching only birth/death pairs would merge duplicate identities. Neither operation
+clones or sorts the payload. `into_data()` discards witnesses; `into_diagram()`
+also discards context. The [runnable example](../../examples/rips_representatives.rs)
+releases its source before borrowing common data, moving both outputs, and
+calling a representative consumer that receives only the data and witness slice.
+Diagram descriptors and contextual distances consume the same moved data;
+they need no new persistence computation.
+
 There is no shortest-support or canonical-across-algorithms claim. At different
 scales, cocycles are solved independently; identical coefficient vectors across
 scales are not promised. The mathematical construction and independent checks

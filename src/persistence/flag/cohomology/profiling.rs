@@ -3,7 +3,7 @@
 use super::*;
 use crate::diagram::{Coverage, IntervalEnd};
 use crate::persistence::rips::resolve_rips_range;
-use crate::persistence::{RipsOptions, assemble_diagram, reference};
+use crate::persistence::{RipsOptions, assembly::assemble_diagram, reference};
 
 #[test]
 fn h2_workspace_failures_discard_scratch_and_retry_repeated_intervals() {
