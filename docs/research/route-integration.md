@@ -7,6 +7,17 @@ algorithm integration. The current issue scopes require interface preparation
 for #88-#93, while keeping their later running goals open. Contract examples,
 hand calculations and ordinary PH are not executions of future algorithms.
 
+On 2026-10-12, main `c85ef24853fb19d510602e7339f82065a3dafdba` already contains
+#102-#107 and #112 through [PR #122](https://github.com/Aequiludium/cocycle-rs/pull/122).
+Its [post-merge CI](https://github.com/Aequiludium/cocycle-rs/actions/runs/38151978060)
+passed all eight jobs. PR #100 is synchronized with that main through ordinary
+merge history but remains unmerged. Relative to the synchronized stage branch,
+this integration layer adds only the signed-stage consumer regression below,
+this report and its documentation index entry. Adopted legacy migration and
+the remaining stage candidate have separate acceptance boundaries; the original
+2026-10-11 hashes and counts below remain dated evidence. Later stack entries
+prepare future contracts, without delivering their algorithms or a release.
+
 ## Integrated existing pipeline: #87 and #94
 
 The frozen pre-migration baseline for closed #87 is main
