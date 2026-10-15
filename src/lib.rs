@@ -38,13 +38,14 @@
 //! # Ok::<(), cocycle::Error>(())
 //! ```
 
+mod eigensolver;
+
 pub mod algebra;
 pub mod complex;
 pub mod descriptors;
 pub mod diagram;
 pub mod diagram_distances;
 pub mod dirac;
-mod eigensolver;
 mod error;
 pub mod execution;
 pub mod filtration;

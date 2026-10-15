@@ -168,7 +168,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `homology_operators` | Validate ordered F2 windows, construct feasible projections and read integer class costs/finite maps | Complex/stage access, execution and error utilities; no persistence engine dependency |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
 | `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
-| `spectral` | Real graded Dirac action, bounded export and signed boundary spectra | Complex signed-cell contract, shared eigensolver, execution, error utilities |
+| `dirac` | Real graded Dirac action, bounded export and signed boundary spectra | Complex signed-cell contract, shared eigensolver, execution, error utilities |
 
 `DiracOperator` freezes supplied signed integer boundaries and ordered degree
 bases, checking the retained chain condition before conversion to f64. It does
