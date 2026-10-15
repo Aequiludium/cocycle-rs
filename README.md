@@ -28,7 +28,8 @@ dependencies and no unsafe code.
 - **Useful summaries** — finite lifetimes, persistence entropy in nats, and Betti
   curves, computed directly from a diagram.
 - **Unreleased Dirac operators** — sparse real action and bounded matrix export
-  on signed chains, with explicit degree truncation and source-local coordinates.
+  on signed chains, selected signed boundary modes, explicit degree truncation
+  and source-local coordinates.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
 - **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
@@ -147,7 +148,7 @@ comparison and analysis. Filtration selects scales when needed; computation
 produces concrete results that comparison and analysis can borrow independently.
 See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
 [roadmap](docs/design/roadmap.md#phase-4-priorities) and
-[interface guide](docs/guides/interface-contracts.md). Laplacian operators and Dirac eigensolvers,
+[interface guide](docs/guides/interface-contracts.md). Laplacian operators and general Dirac spectra,
 persistent spectra, optimal F₂ projections, non-diagram similarity and external
 learning remain future contracts, described in the [route report](docs/research/route-integration.md).
 

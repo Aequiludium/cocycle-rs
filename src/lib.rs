@@ -43,6 +43,7 @@ pub mod complex;
 pub mod descriptors;
 pub mod diagram;
 pub mod diagram_distances;
+mod eigensolver;
 mod error;
 pub mod execution;
 pub mod filtration;

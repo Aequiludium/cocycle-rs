@@ -89,7 +89,7 @@ jobs:
           python -m pip install numpy==2.4.6
           rustc --edition 2024 tools/reference/dirac_cocycle.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/dirac-worker
           target/dirac-worker > target/dirac-rust.jsonl
-          python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json
+          python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json --pairs
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps

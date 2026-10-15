@@ -1,7 +1,7 @@
 //! Public real Dirac contracts, independent hand matrices and invalid chain inputs.
 use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::{DiracOperator, MAX_DIRAC_DEGREES};
+use cocycle::spectral::{DiracOperator, IterativeOptions, MAX_DIRAC_DEGREES};
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
 
@@ -82,6 +82,125 @@ fn multiply(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
     (0..n * n)
         .map(|i| (0..n).map(|j| a[i / n * n + j] * b[j * n + i % n]).sum())
         .collect()
+}
+
+#[test]
+fn boundary_spectrum_preserves_multiplicity_chirality_and_same_interval() -> Result<()> {
+    let source = triangle(true);
+    let op = DiracOperator::new(&source, 0..=2)?;
+    let options = IterativeOptions::default();
+    let execution = Execution::default();
+    let first = op.boundary_spectrum(1, 2, 1e-8, &options, &execution)?;
+    let second = op.boundary_spectrum(2, 1, 1e-8, &options, &execution)?;
+    for pairs in [&first, &second] {
+        assert_eq!(pairs.degrees(), 0..=2);
+        assert_eq!(pairs.basis(), op.basis());
+        assert_eq!(pairs.degree_offsets(), op.degree_offsets());
+        assert!(pairs.orthogonality_error() < 1e-10);
+        for &sigma in pairs.singular_values() {
+            assert!((sigma - 3_f64.sqrt()).abs() < 1e-10);
+        }
+        let columns = pairs.values().len();
+        for j in 0..columns {
+            let vector: Vec<_> = (0..op.basis().len())
+                .map(|row| pairs.vectors()[row * columns + j])
+                .collect();
+            let actual = op.action(&vector)?;
+            let square = op.action(&actual)?;
+            for row in 0..vector.len() {
+                assert!((actual[row] - pairs.values()[j] * vector[row]).abs() < 1e-9);
+                assert!((square[row] - 3. * vector[row]).abs() < 1e-9);
+            }
+            assert!(pairs.residuals()[j] < 1e-9);
+        }
+        for j in 0..columns / 2 {
+            assert_eq!(pairs.values()[j], -pairs.values()[columns - 1 - j]);
+            for (degree, range) in op.degree_offsets().windows(2).enumerate() {
+                let sign = if degree.is_multiple_of(2) { 1. } else { -1. };
+                for row in range[0]..range[1] {
+                    assert_eq!(
+                        pairs.vectors()[row * columns + j],
+                        sign * pairs.vectors()[row * columns + columns - 1 - j]
+                    );
+                }
+            }
+        }
+    }
+    // Both B1 modes and the B2 mode contribute separate +/-sqrt(3) pairs.
+    // Their degree-1 components lie in orthogonal chain subspaces.
+    for i in 0..first.values().len() {
+        for j in 0..second.values().len() {
+            let dot: f64 = (0..op.basis().len())
+                .map(|row| first.vectors()[row * 4 + i] * second.vectors()[row * 2 + j])
+                .sum();
+            assert!(dot.abs() < 1e-10);
+        }
+    }
+    let truncated = DiracOperator::new(&source, 1..=2)?;
+    assert!(
+        truncated
+            .boundary_spectrum(1, 1, 1e-8, &options, &execution)
+            .is_err()
+    );
+    let retained = truncated.boundary_spectrum(2, 1, 1e-8, &options, &execution)?;
+    assert_eq!(retained.degrees(), 1..=2);
+    assert_eq!(retained.basis().len(), 4);
+    // Absolute degrees, not degree-offset parity, determine Gamma here.
+    for row in 0..4 {
+        let sign = if row < 3 { -1. } else { 1. };
+        assert_eq!(
+            retained.vectors()[row * 2],
+            sign * retained.vectors()[row * 2 + 1]
+        );
+    }
+    let single = DiracOperator::new(&source, 1..=1)?;
+    assert!(
+        single
+            .boundary_spectrum(1, 1, 1e-8, &options, &execution)
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn boundary_spectrum_rejects_zero_modes_limits_and_cancellation() -> Result<()> {
+    let source = triangle(true);
+    let op = DiracOperator::new(&source, 0..=2)?;
+    let options = IterativeOptions::default();
+    let execution = Execution::default();
+    assert!(
+        op.boundary_spectrum(1, 3, 1e-8, &options, &execution)
+            .is_err()
+    );
+    assert!(
+        op.boundary_spectrum(1, 1, f64::NAN, &options, &execution)
+            .is_err()
+    );
+    assert!(
+        op.boundary_spectrum(1, 1, 10., &options, &execution)
+            .is_err()
+    );
+    assert!(matches!(
+        op.boundary_spectrum(1, 1, 1e-8, &options, &execution.max_work(0)),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    let limited = IterativeOptions {
+        max_basis_entries: 0,
+        ..Default::default()
+    };
+    assert!(matches!(
+        op.boundary_spectrum(1, 1, 1e-8, &limited, &execution),
+        Err(Error::InvalidParameter { .. })
+    ));
+    let empty = op.boundary_spectrum(1, 0, 1e-8, &limited, &execution)?;
+    assert!(empty.values().is_empty());
+    assert_eq!(empty.gram_applications(), 0);
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        op.boundary_spectrum(1, 1, 1e-8, &options, &execution.cancellation(&flag)),
+        Err(Error::Cancelled)
+    ));
+    Ok(())
 }
 
 #[test]

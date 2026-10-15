@@ -1,6 +1,7 @@
 //! Fixed public-API Dirac fixtures for the independent Python checker.
 use cocycle::complex::{Simplex, SimplicialComplex};
-use cocycle::spectral::DiracOperator;
+use cocycle::execution::Execution;
+use cocycle::spectral::{DiracOperator, IterativeOptions};
 fn main() -> cocycle::Result<()> {
     let cases: Vec<(&str, Vec<Vec<usize>>, usize, usize)> = vec![
         ("empty", vec![], 0, 2),
@@ -50,12 +51,33 @@ fn main() -> cocycle::Result<()> {
             .collect();
         let x: Vec<_> = (0..basis.len()).map(|i| (i as f64 - 3.) / 4.).collect();
         let y = op.action(&x)?;
+        let ranks: &[(usize, usize)] = match name {
+            "edge" => &[(1, 1)],
+            "path" | "triangle_ring" => &[(1, 2)],
+            "filled_triangle" => &[(1, 2), (2, 1)],
+            "filled_triangle_c1_c2" => &[(2, 1)],
+            "tetrahedron" => &[(1, 3), (2, 3), (3, 1)],
+            "tetrahedron_boundary" => &[(1, 3), (2, 3)],
+            _ => &[],
+        };
+        let mut boundary_spectra = Vec::new();
+        for &(degree, count) in ranks {
+            let pairs = op.boundary_spectrum(
+                degree,
+                count,
+                1e-8,
+                &IterativeOptions::default(),
+                &Execution::default(),
+            )?;
+            boundary_spectra.push(format!("{{\"degree\":{degree},\"count\":{count},\"singular_values\":{:?},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?},\"orthogonality\":{},\"gram_actions\":{}}}",pairs.singular_values(),pairs.values(),pairs.vectors(),pairs.residuals(),pairs.orthogonality_error(),pairs.gram_applications()));
+        }
         println!(
-            "{{\"name\":\"{name}\",\"basis\":{basis:?},\"offsets\":{:?},\"truncated\":{},\"matrix\":{:?},\"x\":{x:?},\"action\":{y:?},\"square_action\":{:?}}}",
+            "{{\"name\":\"{name}\",\"basis\":{basis:?},\"offsets\":{:?},\"truncated\":{},\"matrix\":{:?},\"x\":{x:?},\"action\":{y:?},\"square_action\":{:?},\"boundary_spectra\":[{}]}}",
             op.degree_offsets(),
             op.is_truncated(),
             op.matrix(4096)?,
-            op.action(&y)?
+            op.action(&y)?,
+            boundary_spectra.join(",")
         );
     }
     Ok(())

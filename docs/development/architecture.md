@@ -45,6 +45,8 @@ src/
     mod.rs                       borrowed-source F2 critical sets; lazy dual and bounded U
   spectral/
     mod.rs                       owned real graded Dirac incidence, sparse action and bounded export
+    spectrum.rs                  retained boundary singular modes and verified signed pairs
+  eigensolver.rs                 shared real block LOBPCG and small symmetric Ritz solver
   algebra/
     field/mod.rs                 validated PrimeField and modular arithmetic
     column/mod.rs                private ordered sparse coefficient columns
@@ -166,7 +168,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `homology_operators` | Validate ordered F2 windows, construct feasible projections and read integer class costs/finite maps | Complex/stage access, execution and error utilities; no persistence engine dependency |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
 | `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
-| `spectral` | Standard real graded Dirac action and bounded matrix export; no eigensolver | Complex signed-cell contract, execution, error utilities |
+| `spectral` | Real graded Dirac action, bounded export and signed boundary spectra | Complex signed-cell contract, shared eigensolver, execution, error utilities |
 
 `DiracOperator` freezes supplied signed integer boundaries and ordered degree
 bases, checking the retained chain condition before conversion to f64. It does
@@ -442,7 +444,7 @@ public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
 
-Future Laplacian operators and Dirac spectra, true persistent spectral pairs
+Future Laplacian operators and general Dirac spectra, true persistent spectral pairs
 and optimal F2 projections
 need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
 and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).

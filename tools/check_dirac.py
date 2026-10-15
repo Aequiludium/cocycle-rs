@@ -106,7 +106,7 @@ def faces(facets):
                    for face in itertools.combinations(cell, size)})
 
 
-def check(rust_path, toponetx_path=None, use_gudhi=False):
+def check(rust_path, toponetx_path=None, use_gudhi=False, check_pairs=False):
     rows = read_rows(rust_path)
     import numpy as np
 
@@ -155,6 +155,36 @@ def check(rust_path, toponetx_path=None, use_gudhi=False):
         np.testing.assert_array_equal(rust, rust.T)
         np.testing.assert_array_equal(action, expected_k @ x)
         np.testing.assert_array_equal(squared_action, (expected_k @ expected_k) @ x)
+        if check_pairs:
+            spectra = row['boundary_spectra']
+            expected_parts = {}
+            for slot, degree in enumerate(range(a+1, b+1), start=1):
+                block = d[offsets[slot-1]:offsets[slot], offsets[slot]:offsets[slot+1]]
+                singular_values = np.linalg.svd(block, compute_uv=False)
+                nonzero = singular_values[singular_values > 1e-8]
+                if len(nonzero):
+                    expected_parts[degree] = nonzero
+            assert {p['degree'] for p in spectra} == set(expected_parts), name
+            assert len(spectra) == len(expected_parts), name
+            all_signed = []
+            gamma = np.asarray([(-1.)**(len(face)-1) for face in basis])
+            for part in spectra:
+                reference = expected_parts[part['degree']]
+                count = len(reference)
+                assert part['count'] == count
+                np.testing.assert_allclose(part['singular_values'], reference, atol=1e-8, rtol=1e-8)
+                wanted = np.concatenate([-reference, reference[::-1]])
+                np.testing.assert_allclose(part['values'], wanted, atol=1e-8, rtol=1e-8)
+                q = np.asarray(part['vectors']).reshape(n,2*count)
+                v = np.asarray(part['values'])
+                errors = np.linalg.norm(expected_k @ q-q*v,axis=0)
+                np.testing.assert_allclose(part['residuals'],errors,atol=1e-12,rtol=1e-6)
+                assert np.all(errors <= 1.01e-9*(1/np.abs(v)+np.abs(v)))
+                assert np.linalg.norm(q.T @ q-np.eye(2*count)) < 1e-8
+                np.testing.assert_allclose(q[:,:count],gamma[:,None]*q[:,::-1][:,:count],atol=0,rtol=0)
+                all_signed.extend(part['values'])
+            complete = np.linalg.eigvalsh(expected_k)
+            np.testing.assert_allclose(sorted(all_signed),complete[np.abs(complete)>1e-8],atol=1e-8,rtol=1e-8)
         hodge = np.zeros((n, n))
         singular = []
         for degree in range(a, b + 1):
@@ -213,6 +243,8 @@ def check(rust_path, toponetx_path=None, use_gudhi=False):
         "toponetx_scope": "Three unchanged AST-extracted methods with supplied bases; not full package integration. Empty/isolated shapes excluded." if fixed_functions else "not requested",
         "gudhi_scope": "Complete ordinary torsion-free fixtures over F3; kernel dimension only. Empty/truncated cases excluded." if gudhi else "not requested",
         "absolute_spectral_tolerance": TOLERANCE,
+        "rust_signed_pair_cases": len(rows) if check_pairs else 0,
+        "rust_boundary_singular_modes": sum(len(p['singular_values']) for row in rows for p in row['boundary_spectra']) if check_pairs else 0,
         "cases": results,
     }
 
@@ -223,9 +255,10 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True, help="result JSON under target/")
     parser.add_argument("--toponetx", type=Path, help="fixed simplicial_complex.py at ce3d414")
     parser.add_argument("--gudhi", action="store_true", help="also check full-fixture F3 Betti numbers")
+    parser.add_argument("--pairs", action="store_true", help="require Rust signed boundary eigenpairs and compare NumPy SVD/chirality")
     args = parser.parse_args(argv)
     try:
-        report = check(args.rust, args.toponetx, args.gudhi)
+        report = check(args.rust, args.toponetx, args.gudhi, args.pairs)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     except (OSError, ValueError, AssertionError, ImportError, SyntaxError, TypeError, KeyError) as error:

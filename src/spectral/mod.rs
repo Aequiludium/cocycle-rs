@@ -3,8 +3,13 @@
 //! This opt-in path reads signed integer incidence from [`FilteredComplex`],
 //! independently of persistence and its coefficient field. It uses ordinary
 //! nonaugmented chains and the Euclidean inner product: `K = d + d.transpose()`.
-//! Degree truncation removes maps crossing either endpoint. No eigensolver,
-//! weighted/complex adjoint, persistent Dirac or signal filter is provided.
+//! Degree truncation removes maps crossing either endpoint. Nonzero boundary
+//! spectra use a matrix-free shared block solver; weighted/complex adjoints,
+//! persistent Dirac and signal filters remain outside this API.
+
+mod spectrum;
+pub use crate::eigensolver::IterativeOptions;
+pub use spectrum::DiracBoundarySpectrum;
 
 use crate::complex::FilteredComplex;
 use crate::execution::{Execution, WorkBudget};
@@ -290,6 +295,10 @@ impl<I: Copy + Eq + Hash> DiracOperator<I> {
     /// Includes [`Self::action`] errors, cancellation and work exhaustion.
     pub fn action_with(&self, x: &[f64], execution: &Execution<'_>) -> Result<Vec<f64>> {
         let mut budget = WorkBudget::new(execution)?;
+        self.action_budget(x, &mut budget)
+    }
+
+    fn action_budget(&self, x: &[f64], budget: &mut WorkBudget<'_>) -> Result<Vec<f64>> {
         if x.len() != self.basis.len() {
             return Err(Error::ShapeMismatch {
                 input: "Dirac vector",

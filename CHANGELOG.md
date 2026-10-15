@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add matrix-free Dirac `boundary_spectrum`: selected nonzero singular modes of
+  retained B[j] reconstruct signed eigenpairs of the same truncated operator.
+  Share block LOBPCG and the small Ritz solver with Hodge; verify full sparse
+  residuals, chirality and multiplicity. Kernel/rank and global spectrum coverage
+  are not certified; normal maps square conditioning.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
@@ -11,7 +17,7 @@ for the integration provenance and separate future capability contracts.
   bounded matrix export, including degree truncation and execution controls.
   Degree intervals are capped at `spectral::MAX_DIRAC_DEGREES` (4096)
   before offset allocation or source access, including empty inputs.
-  No eigensolver, nonstandard Gram, complex or persistent Dirac is included.
+  Nonstandard Gram, complex and persistent Dirac remain outside this API.
 - Add hand-matrix and resource/error regressions, a runnable `dirac` example,
   an independent NumPy fixture checker with optional fixed TopoNetX/GUDHI
   probes, and the corresponding mathematical/usage contracts.

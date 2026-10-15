@@ -1035,5 +1035,22 @@ transpose contributions with finite f64 products/partial sums. No dense matrix
 is needed. Explicit row-major export checks n*n and the caller's scalar-entry
 cap before allocation. Cooperative work/cancellation errors return no partial
 operator or buffer. The API supports only this real standard-inner-product
-operator: no Gram conversion, complex conjugate adjoint, spectrum solver,
+operator: no Gram conversion, complex conjugate adjoint, general global spectrum,
 augmentation, persistent Dirac, mass term or signal filter is inferred.
+
+For a retained boundary B[j] and a positive singular value sigma, let
+B[j]v=sigma*u and B[j]^T u=sigma*v. Then u lies in im B[j] and v lies in
+im B[j]^T. The integer chain condition gives B[j-1]u=0 and B[j+1]^T v=0
+inside this same selected interval. Consequently w+=(u,v)/sqrt(2) is an
+eigenvector of the entire retained K with eigenvalue sigma; Gamma*w+ has
+eigenvalue -sigma, where Gamma is absolute-degree parity. Different retained
+boundaries contribute orthogonal nonzero chain subspaces, so their nonzero
+singular values contribute separate signed multiplicities. This recovers the
+nonzero spectrum without independently diagonalizing the entire Dirac matrix.
+
+The implemented boundary-spectrum path approximates selected largest singular
+modes through matrix-free B[j]^T B[j] block LOBPCG and a small Ritz problem.
+It verifies the reconstructed signed residuals with the actual truncated K.
+Thresholded positive modes do not certify rank, the kernel or extremal coverage.
+Normal-map tolerances have sigma² units; division by |sigma| translates the
+absolute error scale to signed Dirac residual units and reflects conditioning.

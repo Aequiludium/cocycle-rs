@@ -6,16 +6,16 @@ This **Unreleased** capability implements #74's standard-real Dirac action and
 matrix construction on a finite [supplied complex or stage](filtered-complexes.md).
 It reads signed integer boundaries directly, preserves graded coordinates and
 uses the Euclidean inner product. It performs no persistence request and does
-not turn filtration values into weights. **There is no Rust spectrum API in
-this implementation.** Numerical spectra below are independent Python checks
-of matrices equal to the Rust output.
+not turn filtration values into weights. `boundary_spectrum` also computes
+selected nonzero signed modes from each retained boundary using a matrix-free
+normal-map solve, with actual truncated-Dirac residual and chirality checks.
 
 ## Apply Dirac to one edge
 
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::DiracOperator;
+use cocycle::spectral::{DiracOperator, IterativeOptions};
 
 let source = SimplicialComplex::new(vec![
     Simplex::new(vec![10], -2.)?,
@@ -28,6 +28,10 @@ assert_eq!(dirac.degree_offsets(), &[0, 2, 3]);
 assert_eq!(dirac.action(&[2., 5., 7.])?, [-7., 7., 3.]);
 assert_eq!(dirac.matrix(9)?, [0., 0., -1., 0., 0., 1., -1., 1., 0.]);
 assert_eq!(dirac.entries().count(), 4);
+let pairs = dirac.boundary_spectrum(1, 1, 1e-8, &IterativeOptions::default(), &Execution::default())?;
+assert!((pairs.values()[0] + 2_f64.sqrt()).abs() < 1e-9);
+assert!((pairs.values()[1] - 2_f64.sqrt()).abs() < 1e-9);
+assert!(pairs.residuals().iter().all(|&r| r < 1e-9));
 
 // Every terminal creates a fresh cooperative budget.
 let execution = Execution::default().max_work(100);
@@ -156,12 +160,37 @@ cannot be assigned a single PH degree. On a complete ordinary real chain complex
 the kernel dimension is the sum of real Betti numbers. On a truncated interval,
 the kernel belongs to that interval and may differ from source homology.
 
-These properties are tested using independent matrices and NumPy, not exposed
-through a Rust `spectrum()` method. No Rust eigenvalue selection, vector result,
-residual report, convergence policy or exact Betti certificate is implemented.
-Production spectrum reading remains #74 R4; the separate Hodge implementation's
-solver has not been integrated into this Dirac branch. Weighted/complex or
-persistent operators and signal processing require separate implementation.
+`boundary_spectrum(j,count,zero_threshold,options,execution)` requests count
+largest positive singular modes of one retained B[j], with a<j<=b. The private
+real symmetric numerical core is shared with Hodge's block LOBPCG path. It uses
+only B^T B actions; no full Dirac or Hodge matrix is formed, and no separate
+Dirac dense decomposition is introduced. With Bv=sigma*u and B^T u=sigma*v,
+construct w+=(u,v)/sqrt(2) and w-=Gamma*w+, where Gamma=(-1)^absolute_degree.
+The chain condition removes other adjacent couplings. Final residuals use the
+entire frozen truncated Dirac action, rather than just the selected two degrees.
+
+`DiracBoundarySpectrum` owns basis, all degree offsets and the selected interval.
+Singular values are descending; signed values and paired vector columns are
+ascending: [-sigma_max,...,-sigma_min,sigma_min,...,sigma_max]. Negative column
+j equals Gamma times positive column 2*count-1-j. Repeated singular modes retain
+multiplicity. Other boundaries and the kernel require separate requests; this
+API does not claim a complete globally sorted Dirac spectrum or exact rank.
+
+Options default to an 8-vector block, 800 updates, seed 73, tolerances 1e-9 and
+1,048,576 entries per basis/image or projected buffer. The output N-by-2*count
+vector buffer has the same cap. Count must fit the block; zero requests no modes.
+Limits, cancellation, nonconvergence and requested values at/below the explicit
+zero threshold return errors, without zero padding or a dense fallback.
+Tolerances apply in sigma² units to the normal map. The signed residual bound is
+absolute_tolerance/|sigma| + relative_tolerance*|sigma|, in Dirac units. Normal
+maps square conditioning, so tiny singular modes may be unreliable or rejected.
+Residuals do not certify extremal index coverage; a fixed starting block can
+miss an invariant eigenspace. The core retains such a numerical counterexample.
+
+This implements the signed reconstruction in [CSB23 section 2.4](../reference/bibliography.md#csb23).
+The block iteration follows [Knyazev (2001)](https://doi.org/10.1137/S1064827500366124),
+using identity preconditioning. Weighted/complex, persistent, general global
+spectrum selection and signal processing remain separate capabilities.
 
 ## Independent reproduction and observed results
 
@@ -173,11 +202,13 @@ cargo test --locked --release --test dirac
 cargo run --locked --example dirac
 ```
 
-Twelve Rust tests cover hand matrices, analytic edge eigenvectors, Hodge blocks,
+Public Rust tests cover hand matrices, analytic edge eigenvectors, Hodge blocks,
 parity, both endpoint cuts, empty degrees, noncontiguous IDs, duplicate signed
 terms, orientation, invalid integer chains, source errors, stages, every small
 work limit, degree-span limits and a 20,000-vertex sparse path whose dense
 export is rejected.
+Signed-mode regressions additionally verify singular multiplicity, Gamma pairs,
+the same truncated interval, cross-boundary orthogonality and numerical failures.
 
 The source-checkout checker `tools/check_dirac.py` needs NumPy and consumes
 actual Rust JSONL from `tools/reference/dirac_cocycle.rs`. Its expected signed
@@ -189,7 +220,7 @@ require these optional numerical packages:
 cargo build --locked
 rustc --edition 2024 tools/reference/dirac_cocycle.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/dirac_cocycle.exe
 & ./target/dirac_cocycle.exe | Set-Content target/dirac-rust.jsonl -Encoding utf8
-python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json
+python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json --pairs
 ```
 
 Unix callers can use a binary without the `.exe` suffix and redirect stdout to
