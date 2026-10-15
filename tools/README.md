@@ -1,5 +1,7 @@
 # Developer tools
 
+The [maintained resource snapshot](../benches/reports/spectral-feature-resources.md) records measured revisions, limits and adverse cases.
+
 The optional [spectral resource controller](benchmark_spectral_resources.py)
 runs at least ten fresh serial Windows processes per declared cell, retains one
 discarded warmup and a seeded cell order, and records solve/preparation times,
