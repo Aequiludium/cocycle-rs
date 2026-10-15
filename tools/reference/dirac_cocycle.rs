@@ -1,7 +1,7 @@
 //! Fixed public-API Dirac fixtures for the independent Python checker.
 use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::dirac::{DiracOperator, IterativeOptions};
 use cocycle::execution::Execution;
-use cocycle::spectral::{DiracOperator, IterativeOptions};
 fn main() -> cocycle::Result<()> {
     let cases: Vec<(&str, Vec<Vec<usize>>, usize, usize)> = vec![
         ("empty", vec![], 0, 2),
@@ -24,6 +24,21 @@ fn main() -> cocycle::Result<()> {
             vec![vec![0, 1, 2], vec![0, 1, 3], vec![0, 2, 3], vec![1, 2, 3]],
             0,
             2,
+        ),
+        ("path_96", (0..95).map(|i| vec![i, i + 1]).collect(), 0, 1),
+        (
+            "cycle_64",
+            (0..64)
+                .map(|i| vec![i.min((i + 1) % 64), i.max((i + 1) % 64)])
+                .collect(),
+            0,
+            1,
+        ),
+        (
+            "disconnected_edges_16",
+            (0..16).map(|i| vec![2 * i, 2 * i + 1]).collect(),
+            0,
+            1,
         ),
     ];
     for (name, facets, a, b) in cases {
@@ -58,6 +73,7 @@ fn main() -> cocycle::Result<()> {
             "filled_triangle_c1_c2" => &[(2, 1)],
             "tetrahedron" => &[(1, 3), (2, 3), (3, 1)],
             "tetrahedron_boundary" => &[(1, 3), (2, 3)],
+            "path_96" | "cycle_64" | "disconnected_edges_16" => &[(1, 3)],
             _ => &[],
         };
         let mut boundary_spectra = Vec::new();
@@ -69,13 +85,14 @@ fn main() -> cocycle::Result<()> {
                 &IterativeOptions::default(),
                 &Execution::default(),
             )?;
+            assert!(!pairs.is_index_coverage_certified());
             boundary_spectra.push(format!("{{\"degree\":{degree},\"count\":{count},\"singular_values\":{:?},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?},\"orthogonality\":{},\"gram_actions\":{}}}",pairs.singular_values(),pairs.values(),pairs.vectors(),pairs.residuals(),pairs.orthogonality_error(),pairs.gram_applications()));
         }
         println!(
             "{{\"name\":\"{name}\",\"basis\":{basis:?},\"offsets\":{:?},\"truncated\":{},\"matrix\":{:?},\"x\":{x:?},\"action\":{y:?},\"square_action\":{:?},\"boundary_spectra\":[{}]}}",
             op.degree_offsets(),
             op.is_truncated(),
-            op.matrix(4096)?,
+            op.matrix(262_144)?,
             op.action(&y)?,
             boundary_spectra.join(",")
         );

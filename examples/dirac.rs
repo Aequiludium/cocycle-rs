@@ -1,6 +1,6 @@
 //! Standard real Dirac action on a supplied filled triangle, without computing PH.
 use cocycle::complex::{Simplex, SimplicialComplex};
-use cocycle::spectral::DiracOperator;
+use cocycle::dirac::DiracOperator;
 
 fn main() -> cocycle::Result<()> {
     let cells = [

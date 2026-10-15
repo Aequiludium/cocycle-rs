@@ -28,6 +28,15 @@ pub struct DiracBoundarySpectrum<I> {
     zero_threshold: f64,
 }
 impl<I> DiracBoundarySpectrum<I> {
+    /// Whether extremal index coverage and all requested multiplicities are certified.
+    ///
+    /// Always false for this random-start residual-based iterative result. A small
+    /// residual only validates the returned pairs, even if a fixture agrees with
+    /// an independent complete SVD. It does not certify omitted modes or rank.
+    pub fn is_index_coverage_certified(&self) -> bool {
+        false
+    }
+
     /// Selected inclusive chain interval; all equations use these same endpoints.
     pub fn degrees(&self) -> RangeInclusive<usize> {
         self.degrees.clone()

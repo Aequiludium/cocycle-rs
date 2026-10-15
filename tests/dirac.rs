@@ -1,7 +1,7 @@
 //! Public real Dirac contracts, independent hand matrices and invalid chain inputs.
 use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
+use cocycle::dirac::{DiracOperator, IterativeOptions, MAX_DIRAC_DEGREES};
 use cocycle::execution::Execution;
-use cocycle::spectral::{DiracOperator, IterativeOptions, MAX_DIRAC_DEGREES};
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
 

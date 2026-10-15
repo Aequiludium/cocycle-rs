@@ -38,7 +38,7 @@ class DiracControllerTests(unittest.TestCase):
             unknown = [{**row, "name": "unknown"} if i == 0 else row
                        for i, row in enumerate(rows)]
             for invalid in (rows[:-1], rows[:-1] + [rows[0]], unknown):
-                with self.assertRaisesRegex(ValueError, "eleven fixtures"):
+                with self.assertRaisesRegex(ValueError, "fourteen fixtures"):
                     check_dirac.read_rows(self.write(Path(directory), invalid))
 
     def test_incomplete_or_malformed_records_are_rejected(self):

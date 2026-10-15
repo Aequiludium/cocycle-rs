@@ -43,7 +43,7 @@ src/
     mod.rs                       shared controls and private per-operation budget
   optimization/
     mod.rs                       borrowed-source F2 critical sets; lazy dual and bounded U
-  spectral/
+  dirac/
     mod.rs                       owned real graded Dirac incidence, sparse action and bounded export
     spectrum.rs                  retained boundary singular modes and verified signed pairs
   eigensolver.rs                 shared real block LOBPCG and small symmetric Ritz solver

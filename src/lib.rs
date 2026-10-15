@@ -43,6 +43,7 @@ pub mod complex;
 pub mod descriptors;
 pub mod diagram;
 pub mod diagram_distances;
+pub mod dirac;
 mod eigensolver;
 mod error;
 pub mod execution;
@@ -51,7 +52,6 @@ pub mod geometry;
 pub mod homology_operators;
 pub mod optimization;
 pub mod persistence;
-pub mod spectral;
 
 pub use error::{Error, Result};
 

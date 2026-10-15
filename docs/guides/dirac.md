@@ -2,6 +2,16 @@
 
 [Documentation](../README.md) / Guides
 
+The unreleased API now belongs to `cocycle::dirac`, independently of persistent
+Laplacians. Input/stage interfaces, operator/result types and `Execution` controls
+are preserved. The private LOBPCG/Ritz source is shared unchanged with Hodge;
+the persistent Laplacian's distinct Jacobi numeric/resource semantics stay separate.
+
+`DiracBoundarySpectrum::is_index_coverage_certified()` always returns false.
+Independent complete SVD/full Dirac spectra check selected largest singular modes
+on finite fixtures, including clustered path/cycle roots, repeated disconnected
+edge roots and zeros. This does not certify omitted modes on new inputs.
+
 This **Unreleased** capability implements #74's standard-real Dirac action and
 matrix construction on a finite [supplied complex or stage](filtered-complexes.md).
 It reads signed integer boundaries directly, preserves graded coordinates and
@@ -15,7 +25,7 @@ normal-map solve, with actual truncated-Dirac residual and chirality checks.
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::{DiracOperator, IterativeOptions};
+use cocycle::dirac::{DiracOperator, IterativeOptions};
 
 let source = SimplicialComplex::new(vec![
     Simplex::new(vec![10], -2.)?,

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep the unreleased Dirac API under `cocycle::dirac`, separate from persistent
+  Laplacians. Partial results expose `is_index_coverage_certified() == false`.
+
 - Add matrix-free Dirac `boundary_spectrum`: selected nonzero singular modes of
   retained B[j] reconstruct signed eigenpairs of the same truncated operator.
   Share block LOBPCG and the small Ritz solver with Hodge; verify full sparse

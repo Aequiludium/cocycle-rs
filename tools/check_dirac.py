@@ -30,6 +30,9 @@ CASES = {
     "filled_triangle_c1_c2": ([(0, 1, 2)], 1, 2),
     "tetrahedron": ([(0, 1, 2, 3)], 0, 3),
     "tetrahedron_boundary": ([(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)], 0, 2),
+    "path_96": ([(i, i + 1) for i in range(95)], 0, 1),
+    "cycle_64": ([(min(i, (i + 1) % 64), max(i, (i + 1) % 64)) for i in range(64)], 0, 1),
+    "disconnected_edges_16": ([(2*i, 2*i+1) for i in range(16)], 0, 1),
 }
 ROOT2, ROOT3 = math.sqrt(2), math.sqrt(3)
 ANALYTIC = {
@@ -41,6 +44,11 @@ ANALYTIC = {
     "filled_triangle_c1_c2": [-ROOT3, 0, 0, ROOT3],
     "tetrahedron": [-2] * 7 + [0] + [2] * 7,
     "tetrahedron_boundary": [-2] * 6 + [0] * 2 + [2] * 6,
+    "path_96": sorted([-2*math.sin(math.pi*k/192) for k in range(1,96)]
+                      + [0] + [2*math.sin(math.pi*k/192) for k in range(1,96)]),
+    "cycle_64": sorted([-2*math.sin(math.pi*k/64) for k in range(1,64)]
+                       + [0, 0] + [2*math.sin(math.pi*k/64) for k in range(1,64)]),
+    "disconnected_edges_16": [-ROOT2]*16 + [0]*16 + [ROOT2]*16,
 }
 
 
@@ -55,7 +63,7 @@ def read_rows(path):
         if not isinstance(row["name"], str) or not isinstance(row["truncated"], bool):
             raise ValueError("invalid Rust fixture name or truncation flag")
     if len(rows) != len(CASES) or {row["name"] for row in rows} != set(CASES):
-        raise ValueError("Rust output must contain each of the eleven fixtures exactly once")
+        raise ValueError("Rust output must contain each of the fourteen fixtures exactly once")
     return rows
 
 
@@ -169,9 +177,10 @@ def check(rust_path, toponetx_path=None, use_gudhi=False, check_pairs=False):
             all_signed = []
             gamma = np.asarray([(-1.)**(len(face)-1) for face in basis])
             for part in spectra:
-                reference = expected_parts[part['degree']]
-                count = len(reference)
-                assert part['count'] == count
+                complete_reference = expected_parts[part['degree']]
+                count = part['count']
+                assert 0 < count <= len(complete_reference)
+                reference = complete_reference[:count]
                 np.testing.assert_allclose(part['singular_values'], reference, atol=1e-8, rtol=1e-8)
                 wanted = np.concatenate([-reference, reference[::-1]])
                 np.testing.assert_allclose(part['values'], wanted, atol=1e-8, rtol=1e-8)
@@ -184,7 +193,8 @@ def check(rust_path, toponetx_path=None, use_gudhi=False, check_pairs=False):
                 np.testing.assert_allclose(q[:,:count],gamma[:,None]*q[:,::-1][:,:count],atol=0,rtol=0)
                 all_signed.extend(part['values'])
             complete = np.linalg.eigvalsh(expected_k)
-            np.testing.assert_allclose(sorted(all_signed),complete[np.abs(complete)>1e-8],atol=1e-8,rtol=1e-8)
+            if name not in {'path_96', 'cycle_64', 'disconnected_edges_16'}:
+                np.testing.assert_allclose(sorted(all_signed),complete[np.abs(complete)>1e-8],atol=1e-8,rtol=1e-8)
         hodge = np.zeros((n, n))
         singular = []
         for degree in range(a, b + 1):
