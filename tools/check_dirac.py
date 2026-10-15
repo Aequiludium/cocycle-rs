@@ -179,7 +179,8 @@ def check(rust_path, toponetx_path=None, use_gudhi=False, check_pairs=False):
             for part in spectra:
                 complete_reference = expected_parts[part['degree']]
                 count = part['count']
-                assert 0 < count <= len(complete_reference)
+                requested = 3 if name in {'path_96', 'cycle_64', 'disconnected_edges_16'} else len(complete_reference)
+                assert count == requested
                 reference = complete_reference[:count]
                 np.testing.assert_allclose(part['singular_values'], reference, atol=1e-8, rtol=1e-8)
                 wanted = np.concatenate([-reference, reference[::-1]])

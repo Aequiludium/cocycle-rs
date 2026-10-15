@@ -94,7 +94,7 @@ coordinate count; repeated adjacent offsets represent a zero-dimensional space.
 `degrees()` returns the inclusive interval that was actually selected.
 
 Both constructors reject intervals containing more than
-`spectral::MAX_DIRAC_DEGREES` (4096) degrees with `InvalidParameter` for `degrees`,
+`dirac::MAX_DIRAC_DEGREES` (4096) degrees with `InvalidParameter` for `degrees`,
 before allocating offsets or reading the source. This applies to empty sources
 and unlimited execution, bounding the offset table to 4097 `usize` entries
 (32,776 bytes on a 64-bit platform). The limit concerns interval length, not
@@ -246,14 +246,14 @@ No third-party source, raw data or generated report belongs in source Git.
 The original full probe used Windows 11, Rust 1.98.1, Python 3.12.0rc3,
 NumPy 2.4.6, SciPy 1.17.0 and GUDHI 3.11.0; new reports record actual versions.
 
-All eleven fixtures passed: empty/isolated sources, one edge, edge-only and
+The original eleven-fixture probe passed: empty/isolated sources, one edge, edge-only and
 absent-degree windows, a relabelled path, unfilled/filled triangles, the filled
 triangle restricted to C1+C2, and a tetrahedron with/without its solid interior.
 Analytic spectra, independent boundary SVD, signed pairing and same-window Hodge
 blocks agreed. Absolute spectral tolerance was 1e-11; the largest Frobenius
 eigenpair residual was 5.7913e-15 and orthogonality defect was 3.0704e-15.
 
-Nine fixtures also agree with three unchanged AST-extracted methods from
+Nine original fixtures also agree with three unchanged AST-extracted methods from
 [TopoNetX ce3d414](https://github.com/pyt-team/TopoNetX/blob/ce3d414b571fff95916c4cbc20b8d2c2c9d428e6/toponetx/classes/simplicial_complex.py).
 The Git source blob `8ace5fef7ad5e9a44cce02b284578444340bbae9` is checked before
 execution. A supplied skeleton adapter replaces class storage; this does not
@@ -262,7 +262,14 @@ excluded, while truncated cases compare the same principal degree window.
 Its rank-zero incidence and `weight` argument do not change this API's ordinary,
 standard-inner-product definition.
 
-GUDHI F3 Betti numbers agree with total kernel dimension on seven complete,
+In that original probe, GUDHI F3 Betti numbers agree with total kernel dimension on seven complete,
 torsion-free fixtures. This is finite-field topology evidence, not a GUDHI
 Dirac-matrix comparison or a general equivalence with real homology. No such
 claim is made for truncated windows.
+
+The maintained CI corpus now has fourteen fixtures, adding a 96-node path,
+64-cycle and sixteen disjoint edges. Their selected modes are compared with
+independent complete SVDs/analytic Dirac spectra, including multiplicities and
+zeros. Twelve cases also use the pinned TopoNetX functions and ten complete
+torsion-free cases use GUDHI F3. These current checks do not certify extremal
+index coverage on new inputs; returned results explicitly report that limit.

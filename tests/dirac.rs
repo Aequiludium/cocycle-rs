@@ -55,6 +55,55 @@ fn edge() -> Chain {
     chain(&[0, 0, 1], &[&[], &[], &[(10, -1), (20, 1)]])
 }
 
+#[test]
+fn ill_conditioned_integer_modes_are_bounded_or_fail_explicitly() -> Result<()> {
+    for n in [16_usize, 32] {
+        let mut cells: Vec<_> = (0..n)
+            .map(|i| Cell {
+                id: i as u32,
+                degree: 0,
+                value: 0.,
+                boundary: vec![],
+            })
+            .collect();
+        cells.extend((0..n).map(|i| {
+            let mut boundary = vec![(i as u32, 1)];
+            if i > 0 {
+                boundary.push(((i - 1) as u32, -2));
+            }
+            Cell {
+                id: (n + i) as u32,
+                degree: 1,
+                value: 0.,
+                boundary,
+            }
+        }));
+        let source = Chain(cells);
+        let operator = DiracOperator::new(&source, 0..=1)?;
+        let options = IterativeOptions {
+            block_size: n,
+            ..Default::default()
+        };
+        match operator.boundary_spectrum(1, n, 0., &options, &Execution::default()) {
+            Ok(pairs) => {
+                assert_eq!(pairs.singular_values().len(), n);
+                assert!(!pairs.is_index_coverage_certified());
+                // B^-1 has entries 2^(j-i). Its exact Frobenius and maximum
+                // column norms independently enclose sigma_min=1/||B^-1||_2.
+                let inverse_frobenius_squared: f64 =
+                    (0..n).map(|k| (n - k) as f64 * 4_f64.powi(k as i32)).sum();
+                let inverse_column_squared = (4_f64.powi(n as i32) - 1.) / 3.;
+                let smallest = *pairs.singular_values().last().unwrap();
+                assert!(smallest >= inverse_frobenius_squared.sqrt().recip() * (1. - 1e-6));
+                assert!(smallest <= inverse_column_squared.sqrt().recip() * (1. + 1e-6));
+            }
+            Err(Error::NumericalFailure { .. }) => (),
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
 fn triangle(filled: bool) -> Chain {
     let mut result = chain(
         &[0, 0, 0, 1, 1, 1],

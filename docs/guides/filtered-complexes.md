@@ -223,7 +223,7 @@ limits, units, ordering and independent validation.
 
 ## Apply a real Dirac operator
 
-`spectral::DiracOperator` reads this signed source directly for sparse real
+`dirac::DiracOperator` reads this signed source directly for sparse real
 action and bounded matrix export. Pass a stage to choose a scale; filtration
 values do not become weights. The [Dirac guide](dirac.md) covers runnable
 usage, graded coordinates, endpoint truncation and independent verification.

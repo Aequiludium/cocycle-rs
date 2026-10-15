@@ -1,5 +1,7 @@
 # Developer tools
 
+The [maintained resource snapshot](../benches/reports/dirac-resources.md) records measured revisions, limits and adverse cases.
+
 The optional [spectral resource controller](benchmark_spectral_resources.py)
 runs at least ten fresh serial Windows processes per declared cell, retains one
 discarded warmup and a seeded cell order, and records solve/preparation times,
@@ -18,7 +20,7 @@ These tools are outside the Rust library and crate package. See
 
 The `Real Dirac reference comparisons` CI job requires `--pairs --toponetx
 PATH --gudhi` on every push and pull request. It builds a fresh release worker,
-checks all eleven fixtures with NumPy, executes the fixed TopoNetX methods on
+checks all fourteen fixtures with NumPy, executes the fixed TopoNetX methods on
 their supported subset and corroborates complete torsion-free kernels with
 GUDHI F3. Empty/truncated reference exclusions remain explicit in the report.
 

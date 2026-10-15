@@ -15,10 +15,10 @@ These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
-- Add `spectral::DiracOperator` for standard real, nonaugmented signed chains:
+- Add `dirac::DiracOperator` for standard real, nonaugmented signed chains:
   owned graded bases, integer chain validation, sparse action and explicitly
   bounded matrix export, including degree truncation and execution controls.
-  Degree intervals are capped at `spectral::MAX_DIRAC_DEGREES` (4096)
+  Degree intervals are capped at `dirac::MAX_DIRAC_DEGREES` (4096)
   before offset allocation or source access, including empty inputs.
   Nonstandard Gram, complex and persistent Dirac remain outside this API.
 - Add hand-matrix and resource/error regressions, a runnable `dirac` example,
