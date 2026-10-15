@@ -19,8 +19,6 @@
 //! independent test oracles verify ranks and interval semantics.
 //! Opt-in F2 critical-set workspaces retain sparse decompositions for endpoint
 //! proposals and bounded partial U queries on frozen simplicial complexes.
-//! Standard real Dirac operators provide opt-in sparse action and bounded matrix
-//! export on supplied signed chains, independently of persistent homology.
 //! Work and memory can still grow substantially with input size and reduction
 //! fill-in. See the mathematical specification and benchmark records for limits.
 //!
@@ -43,7 +41,6 @@ pub mod complex;
 pub mod descriptors;
 pub mod diagram;
 pub mod diagram_distances;
-mod eigensolver;
 mod error;
 pub mod execution;
 pub mod filtration;
@@ -51,7 +48,6 @@ pub mod geometry;
 pub mod homology_operators;
 pub mod optimization;
 pub mod persistence;
-pub mod spectral;
 
 pub use error::{Error, Result};
 
