@@ -1,7 +1,7 @@
 //! Public real Dirac contracts, independent hand matrices and invalid chain inputs.
 use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::DiracOperator;
+use cocycle::spectral::{DiracOperator, MAX_DIRAC_DEGREES};
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
 
@@ -189,6 +189,48 @@ fn empty_degrees_and_owned_coordinates() -> Result<()> {
             []
         );
     }
+    Ok(())
+}
+
+#[test]
+fn degree_span_is_bounded_before_work_or_allocation() -> Result<()> {
+    let source = chain(&[], &[]);
+    for first in [0, usize::MAX - (MAX_DIRAC_DEGREES - 1)] {
+        let degrees = first..=first + (MAX_DIRAC_DEGREES - 1);
+        let operator = DiracOperator::new(&source, degrees.clone())?;
+        assert_eq!(operator.degrees(), degrees);
+        assert_eq!(operator.degree_offsets(), vec![0; MAX_DIRAC_DEGREES + 1]);
+        assert!(operator.basis().is_empty());
+    }
+    assert!(matches!(
+        DiracOperator::new(&source, 0..=MAX_DIRAC_DEGREES),
+        Err(Error::InvalidParameter {
+            parameter: "degrees",
+            ..
+        })
+    ));
+    for execution in [Execution::default(), Execution::default().max_work(0)] {
+        assert!(matches!(
+            DiracOperator::new_with(&source, 0..=MAX_DIRAC_DEGREES, &execution),
+            Err(Error::InvalidParameter {
+                parameter: "degrees",
+                ..
+            })
+        ));
+    }
+    // A zero work budget keeps this huge-input regression safe if the guard
+    // regresses: it must reject the parameter, not merely exhaust work.
+    assert!(matches!(
+        DiracOperator::new_with(
+            &source,
+            0..=usize::MAX - 2,
+            &Execution::default().max_work(0),
+        ),
+        Err(Error::InvalidParameter {
+            parameter: "degrees",
+            ..
+        })
+    ));
     Ok(())
 }
 

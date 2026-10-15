@@ -9,6 +9,8 @@ for the integration provenance and separate future capability contracts.
 - Add `spectral::DiracOperator` for standard real, nonaugmented signed chains:
   owned graded bases, integer chain validation, sparse action and explicitly
   bounded matrix export, including degree truncation and execution controls.
+  Degree intervals are capped at `spectral::MAX_DIRAC_DEGREES` (4096)
+  before offset allocation or source access, including empty inputs.
   No eigensolver, nonstandard Gram, complex or persistent Dirac is included.
 - Add hand-matrix and resource/error regressions, a runnable `dirac` example,
   an independent NumPy fixture checker with optional fixed TopoNetX/GUDHI

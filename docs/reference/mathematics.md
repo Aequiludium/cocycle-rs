@@ -1018,7 +1018,11 @@ degrees and exact integer-chain rejection are exercised in
 [`tests/dirac.rs`](../../tests/dirac.rs).
 
 `DiracOperator` groups coordinates by degree while preserving source traversal
-within each degree. Duplicate signed terms are summed in checked i64 arithmetic;
+within each degree. The implementation accepts at most `MAX_DIRAC_DEGREES`
+(4096) consecutive degrees, rejecting longer intervals before offset allocation
+or source access even when the source is empty or execution is unlimited. This
+bounds degree metadata, not source size, and does not restrict absolute labels.
+Duplicate signed terms are summed in checked i64 arithmetic;
 zero sums are removed. Coefficients must lie in [-2^53,2^53] for exact f64
 conversion. Retained two-step sums use checked i128 arithmetic. Numeric overflow
 is an error, including validation overflow; no modular or tolerance-based chain

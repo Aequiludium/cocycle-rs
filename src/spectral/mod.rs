@@ -13,6 +13,13 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::RangeInclusive;
 
+/// Maximum number of degrees selected by a Dirac constructor: 4096.
+///
+/// This bounds the dense offset table to 4097 `usize` entries, even for an empty
+/// source and unlimited [`Execution`]. It limits interval length, not absolute
+/// degree labels. Overlong intervals fail before allocation or source access.
+pub const MAX_DIRAC_DEGREES: usize = 4096;
+
 /// An owned sparse Dirac operator with its ordered, source-local basis.
 ///
 /// Coordinates are grouped by increasing degree; within a degree, source traversal
@@ -48,7 +55,10 @@ impl<I: Copy + Eq + Hash> DiracOperator<I> {
     /// are zero-dimensional spaces, including intervals entirely above the source.
     ///
     /// # Errors
-    /// Rejects reversed/unrepresentable intervals, duplicate IDs, nonfinite or
+    /// Rejects intervals longer than [`MAX_DIRAC_DEGREES`] before allocation or
+    /// source access: [`Error::SizeOverflow`] for unrepresentable offset counts,
+    /// otherwise [`Error::InvalidParameter`].
+    /// Also rejects reversed/unrepresentable intervals, duplicate IDs, nonfinite or
     /// unordered filtration values, missing/later or wrong-degree boundary cells
     /// of selected cells, and nonzero boundary square within the retained interval.
     /// Zero incidence terms are ignored; duplicates are summed with checked `i64`
@@ -86,6 +96,12 @@ impl<I: Copy + Eq + Hash> DiracOperator<I> {
         let offset_count = (last - first).checked_add(2).ok_or(Error::SizeOverflow {
             operation: "Dirac degree offsets",
         })?;
+        if offset_count > MAX_DIRAC_DEGREES + 1 {
+            return Err(Error::InvalidParameter {
+                parameter: "degrees",
+                reason: "degree interval exceeds MAX_DIRAC_DEGREES",
+            });
+        }
         budget.step_by(offset_count)?;
         let mut offsets = buffer(offset_count, 0_usize)?;
         // ID -> (source traversal position, degree, selected coordinate).

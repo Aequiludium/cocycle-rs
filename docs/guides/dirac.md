@@ -79,6 +79,15 @@ order is preserved. `degree_offsets()` includes empty degrees and a final total
 coordinate count; repeated adjacent offsets represent a zero-dimensional space.
 `degrees()` returns the inclusive interval that was actually selected.
 
+Both constructors reject intervals containing more than
+`spectral::MAX_DIRAC_DEGREES` (4096) degrees with `InvalidParameter` for `degrees`,
+before allocating offsets or reading the source. This applies to empty sources
+and unlimited execution, bounding the offset table to 4097 `usize` entries
+(32,776 bytes on a 64-bit platform). The limit concerns interval length, not
+absolute degree labels; a narrow interval at a high degree remains valid.
+Unrepresentable offset counts still return `SizeOverflow`. This metadata bound
+does not cap source-dependent allocations or process memory.
+
 For selected cells, nonzero boundary terms must name earlier existing cells of
 degree one less, including terms discarded at the bottom endpoint. Zero terms
 are ignored. Duplicate signed terms are summed in checked i64 arithmetic and
@@ -164,10 +173,11 @@ cargo test --locked --release --test dirac
 cargo run --locked --example dirac
 ```
 
-Eleven Rust tests cover hand matrices, analytic edge eigenvectors, Hodge blocks,
+Twelve Rust tests cover hand matrices, analytic edge eigenvectors, Hodge blocks,
 parity, both endpoint cuts, empty degrees, noncontiguous IDs, duplicate signed
 terms, orientation, invalid integer chains, source errors, stages, every small
-work limit and a 20,000-vertex sparse path whose dense export is rejected.
+work limit, degree-span limits and a 20,000-vertex sparse path whose dense
+export is rejected.
 
 The source-checkout checker `tools/check_dirac.py` needs NumPy and consumes
 actual Rust JSONL from `tools/reference/dirac_cocycle.rs`. Its expected signed
