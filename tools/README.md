@@ -151,6 +151,9 @@ The command checks its Git blob before executing only the original matrix-level
 functions with explicit boundary/prefix adapters, plus the unchanged feature
 loop with trace callbacks. It does not run the author's image constructor or
 full MNIST pipeline. Rust 1.91+ is needed for the existing-descriptor worker.
+The small vertex-cubical fixture checks matrix conventions; the complete cubical
+image-processing pipeline and the paper's MNIST/MoleculeNet experiments have
+not been reproduced here.
 
 ```sh
 python3 -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py'
@@ -191,6 +194,42 @@ degree-zero persistent spectrum. In the disk control, the one-face and
 three-face fillings give degree-one spectra `{3,3,3}` and `{1,3,3}`, while
 degree-zero persistent spectra and positive-length PH agree. The shared disk
 motif occurs in both splits, so the experiment does not test new motif families.
+
+Representation limits of this reproduction remain explicit:
+
+- Sorting retains eigenvalue multiplicities and removes dependence on input
+  spectrum order. Repeated eigenvalues are not deduplicated. For symmetric
+  matrices of the same size, ordered eigenvalues satisfy Weyl's perturbation
+  bound; sorting alone is not a reason to claim instability. Truncation still
+  discards the remaining spectrum, including all positive values if the nullity
+  reaches the retained length.
+- Fixed feature width does not make different complex sizes equivalent.
+  Domain sizes, coverage and bases are exported, but the model does not consume
+  them. Neither the spectra nor their traces are automatically size-normalized.
+- The mask separates padding from computed entries after numerical thresholding.
+  It does not distinguish exact zero eigenvalues from small values mapped to zero
+  by `zero_tolerance`. Raw floating-point spectra and the threshold are retained;
+  exact-rank checks certify nullity only for the worked oracle cases.
+- Only value features enter the current forests. Values-only, values-plus-mask,
+  mask-only and domain-size controls on the same grouped splits remain future
+  ablations, especially for varying complex sizes. No robustness guarantee under
+  filtration perturbations has been established; threshold crossings, changes in
+  sampled stages, domain dimension and retained coverage require separate checks.
+
+For subsequent representation work, see Jung, Kang and Park,
+[Stable Vectorization of Persistent Laplacians via Spectral Descriptors](https://arxiv.org/abs/2512.05463v2)
+(v2, 11 August 2026). It constructs scalar-signature persistent Laplacian
+diagrams (PLDs) and smoothed persistent Laplacian images (PLIs), and reports
+trace-based improvements in its MNIST/QM7 experiments. Its stability statement
+is at the PLD Wasserstein-distance level under signature admissibility conditions.
+Before adoption, check the data-class/size bounds, how the matching metric
+controls descriptor-amplitude changes, and the link from input/filtration
+perturbations to that metric. This is not a stability guarantee for this tool.
+Trace requires the full operator diagonal or full spectrum; the sum of a
+truncated smallest-eigenvalue prefix is not the trace. Size normalization, empty
+domains and partial-coverage policies need explicit definitions and validation.
+These descriptor/PLI experiments are follow-up work; the present algorithm and
+reported model inputs remain the ICML 2023 reproduction baseline.
 
 Validation combines hand-derived matrices, restricted-boundary SVD nullspaces,
 exact rational incidence ranks and GUDHI F2 corroboration on torsion-free
