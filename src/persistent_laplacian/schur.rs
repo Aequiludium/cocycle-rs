@@ -211,6 +211,7 @@ pub(super) fn schur_complement(
     // Match the reference SchurComp.m structure: solve C X = E^T in the
     // retained eigenspace, then form A - E X. Never materialize C+.
     let mut solution = dense(m, keep, options, budget)?;
+    let mut discarded_correction = 0.0;
     for eigen in 0..m {
         let lambda = values[eigen];
         if lambda < -options.residual_tolerance * scale {
@@ -223,6 +224,27 @@ pub(super) fn schur_complement(
                 .sum();
         }
         if lambda <= cutoff {
+            if lambda > 0.0 {
+                budget.step_by(keep)?;
+                // A small C X - E^T residual relative to another large RHS
+                // does not bound a discarded c*c^T/lambda correction. Sum
+                // the positive-direction entry bounds before accepting it.
+                let scaled = norm(&coupling) / lambda.sqrt();
+                let correction = scaled * scaled;
+                discarded_correction += if up_scale == 0.0 {
+                    correction
+                } else {
+                    correction / up_scale
+                };
+                if !discarded_correction.is_finite()
+                    || discarded_correction > options.residual_tolerance
+                {
+                    return Err(numerical(
+                        "discarded Schur direction has significant correction",
+                    ));
+                }
+                residual = residual.max(discarded_correction);
+            }
             let range = if up_scale == 0.0 {
                 norm(&coupling)
             } else {
@@ -385,15 +407,34 @@ mod tests {
     #[test]
     fn discarded_direction_must_satisfy_the_actual_solve_residual() {
         // Coupling 1e-10 is small relative to the whole Gram, but dropping it
-        // loses the entire unit Schur correction. A relative C X - E^T check
-        // catches what a whole-Gram coupling check alone misses.
+        // loses the entire unit Schur correction. The correction guard and
+        // actual solve check reject what a whole-Gram coupling test misses.
         let matrix = [1.0, 1e-10, 0.0, 1e-10, 1e-20, 0.0, 0.0, 0.0, 1.0];
         let mut budget = WorkBudget::new(&Execution::default()).unwrap();
         assert!(matches!(
             schur_complement(&matrix, 3, 1, &SpectralOptions::default(), &mut budget),
             Err(Error::NumericalFailure {
-                context: "Schur solve residual exceeds tolerance"
+                context: "discarded Schur direction has significant correction"
             })
+        ));
+        let options = SpectralOptions {
+            relative_tolerance: 1e-22,
+            ..Default::default()
+        };
+        let (result, _) = schur_complement(&matrix, 3, 1, &options, &mut budget).unwrap();
+        assert!(result[0].abs() < 1e-12);
+    }
+
+    #[test]
+    fn large_retained_rhs_cannot_hide_a_discarded_unit_correction() {
+        // PSD Gram of [(.5,1), (1,0), (0,1e-10)]. Its exact Schur
+        // complement on the first coordinate is zero. A 1e-10 residual
+        // relative to the other RHS entry .5 can still lose a unit correction.
+        let matrix = [1.25, 0.5, 1e-10, 0.5, 1.0, 0.0, 1e-10, 0.0, 1e-20];
+        let mut budget = WorkBudget::new(&Execution::default()).unwrap();
+        assert!(matches!(
+            schur_complement(&matrix, 3, 1, &SpectralOptions::default(), &mut budget),
+            Err(Error::NumericalFailure { .. })
         ));
         let options = SpectralOptions {
             relative_tolerance: 1e-22,

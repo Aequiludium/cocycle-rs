@@ -14,6 +14,13 @@ and subsequent starts, under the same cumulative work and per-buffer storage
 limits. `used_direct_fallback()` records this route. A failed direct solve returns
 a numerical error; no tolerance is increased and no coupled correction is dropped.
 
+The direct solve also bounds the accumulated max-entry correction of discarded
+positive eigenmodes against the existing residual tolerance and original Gram
+scale. A small solve residual relative to another large right-hand-side entry
+cannot justify dropping a large correction. A separate PSD Gram regression
+exposes this failure before the guard; it now returns a numerical error. These
+floating checks remain numerical evidence, not a forward-error/rank certificate.
+
 This is a bounded dense reference route. The default 65,536-entry per-buffer cap
 limits the target degree basis to 256; cumulative output storage is capped too.
 It does not establish a high-performance persistent spectral kernel.

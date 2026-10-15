@@ -995,6 +995,16 @@ then add its own lower term. This is reverse elimination at a fixed endpoint,
 not arbitrary online filtration updates. Tied births introduce no intermediate
 requested stage. Spectra transform by signed permutation under vertex relabeling.
 
+A floating near-zero pivot is not the exact zero-pivot case: even the PSD block
+`[[1,eps],[eps,eps^2]]` has a unit Schur correction. The numerical reverse route
+therefore skips only exactly uncoupled coordinates and otherwise uses the checked
+direct solve, or returns a numerical error under the original execution limits.
+For computed discarded positive directions, the direct solve bounds the sum of
+max-entry corrections `maxabs(c)^2/lambda`, normalized by the original upper Gram
+scale, in addition to its actual solve/range residuals. This prevents another
+large right-hand-side component from masking a lost correction. These finite
+floating checks do not supply an exact rank or general forward-error certificate.
+
 The [bounded dense implementation](../guides/persistent-laplacian.md) uses f64,
 relative cutoff, checked residuals and explicit storage limits. Numerical zeros
 and residual checks do not certify exact ranks or a forward-error bound.

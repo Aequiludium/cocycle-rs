@@ -10,7 +10,7 @@ These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
-- Add bounded real `spectral::PersistentLaplacian` for same-source stages:
+- Add bounded real `persistent_laplacian::PersistentLaplacian` for same-source stages:
   generalized Schur construction, owned matrix/action and numerical spectrum,
   plus explicitly selected fixed-endpoint reverse elimination. Standard inner
   products only; storage limits, numeric residuals and execution controls are

@@ -35,6 +35,8 @@ pub struct SpectralOptions {
     /// Also controls Jacobi convergence and the stepwise zero-pivot test.
     pub relative_tolerance: f64,
     /// Maximum relative eigensystem/range residual (default 1e-9).
+    /// Also bounds the accumulated positive-mode discarded Schur correction,
+    /// normalized by the original upper Gram's max-entry scale.
     /// Must be at least `relative_tolerance` and less than one.
     pub residual_tolerance: f64,
     /// Maximum cyclic Jacobi sweeps, excluding the initial convergence check.
@@ -237,8 +239,9 @@ impl PersistentLaplacian {
     /// Maximum normalized Schur eigensystem/discarded-range, solve and symmetry
     /// residual. Solve residual uses the max entry of E^T as denominator;
     /// symmetry uses the original upper Gram scale. A zero denominator keeps
-    /// the absolute error. For the fixed-endpoint algorithm this records the
-    /// discarded-row residual.
+    /// the absolute error. Accepted discarded positive-direction correction
+    /// bounds also enter this maximum. A fixed-endpoint result uses zero for
+    /// exact-uncoupled elimination or the direct solver's residual after fallback.
     /// For a lower-only operator this is zero because no Schur solve is used;
     /// its eigensystem residual is checked separately by `spectrum`.
     pub fn solver_residual(&self) -> f64 {
