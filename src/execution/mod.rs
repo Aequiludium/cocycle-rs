@@ -18,6 +18,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// `_with` operations charge coordinate and arithmetic visits across the whole
 /// operation. Exhaustive stretch charges each visited cycle. Their counts are
 /// also version-dependent and do not establish a memory quota or deadline.
+/// Dirac construction counts cells, degree slots, incidence and two-step chain
+/// terms. Its action counts input/output coordinates and incidence; matrix export
+/// counts dense entries and signed entries. Each operation starts a fresh budget;
+/// the separate dense-entry cap is checked before matrix allocation.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.
