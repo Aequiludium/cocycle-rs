@@ -39,6 +39,9 @@ implemented source tree below.
 src/
   lib.rs                         public domains and Error/Result exports
   error.rs                       shared structured errors
+  spectral/
+    mod.rs                       real stage-pair Schur operators and reverse elimination
+    schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/
@@ -157,6 +160,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `geometry` | Input validation and distance access | Error utilities |
 | `complex` | Checked graphs, simplicial incidence and filtered-cell contract | Geometry scalar validation, execution, error utilities |
 | `execution` | Immutable controls and private per-operation budget | Error utilities |
+| `spectral` | Bounded real persistent Laplacian, action, complete spectrum and fixed-endpoint elimination | Complex signed incidence, filtration stages/provenance, execution, error utilities |
 | `filtration` | Construction, source context, coverage and private coface access | Geometry, complex, execution, error utilities |
 | `persistence` | Algorithms, options, interval and representative assembly | Algebra, geometry, filtration, diagram, execution |
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
@@ -433,7 +437,7 @@ public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
 
-Future Laplacian/Dirac, true persistent spectral pairs and optimal F2 projections
+General Hodge/Dirac solvers, scalable persistent spectra and optimal F2 projections
 need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
 and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
 Non-diagram similarities need defined coordinates and units; exporters, external

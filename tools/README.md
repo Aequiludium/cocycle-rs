@@ -3,6 +3,65 @@
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Real persistent Laplacian reproduction
+
+[compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
+release [example worker](../examples/persistent_laplacian.rs) with independently
+assembled signed boundaries, NumPy Schur and SVD nullspace computations, exact
+rational restricted-domain matrices and real persistent ranks. NumPy is required;
+`--gudhi` adds finite-field corroboration on declared torsion-free examples only.
+These dependencies remain outside the Rust runtime.
+
+The local reproduction used Python 3.10.11, NumPy 2.2.6, SciPy 1.15.3 and
+GUDHI 3.12.0. Create an isolated oracle environment for the same package versions:
+
+```sh
+python3 -m venv target/persistent-oracle-venv
+target/persistent-oracle-venv/bin/python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0
+cargo build --locked --release --example persistent_laplacian
+target/persistent-oracle-venv/bin/python tools/compare_persistent_laplacians.py --worker target/release/examples/persistent_laplacian --output target/persistent-run-001 --gudhi --benchmark
+```
+
+On Windows use `target/persistent-oracle-venv/Scripts/python.exe` and append
+`.exe` to the worker path. Outputs must be new. Fixtures, raw worker results,
+matrix/spectral errors and adverse timings remain under the output directory.
+`--reference-python PATH` evaluates only the fixed external Python
+`schur_complement` function, without importing its application dependencies.
+The optional benchmark measures matrix construction for identical start/target
+pairs, excluding source preparation and spectrum computation. Process elapsed
+time and Windows peak working set are recorded separately; the latter includes
+the process baseline and is not allocation peak. Linux peak measurement needs
+an isolated resource harness. No timing threshold is an ordinary unit test.
+
+`--reference-matlab DIR` verifies the Git blobs of the author's fixed
+`ebff6e3ad6f5eb90eb8058e4f5567755b62f0c3e` sources, 35-point input and
+precomputed q=2 boundaries. It recovers the original 580 oriented K-triangle
+labels, matches Rust coordinates, replays the least-norm Schur formula with
+SciPy, compares both routes and eigenvalues, and checks the rebuilt skeleton
+with GUDHI. It needs SciPy/GUDHI and an explicit worker storage override already
+present in the example. This is author-data/formula replay, not execution of
+MATLAB or Dionysus. Original `.m`, `Point.txt` and `.mat` files stay under ignored
+artifact storage; no dependency or reference code enters the Rust runtime.
+
+To prepare the optional author-data replay, keep a pinned reference checkout
+under `target/`. Its root must contain `SchurComp.m`, `persistLap.m`,
+`boundary.py`, `VR_persistLap.m`, `Point.txt`, `q1Boundary.mat` and `qBoundary.mat`;
+the controller rejects any of these files whose Git blob identity differs.
+
+```sh
+git clone https://github.com/ndag/Persistent-Laplacian.git target/persistent-matlab-reference
+git -C target/persistent-matlab-reference checkout --detach ebff6e3ad6f5eb90eb8058e4f5567755b62f0c3e
+target/persistent-oracle-venv/bin/python tools/compare_persistent_laplacians.py --worker target/release/examples/persistent_laplacian --output target/persistent-author-run-001 --gudhi --reference-matlab target/persistent-matlab-reference
+```
+
+The optional Python subset can be downloaded from the
+[fixed MIT reference](https://github.com/tomogwen/persistentlaplaciandatascience/blob/b36b080f739653d84284f3f7ca9ccea5fad286ae/src/perslap.py)
+to `target/persistent-python-reference.py`, then supplied with
+`--reference-python target/persistent-python-reference.py`. This runs only
+`schur_complement`; it does not validate the reference application's pair,
+feature or learning pipeline. Outputs also freeze the actual worker and controller
+and record the worker hash; preserve these together with the result JSON.
+
 ## Native cross-library benchmarks
 
 Use [benchmark_native.py](benchmark_native.py) for Cocycle, GUDHI C++ and upstream

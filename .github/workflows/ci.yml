@@ -92,6 +92,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 --test docs/guides/persistent-laplacian.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
@@ -130,6 +131,7 @@ jobs:
       - run: cargo run --locked --example diagram_distances
       - run: cargo run --locked --example critical_sets
       - run: cargo run --locked --example homology_operators
+      - run: cargo run --locked --example persistent_laplacian
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
 

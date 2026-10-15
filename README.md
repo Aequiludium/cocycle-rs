@@ -31,6 +31,9 @@ dependencies and no unsafe code.
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
 - **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
   with bounded Partial U; updates and differentiation remain caller-owned.
+- **Unreleased persistent Laplacians** — bounded real stage-pair Schur operators,
+  action, complete numerical spectra and fixed-endpoint reverse elimination.
+  See the [usage and limits](docs/guides/persistent-laplacian.md).
 
 ![A square's Rips filtration: points, a loop at edge length 1, and filled triangles at sqrt(2).](assets/filtration.svg)
 

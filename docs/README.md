@@ -20,7 +20,9 @@ Usage pages describe this checkout, including **Unreleased** borrowed stages,
 critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
 and [architecture](development/architecture.md) for candidate additions.
-Laplacian/Dirac solvers, persistent spectra, optimal F2 projections, non-diagram
+The bounded real [persistent Laplacian](guides/persistent-laplacian.md) reproduction
+is also Unreleased. General Hodge/Dirac solvers, scalable sparse persistent spectra,
+optimal F2 projections, non-diagram
 similarity, external learning and automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
@@ -42,6 +44,8 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,
   selected class costs and controlled finite transport from borrowed stages.
 
+- [Real persistent Laplacians](guides/persistent-laplacian.md): same-source pairs,
+  Schur operators, complete numerical spectra and fixed-endpoint elimination.
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
   bounded partial U and a lower-star simplification step.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage

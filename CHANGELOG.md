@@ -6,6 +6,12 @@ These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
+- Add bounded real `spectral::PersistentLaplacian` for same-source stages:
+  generalized Schur construction, owned matrix/action and numerical spectrum,
+  plus explicitly selected fixed-endpoint reverse elimination. Standard inner
+  products only; storage limits, numeric residuals and execution controls are
+  explicit. Includes an independent rational/NumPy reproduction tool.
+
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.
 - Consolidate stage usage, the six-responsibility architecture and Phase-4

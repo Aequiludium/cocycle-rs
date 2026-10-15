@@ -969,3 +969,40 @@ RSS bound. No persistent family cache or streaming barcode is introduced.
 The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
 cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
 separates finite implementation checks from these algebraic derivations.
+
+## 22. Real persistent Laplacians
+
+For a same-source pair K included in L, use real ordinary chains with orthonormal
+increasing-vertex simplex bases. Let B denote the signed (q+1)-boundary of L,
+with rows grouped into K and its complement: B = [R; F]. The allowed domain of
+the persistent boundary is ker(F), with the inner product inherited from C_(q+1)(L).
+For any orthonormal kernel basis N, its upper term is R N N^T R^T. For a general
+full-rank kernel basis Z it is R Z (Z^T Z)^-1 Z^T R^T, not R Z Z^T R^T.
+
+Partition B B^T = [A E; E^T C]. Then the persistent operator is
+Delta_q(K,L) = B_q(K)^T B_q(K) + A - E C+ E^T, where C+ is the Moore--Penrose
+pseudoinverse. Singular C is permitted. At q=0, B_0 has zero rows: the lower
+term vanishes, with no augmentation. K=L gives the ordinary Hodge operator.
+The operator is self-adjoint and positive semidefinite; its exact nullity equals
+rank(H_q(K;R) -> H_q(L;R)). For integer boundaries an independent exact check is
+n_q(K) - rank_Q(B_q(K)) - rank_Q(B) + rank_Q(F).
+
+For a fixed endpoint L, eliminate the last active q-coordinate ell of the upper
+term M by M'_ij = M_ij - M_iell M_ellj / M_ellell when the pivot is nonzero.
+When the pivot is zero, positive semidefiniteness implies the eliminated row is
+zero and the leading principal block remains. Iterate to each requested start,
+then add its own lower term. This is reverse elimination at a fixed endpoint,
+not arbitrary online filtration updates. Tied births introduce no intermediate
+requested stage. Spectra transform by signed permutation under vertex relabeling.
+
+The [bounded dense implementation](../guides/persistent-laplacian.md) uses f64,
+relative cutoff, checked residuals and explicit storage limits. Numerical zeros
+and residual checks do not certify exact ranks or a forward-error bound.
+Independent rational projection and rank calculations cover finite fixtures;
+finite-field persistence only corroborates torsion-free examples.
+
+Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
+and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
+(2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
+equation 15 / Theorem 5.1. The implementation is independently written from
+these formulas, rather than copied from reference code.
