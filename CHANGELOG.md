@@ -6,6 +6,13 @@ These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
+- Add `spectral::DiracOperator` for standard real, nonaugmented signed chains:
+  owned graded bases, integer chain validation, sparse action and explicitly
+  bounded matrix export, including degree truncation and execution controls.
+  No eigensolver, nonstandard Gram, complex or persistent Dirac is included.
+- Add hand-matrix and resource/error regressions, a runnable `dirac` example,
+  an independent NumPy fixture checker with optional fixed TopoNetX/GUDHI
+  probes, and the corresponding mathematical/usage contracts.
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.
 - Consolidate stage usage, the six-responsibility architecture and Phase-4

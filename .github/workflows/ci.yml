@@ -80,15 +80,22 @@ jobs:
       - run: python tools/check_docs.py
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
-      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+      - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs tools/reference/dirac_cocycle.rs
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
+      - name: Check real Dirac fixtures independently
+        run: |
+          python -m pip install numpy==2.4.6
+          rustc --edition 2024 tools/reference/dirac_cocycle.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/dirac-worker
+          target/dirac-worker > target/dirac-rust.jsonl
+          python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-representatives.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 --test docs/guides/dirac.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -128,6 +135,7 @@ jobs:
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --release --example complex_construction
       - run: cargo run --locked --example diagram_distances
+      - run: cargo run --locked --example dirac
       - run: cargo run --locked --example critical_sets
       - run: cargo run --locked --example homology_operators
       - run: cargo test --locked --example critical_sets

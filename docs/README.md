@@ -17,10 +17,11 @@ proposed APIs and remaining acceptance gates.
 <a id="version-and-capability-status"></a>
 
 Usage pages describe this checkout, including **Unreleased** borrowed stages,
-critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
+critical sets, feasible F2 operators, real Dirac action and source/interval assembly
+integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
 and [architecture](development/architecture.md) for candidate additions.
-Laplacian/Dirac solvers, persistent spectra, optimal F2 projections, non-diagram
+Laplacian operators and Dirac eigensolvers, persistent spectra, optimal F2 projections, non-diagram
 similarity, external learning and automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
@@ -48,6 +49,8 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
   storage, borrowed stages and inclusions, signed scales and boundary reduction.
+  [Real Dirac action and matrices](guides/dirac.md) use the same signed sources
+  with explicit degree truncation and bounded export.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret
   coverage and endpoints, and derive measurements.
 - [Rips construction guide](guides/rips-construction.md): matrix layouts, custom
@@ -111,7 +114,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
-| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); algorithms remain future work |
+| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); standard real Dirac action is in the guide above; spectral solvers remain future work |
 | [Performance reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
 | [Changelog](../CHANGELOG.md) | Unreleased implemented changes and versioned release notes |
 

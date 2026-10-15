@@ -969,3 +969,67 @@ RSS bound. No persistent family cache or streaming barcode is introduced.
 The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
 cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
 separates finite implementation checks from these algebraic derivations.
+
+## 22. Standard real discrete Dirac
+
+For a finite supplied chain complex with ordered bases, use ordinary,
+nonaugmented chains: C[-1]=0. Signed integer boundary matrices
+B[j]:C[j]->C[j-1] satisfy B[j-1]B[j]=0 over the integers, before any modular
+reduction. The standard real inner product has Gram I in every degree, so the
+adjoint is the transpose. Filtration values select stages and are not matrix
+weights. See [CSB23](bibliography.md#csb23), section 2.
+
+On C[a] + ... + C[b], let d be the degree-lowering block matrix retaining only
+B[a+1], ..., B[b], and let K=d+d^T. Thus
+`(Kx)[j] = B[j]^T x[j-1] + B[j+1] x[j+1]`, with terms outside [a,b] zero.
+Since d^2=0 and (d^T)^2=0, K^2=dd^T+d^Td is block diagonal, with degree-j
+block `B[j]^T B[j] + B[j+1] B[j+1]^T` under the **same endpoint truncation**.
+K is real symmetric. Replacing oriented incidence by absolute values or lifting
+F2 coefficients to 0/1 may break d^2=0 and this identity.
+
+Let Gamma multiply degree-j coordinates by (-1)^j. Adjacent degrees have
+opposite parity, so Gamma K=-K Gamma. Therefore each nonzero eigenvalue lambda
+pairs with -lambda, with equal multiplicity. The nonzero spectrum is the union
+of +/- the nonzero singular values of the retained adjacent B[j]: each singular
+pair gives coupled vectors in degrees j-1 and j, and the chain condition makes
+these boundary summands orthogonal. Each resulting vector retains its complete
+graded coordinates. It must not be labeled as one homology degree.
+
+Also `x^T K^2 x = ||dx||^2 + ||d^T x||^2`; hence ker K is the direct sum of
+the graded harmonic spaces. On a complete ordinary finite real chain complex,
+its dimension is the sum of the real Betti numbers. For a truncated interval,
+the kernel belongs to that interval, and generally differs from the source's
+homology. A floating eigenvalue threshold is numerical evidence, not an exact
+homology certificate; F2 Betti numbers need not equal the real ones.
+
+For one edge ordered (v0,v1,e01),
+
+```text
+K   = [[0,0,-1], [0,0,1], [-1,1,0]]
+K^2 = [[1,-1,0], [-1,1,0], [0,0,2]]
+spectrum = (-sqrt(2), 0, sqrt(2))
+```
+
+The unfilled triangle has two +/-sqrt(3) pairs and two zero eigenvalues;
+the filled triangle has three pairs and one zero eigenvalue. Restricting the
+single edge to C1 instead gives K=[0], while its full edge Laplacian is [2].
+These fixed matrices, independent Hodge blocks, orientation/parity, empty
+degrees and exact integer-chain rejection are exercised in
+[`tests/dirac.rs`](../../tests/dirac.rs).
+
+`DiracOperator` groups coordinates by degree while preserving source traversal
+within each degree. Duplicate signed terms are summed in checked i64 arithmetic;
+zero sums are removed. Coefficients must lie in [-2^53,2^53] for exact f64
+conversion. Retained two-step sums use checked i128 arithmetic. Numeric overflow
+is an error, including validation overflow; no modular or tolerance-based chain
+test substitutes for integer zero. Selected cells' nonzero boundary references
+must be earlier existing cells of degree one less, even when a bottom-endpoint
+map is discarded. Unselected boundaries are not read or certified.
+
+Sparse action visits incidence once and accumulates both its downward and
+transpose contributions with finite f64 products/partial sums. No dense matrix
+is needed. Explicit row-major export checks n*n and the caller's scalar-entry
+cap before allocation. Cooperative work/cancellation errors return no partial
+operator or buffer. The API supports only this real standard-inner-product
+operator: no Gram conversion, complex conjugate adjoint, spectrum solver,
+augmentation, persistent Dirac, mass term or signal filter is inferred.

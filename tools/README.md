@@ -83,6 +83,16 @@ comparing mathematical fixtures. Outputs and fixture records include the actual
 characteristic; `environment.json` retains the protocol-check outcomes.
 Its raw unpaired endpoints are compared along with separately checked Rust coverage.
 
+## Real Dirac correctness checks
+
+[check_dirac.py](check_dirac.py) compares the fixed public-API Rust fixtures
+with independently assembled signed matrices, analytic spectra and boundary
+SVD using NumPy. Optional fixed TopoNetX methods and GUDHI F3 Betti checks
+retain their source identity and shape/field exclusions. See the
+[Dirac guide](../docs/guides/dirac.md#independent-reproduction-and-observed-results)
+for the standalone worker and commands. Keep output and external sources under
+ignored `target/`; this is a correctness check, not a timing benchmark.
+
 ## Documentation and tool verification
 
 [check_algorithm.py](check_algorithm.py) provides focused `diagram-analysis`,
@@ -99,7 +109,7 @@ python3 tools/check_source.py
 python3 tools/check_artifacts.py
 python3 tools/check_docs.py
 python3 -m unittest discover -s tools -p 'test_*.py'
-rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs tools/reference/dirac_cocycle.rs
 ```
 
 Run the artifact check after staging. It rejects generated paths and log/archive/

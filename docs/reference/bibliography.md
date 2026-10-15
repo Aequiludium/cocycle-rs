@@ -23,6 +23,22 @@ algorithm using its existing sparse reducer; it does not import Oineus code
 or add it as a runtime dependency. Runtime comparisons and mathematical
 theorems are distinct evidence.
 
+## CSB23
+
+Lucille Calmon, Michael T. Schaub and Ginestra Bianconi.
+**Dirac Signal Processing of Higher-Order Topological Signals**.
+New Journal of Physics 25, 093013 (2023).
+[arXiv:2301.10137v2](https://arxiv.org/abs/2301.10137v2), section 2 for the
+standard real graded Dirac definition, square and signed spectral pairing.
+The [specification](mathematics.md#22-standard-real-discrete-dirac) fixes the
+ordinary-chain and degree-truncation conventions used here; signal filtering
+and persistent/weighted variants are outside this implementation.
+
+[TopoNetX signed incidence and Dirac methods](https://github.com/pyt-team/TopoNetX/blob/ce3d414b571fff95916c4cbc20b8d2c2c9d428e6/toponetx/classes/simplicial_complex.py)
+at `ce3d414b571fff95916c4cbc20b8d2c2c9d428e6` provide an independent matrix
+reference. The reference's rank-zero incidence is augmented; Cocycle's Dirac
+coupling starts at B1. Its `weight` argument is not evidence of a metric adjoint.
+
 ## ZC05
 
 Afra Zomorodian and Gunnar Carlsson. **Computing Persistent Homology**.
