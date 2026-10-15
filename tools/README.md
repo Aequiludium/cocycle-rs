@@ -1,7 +1,48 @@
 # Developer tools
 
+The [maintained resource snapshot](../benches/reports/hodge-resources.md) records measured revisions, limits and adverse cases.
+
+The optional [spectral resource controller](benchmark_spectral_resources.py)
+runs at least ten fresh serial Windows processes per declared cell, retains one
+discarded warmup and a seeded cell order, and records solve/preparation times,
+whole-process wall time, absolute peak working set, failures and immutable source
+identities. Commit measured code first. Supply a JSON list of explicit fixture
+descriptions, commands, independent expected values and tolerances through
+`--specification PATH --output NEW_DIRECTORY`. Specifications and raw outputs stay
+under ignored `target/benchmarks/commit-<sha12>/spectral-resources/run-<NNN>/`.
+See the [performance reporting rules](../benches/reporting.md): these resource
+snapshots do not establish native cross-library rankings or general speedups.
+
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
+
+The existing Hodge checker also accepts `--path-convergence`: it records
+independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
+controls on the 1024-node path against its complete analytic spectrum, using the
+same SplitMix64 starting span. Warnings and incomplete lookahead convergence
+remain explicit; these controls are numerical diagnosis, not native timing.
+
+## Spectral reference CI
+
+The `Real Hodge reference comparisons` CI job requires `--iterative
+--toponetx PATH --perslap PATH --gudhi` on fresh Rust example output. It checks
+matrices, actions, dense eigenpairs and matrix-free Ritz pairs against independent
+NumPy/rational expectations, unchanged pinned TopoNetX and perslap functions on
+their supported subsets, and GUDHI field-101 topology. Unsupported reference
+degrees and the RP2 real/F2 distinction remain explicit.
+
+The job uses Python 3.12 with NumPy 2.2.6, SciPy 1.15.3 and GUDHI 3.12.0.
+External sources are checked out at the exact revisions linked in the relevant
+oracle documentation; no runtime dependency is added. Explicitly requested
+missing packages or comparisons fail the job.
+
+The artifact named `hodge-reference-<sha>-<attempt>` retains the actual
+checkout SHA, event/run identity, reference commits and source hashes, dependency
+versions, Rust outputs and comparison results/logs, including failure evidence.
+Artifacts are uploaded even when a comparison fails and expire after 14 days.
+These are numerical correctness checks; finite-field corroboration, supported
+external function subsets and bounded learning controls do not establish exact
+real topology, whole-package compatibility or performance rankings.
 
 ## Native cross-library benchmarks
 

@@ -17,6 +17,8 @@
 //! diagrams; concrete simplicial sources also support vertex-labelled representatives.
 //! Requested cycle/cocycle representatives use production boundary reduction;
 //! independent test oracles verify ranks and interval semantics.
+//! Single-scale real Hodge analysis reads signed supplied boundaries directly;
+//! sparse action, explicit matrices and small dense spectra use standard inner products.
 //! Opt-in F2 critical-set workspaces retain sparse decompositions for endpoint
 //! proposals and bounded partial U queries on frozen simplicial complexes.
 //! Work and memory can still grow substantially with input size and reduction
@@ -36,6 +38,8 @@
 //! # Ok::<(), cocycle::Error>(())
 //! ```
 
+mod eigensolver;
+
 pub mod algebra;
 pub mod complex;
 pub mod descriptors;
@@ -45,6 +49,7 @@ mod error;
 pub mod execution;
 pub mod filtration;
 pub mod geometry;
+pub mod hodge;
 pub mod homology_operators;
 pub mod optimization;
 pub mod persistence;

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Mark residual-based partial Hodge results explicitly with
+  `is_index_coverage_certified() == false`, including after successful convergence.
+
+- Add matrix-free Hodge `smallest_eigenpairs` using bounded block LOBPCG and
+  the shared small Jacobi Ritz solver. Preserve numerical residuals and owned
+  coordinates without retaining a dense operator matrix. Iterative convergence
+  does not certify extremal index coverage or harmonic nullity; weighted and
+  normalized operators remain future work.
+
+- Add standard real single-scale Hodge Laplacians from supplied complexes or
+  stages: sparse full/lower/upper action, explicit row-major matrices and bounded
+  dense selected eigenpairs with measured residuals and orthogonality, and
+  borrowed numerical kernel-column reads. Integer
+  chain validation is independent of prime-field persistence. General SPD Grams,
+  complex coefficients and persistent Laplacians remain unsupported.
+- Bound explicit Hodge matrices to 1,048,576 entries (8 MiB of f64) by default
+  before dense allocation. `matrix_with_limit` and `SpectrumOptions::max_dense_entries`
+  allow explicit per-buffer limits; sparse action remains independent. Spectrum
+  callers using full option literals must supply the new field or use `..Default::default()`.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
