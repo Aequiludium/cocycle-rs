@@ -11,6 +11,12 @@ for the integration provenance and separate future capability contracts.
   plus explicitly selected fixed-endpoint reverse elimination. Standard inner
   products only; storage limits, numeric residuals and execution controls are
   explicit. Includes an independent rational/NumPy reproduction tool.
+  Independent upper/lower constructors share the owned result type and expose
+  separate matrix/action/spectrum requests. `LaplacianComponent` tags results
+  and spectra; lower-only computation needs no endpoint or q+1 skeleton.
+  Spectrum struct literals must now supply the new `component` field.
+  PSD acceptance and suggested near-zero thresholds retain the original Gram
+  scale through Schur cancellation; raw eigenvalues are not clipped.
 
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.

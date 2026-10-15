@@ -1006,3 +1006,24 @@ and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
 (2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
 equation 15 / Theorem 5.1. The implementation is independently written from
 these formulas, rather than copied from reference code.
+
+For U=A-E C+ E^T and D=B_q(K)^T B_q(K), the chain identity B_q(K) R N=0
+implies DU=UD=0. Thus their images are orthogonal. In this finite-dimensional
+setting, the nonzero spectral multiset of U+D is the union of those of U and D;
+its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
+z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
+exact ranks from arbitrary floating-point near-zero cutoffs.
+
+The implementation exposes full/upper/lower results and separately tagged
+spectra. The lower term depends only on K and requires its q-skeleton; it does
+not require L or a q+1 skeleton. Full and upper operators retain the stronger
+q+1 coverage check. Each result retains its owned bases and source metadata.
+Numerical spectrum tags identify the component, not the pair/source identity.
+
+Wolf, Fan and Monod, [Generalized Persistent Laplacians and their Spectral
+Properties](https://arxiv.org/html/2509.20220v1), arXiv:2509.20220v1 (2025-09-24),
+Section 5.2 / Theorems 5.6--5.7 and Section 5.3 / Theorem 5.11, study component
+spectral functions and generalize this decomposition. Their infinite-dimensional
+operator domains and stability hypotheses are not implemented here. The full
+operator does not inherit all component comparison properties; this does not
+rule out the fixed-K, increasing-L monotonicity, where D stays constant.

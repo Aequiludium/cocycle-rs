@@ -1,7 +1,9 @@
 //! A runnable path example and a whitespace protocol for independent verification.
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::{PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians};
+use cocycle::spectral::{
+    PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+};
 use std::io::{self, Read};
 use std::time::Instant;
 
@@ -43,12 +45,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
-    let benchmark = match args.as_slice() {
-        [a] if a == "--oracle" => None,
-        [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => Some(b.as_str()),
+    let (benchmark, components) = match args.as_slice() {
+        [a] if a == "--oracle" => (None, false),
+        [a] if a == "--components" => (None, true),
+        [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => {
+            (Some(b.as_str()), false)
+        }
         _ => {
             return Err(
-                "usage: persistent_laplacian [--oracle | --benchmark direct|stepwise]".into(),
+                "usage: persistent_laplacian [--oracle | --components | --benchmark direct|stepwise]".into(),
             );
         }
     };
@@ -100,7 +105,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
         let steps = fixed_endpoint_laplacians(&starts, &target, degree, options, &execution)?;
-        for (k, step) in starts.iter().zip(steps) {
+        let upper_steps = if components {
+            Some(fixed_endpoint_up_laplacians(
+                &starts, &target, degree, options, &execution,
+            )?)
+        } else {
+            None
+        };
+        for (index, (k, step)) in starts.iter().zip(steps).enumerate() {
             let r = PersistentLaplacian::compute(k, &target, degree, options, &execution)?;
             let spectrum = r.spectrum(&execution)?;
             println!(
@@ -129,6 +141,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 spectrum.residual,
                 step.solver_residual()
             );
+            if let Some(upper_steps) = &upper_steps {
+                let up = PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?;
+                let down = PersistentLaplacian::compute_down(k, degree, options, &execution)?;
+                let upper_spectrum = up.spectrum(&execution)?;
+                let lower_spectrum = down.spectrum(&execution)?;
+                print_values("UP", up.matrix());
+                print_values("DOWN", down.matrix());
+                print_values("UP_STEPWISE", upper_steps[index].matrix());
+                print_values("UP_SPECTRUM", &upper_spectrum.eigenvalues);
+                print_values("DOWN_SPECTRUM", &lower_spectrum.eigenvalues);
+                print_values("UP_ACTION", &up.action(&x, &execution)?);
+                print_values("DOWN_ACTION", &down.action(&x, &execution)?);
+                print_values(
+                    "COMPONENT_RESIDUAL",
+                    &[
+                        up.solver_residual(),
+                        upper_spectrum.residual,
+                        lower_spectrum.residual,
+                        upper_steps[index].solver_residual(),
+                    ],
+                );
+            }
         }
     }
     Ok(())

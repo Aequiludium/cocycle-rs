@@ -33,6 +33,13 @@ time and Windows peak working set are recorded separately; the latter includes
 the process baseline and is not allocation peak. Linux peak measurement needs
 an isolated resource harness. No timing threshold is an ordinary unit test.
 
+Add `--components` to verify the independent upper/lower matrices, actions and
+spectra, as well as fixed-endpoint upper results. The oracle checks U+D against
+the full operator, UD=DU=0, and the nonzero spectral union with zero multiplicity
+determined by independent exact rational ranks. It does not substitute numerical
+threshold ranks for these exact fixture ranks. The recorded `component_pairs`
+and per-pair component errors distinguish this coverage from full-only replay.
+
 `--reference-matlab DIR` verifies the Git blobs of the author's fixed
 `ebff6e3ad6f5eb90eb8058e4f5567755b62f0c3e` sources, 35-point input and
 precomputed q=2 boundaries. It recovers the original 580 oriented K-triangle

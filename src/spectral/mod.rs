@@ -1,7 +1,8 @@
 //! Real persistent Laplacians of same-source simplicial stage pairs.
 //!
 //! Standard inner products and ordinary, nonaugmented chains only. This bounded
-//! dense reproduction implements Algorithm 2 and fixed-endpoint reverse
+//! dense reproduction exposes full, upper and lower operators, Algorithm 2 and
+//! fixed-endpoint reverse
 //! elimination of Mémoli--Wan--Wang, arXiv:2012.02808v3, Sections 4 and 5.2.
 //! It does not implement weighted Grams, general maps or online endpoint updates.
 //! Signed incidence is assembled directly; no dense boundary matrix is required.
@@ -15,6 +16,17 @@ use crate::execution::{Execution, WorkBudget};
 use crate::filtration::{Coverage, FiltrationContext, SimplicialStage};
 use crate::{Error, Result};
 use schur::{copy_matrix, dense, eigensystem, norm, schur_complement};
+
+/// Mathematical component of an operator and its numerical spectrum.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LaplacianComponent {
+    /// Persistent upper term plus the source stage's lower term.
+    Full,
+    /// Persistent upper term A - E C+ E^T for K included in L.
+    Up,
+    /// Ordinary lower term Bq(K)^T Bq(K), independent of L.
+    Down,
+}
 
 /// Numerical and storage policy for the bounded dense reproduction.
 #[derive(Clone, Copy, Debug)]
@@ -59,17 +71,19 @@ impl SpectralOptions {
     }
 }
 
-/// Owned pair-level operator on the ordered q-simplices of K.
+/// Owned full or component operator on the ordered q-simplices of K.
 ///
 /// Matrix entries and action use f64, real coefficients, standard inner products
 /// and increasing-vertex orientation. Bases contain owned simplex labels and
 /// birth values, not transferable owner-local handles. Scales and optional source
 /// certificates describe this pair; they do not assert cross-source identity.
 /// A bare supplied complex is the entire mathematical source. Certified sources
-/// require the q+1 skeleton unless their construction exhausted the source.
+/// require the q+1 skeleton for full/upper results and the q-skeleton for lower
+/// results, unless their construction exhausted the source.
 /// All results are independent of the input lifetime.
 #[derive(Clone, Debug)]
 pub struct PersistentLaplacian {
+    component: LaplacianComponent,
     degree: usize,
     scales: (f64, f64),
     basis: Vec<Simplex>,
@@ -80,6 +94,7 @@ pub struct PersistentLaplacian {
     matrix: Vec<f64>,
     options: SpectralOptions,
     solver_residual: f64,
+    reference_scale: f64,
 }
 impl PersistentLaplacian {
     /// Construct the actual pair-level Schur operator A - E C+ E^T + Bq^T Bq.
@@ -98,16 +113,66 @@ impl PersistentLaplacian {
         options: SpectralOptions,
         execution: &Execution<'_>,
     ) -> Result<Self> {
+        Self::compute_component(k, l, degree, LaplacianComponent::Full, options, execution)
+    }
+
+    /// Construct only the persistent upper operator A - E C+ E^T.
+    ///
+    /// Its owned metadata and ordered coordinates describe the pair (K,L).
+    /// It does not assemble the lower term or diagonalize the full operator.
+    /// # Errors
+    /// Has the same inclusion, skeleton, numeric and resource checks as `compute`.
+    pub fn compute_up(
+        k: &SimplicialStage<'_>,
+        l: &SimplicialStage<'_>,
+        degree: usize,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::compute_component(k, l, degree, LaplacianComponent::Up, options, execution)
+    }
+
+    /// Construct only Bq(K)^T Bq(K), independently of any endpoint L.
+    ///
+    /// Both scales and both bases describe K: `scales()` is (s,s).
+    /// Requires the certified q-skeleton, but no q+1 skeleton or Schur solve.
+    /// At q=0 this is the ordinary nonaugmented zero operator.
+    /// # Errors
+    /// Rejects an insufficient certified q-skeleton, invalid policy, allocation
+    /// or storage limits, degree overflow, cancellation and work exhaustion.
+    pub fn compute_down(
+        k: &SimplicialStage<'_>,
+        degree: usize,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::compute_component(k, k, degree, LaplacianComponent::Down, options, execution)
+    }
+
+    fn compute_component(
+        k: &SimplicialStage<'_>,
+        l: &SimplicialStage<'_>,
+        degree: usize,
+        component: LaplacianComponent,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
         let mut budget = WorkBudget::new(execution)?;
-        validate_pair(k, l, degree, &options, &mut budget)?;
+        validate_pair(k, l, degree, component, &options, &mut budget)?;
         let target_ids = basis_ids(l, degree, &mut budget)?;
         let count = target_ids
             .iter()
             .take_while(|id| id.index() < k.len())
             .count();
-        let up = up_matrix(l, &target_ids, degree, &options, &mut budget)?;
-        let (matrix, residual) =
-            schur_complement(&up, target_ids.len(), count, &options, &mut budget)?;
+        let (matrix, residual, reference_scale) = if component == LaplacianComponent::Down {
+            (dense(count, count, &options, &mut budget)?, 0.0, 0.0)
+        } else {
+            let up = up_matrix(l, &target_ids, degree, &options, &mut budget)?;
+            let reference_scale = norm(&up);
+            let (matrix, residual) =
+                schur_complement(&up, target_ids.len(), count, &options, &mut budget)?;
+            (matrix, residual, reference_scale)
+        };
         finish(
             k,
             l,
@@ -117,10 +182,16 @@ impl PersistentLaplacian {
             matrix,
             residual,
             options,
+            component,
+            reference_scale,
             &mut budget,
         )
     }
 
+    /// Full, persistent upper, or source-stage lower operator.
+    pub fn component(&self) -> LaplacianComponent {
+        self.component
+    }
     /// Degree of the real chain space on which this operator acts.
     pub fn degree(&self) -> usize {
         self.degree
@@ -167,8 +238,21 @@ impl PersistentLaplacian {
     /// symmetry uses the original upper Gram scale. A zero denominator keeps
     /// the absolute error. For the fixed-endpoint algorithm this records the
     /// discarded-row residual.
+    /// For a lower-only operator this is zero because no Schur solve is used;
+    /// its eigensystem residual is checked separately by `spectrum`.
     pub fn solver_residual(&self) -> f64 {
         self.solver_residual
+    }
+
+    /// Max-entry scale used for numerical PSD acceptance and near-zero guidance.
+    ///
+    /// This is the maximum of the assembled matrix scale and the original target
+    /// upper Gram scale (the latter is absent for lower-only construction).
+    /// Retaining the construction scale prevents near-zero Schur cancellation
+    /// errors from being judged relative only to their own tiny magnitude.
+    /// It is neither a forward-error bound nor an exact rank certificate.
+    pub fn reference_scale(&self) -> f64 {
+        self.reference_scale
     }
 
     /// Apply this pair-level operator to finite coordinates in `basis()` order.
@@ -206,16 +290,17 @@ impl PersistentLaplacian {
         Ok(result)
     }
 
-    /// Compute the complete sorted spectrum, retaining multiplicity and small
-    /// signed roundoff values. The residual is checked without clipping values.
-    /// A near-zero count is numerical evidence, not a real Betti certificate.
+    /// Compute this component's complete sorted spectrum, retaining multiplicity
+    /// and small signed roundoff values. The residual is checked without clipping values.
+    /// A near-zero count is not a real Betti certificate. Even exact upper/lower
+    /// nullities individually are not the persistent Betti number of the pair.
     /// # Errors
     /// Includes resource, nonconvergence, residual and significant negativity errors.
     pub fn spectrum(&self, execution: &Execution<'_>) -> Result<LaplacianSpectrum> {
         let mut budget = WorkBudget::new(execution)?;
         let (mut eigenvalues, _, residual) =
             eigensystem(&self.matrix, self.basis.len(), &self.options, &mut budget)?;
-        let scale = norm(&self.matrix);
+        let scale = self.reference_scale;
         if eigenvalues
             .iter()
             .any(|v| *v < -self.options.residual_tolerance * scale)
@@ -231,6 +316,7 @@ impl PersistentLaplacian {
             eigenvalues,
             residual,
             zero_threshold: self.options.relative_tolerance * scale,
+            component: self.component,
         })
     }
 }
@@ -238,11 +324,17 @@ impl PersistentLaplacian {
 /// Complete numerical spectrum; near-zero multiplicity is not exact homology.
 #[derive(Clone, Debug)]
 pub struct LaplacianSpectrum {
+    /// Component whose spectrum was computed; this is not a pair/source identity.
+    /// Keep the originating operator's degree, bases and source metadata when
+    /// storing spectra from different requests. No thresholded spectral union
+    /// or exact rank inference is performed implicitly.
+    pub component: LaplacianComponent,
     /// All eigenvalues in increasing order, with multiplicity and no clipping.
     pub eigenvalues: Vec<f64>,
     /// Relative max-entry residual of the computed eigensystem.
     pub residual: f64,
-    /// Suggested absolute near-zero threshold for this matrix scale.
+    /// Suggested absolute near-zero threshold using the operator's reference scale.
+    /// In particular, upper Schur cancellation is judged at the input Gram scale.
     pub zero_threshold: f64,
 }
 
@@ -265,11 +357,52 @@ pub fn fixed_endpoint_laplacians(
     options: SpectralOptions,
     execution: &Execution<'_>,
 ) -> Result<Vec<PersistentLaplacian>> {
+    fixed_endpoint_components(
+        starts,
+        target,
+        degree,
+        LaplacianComponent::Full,
+        options,
+        execution,
+    )
+}
+
+/// Fixed-endpoint reverse elimination returning only persistent upper operators.
+///
+/// Like `fixed_endpoint_laplacians`, but without constructing any lower term.
+/// Results retain pair metadata, input order and `LaplacianComponent::Up`.
+/// # Errors
+/// Has the same validation, storage, numeric and execution checks as the full route.
+pub fn fixed_endpoint_up_laplacians(
+    starts: &[SimplicialStage<'_>],
+    target: &SimplicialStage<'_>,
+    degree: usize,
+    options: SpectralOptions,
+    execution: &Execution<'_>,
+) -> Result<Vec<PersistentLaplacian>> {
+    fixed_endpoint_components(
+        starts,
+        target,
+        degree,
+        LaplacianComponent::Up,
+        options,
+        execution,
+    )
+}
+
+fn fixed_endpoint_components(
+    starts: &[SimplicialStage<'_>],
+    target: &SimplicialStage<'_>,
+    degree: usize,
+    component: LaplacianComponent,
+    options: SpectralOptions,
+    execution: &Execution<'_>,
+) -> Result<Vec<PersistentLaplacian>> {
     let mut budget = WorkBudget::new(execution)?;
-    validate_pair(target, target, degree, &options, &mut budget)?;
+    validate_pair(target, target, degree, component, &options, &mut budget)?;
     let mut total_entries = 0usize;
     for (index, k) in starts.iter().enumerate() {
-        validate_pair(k, target, degree, &options, &mut budget)?;
+        validate_pair(k, target, degree, component, &options, &mut budget)?;
         if index > 0 && starts[index - 1].scale() > k.scale() {
             return Err(Error::InvalidParameter {
                 parameter: "start stages",
@@ -348,6 +481,8 @@ pub fn fixed_endpoint_laplacians(
             matrix,
             residual,
             options,
+            component,
+            scale,
             &mut budget,
         )?);
     }
@@ -360,18 +495,24 @@ fn validate_pair(
     k: &SimplicialStage<'_>,
     l: &SimplicialStage<'_>,
     degree: usize,
+    component: LaplacianComponent,
     options: &SpectralOptions,
     budget: &mut WorkBudget<'_>,
 ) -> Result<()> {
     budget.step()?;
     options.validate()?;
-    degree.checked_add(1).ok_or(Error::SizeOverflow {
+    let adjacent = degree.checked_add(1).ok_or(Error::SizeOverflow {
         operation: "adjacent spectral degree",
     })?;
     let _ = k.inclusion_into(l)?;
     if let Some(source) = l.source_filtration()
         && !source.is_dimension_complete()
-        && source.max_simplex_dimension() <= degree
+        && source.max_simplex_dimension()
+            < if component == LaplacianComponent::Down {
+                degree
+            } else {
+                adjacent
+            }
     {
         return Err(Error::InsufficientSkeleton {
             requested_homology_dimension: degree,
@@ -443,29 +584,33 @@ fn finish(
     mut matrix: Vec<f64>,
     residual: f64,
     options: SpectralOptions,
+    component: LaplacianComponent,
+    reference_scale: f64,
     budget: &mut WorkBudget<'_>,
 ) -> Result<PersistentLaplacian> {
     let n = ids.len();
-    for (i, &a) in ids.iter().enumerate() {
-        for (j, &b) in ids[..=i].iter().enumerate() {
-            budget.step()?;
-            let ba = k.boundary(a).ok_or(Error::InternalInvariant {
-                reason: "K boundary missing",
-            })?;
-            let bb = k.boundary(b).ok_or(Error::InternalInvariant {
-                reason: "K boundary missing",
-            })?;
-            let mut dot = 0.0;
-            for x in ba {
-                for y in bb {
-                    budget.step()?;
-                    if x.face == y.face {
-                        dot += f64::from(x.coefficient) * f64::from(y.coefficient);
+    if component != LaplacianComponent::Up {
+        for (i, &a) in ids.iter().enumerate() {
+            for (j, &b) in ids[..=i].iter().enumerate() {
+                budget.step()?;
+                let ba = k.boundary(a).ok_or(Error::InternalInvariant {
+                    reason: "K boundary missing",
+                })?;
+                let bb = k.boundary(b).ok_or(Error::InternalInvariant {
+                    reason: "K boundary missing",
+                })?;
+                let mut dot = 0.0;
+                for x in ba {
+                    for y in bb {
+                        budget.step()?;
+                        if x.face == y.face {
+                            dot += f64::from(x.coefficient) * f64::from(y.coefficient);
+                        }
                     }
                 }
+                matrix[i * n + j] += dot;
+                matrix[j * n + i] = matrix[i * n + j];
             }
-            matrix[i * n + j] += dot;
-            matrix[j * n + i] = matrix[i * n + j];
         }
     }
     if matrix.iter().any(|v| !v.is_finite()) {
@@ -494,8 +639,10 @@ fn finish(
     };
     let basis = owned_basis(k, ids, budget)?;
     let target_basis = owned_basis(l, target_ids, budget)?;
+    let reference_scale = reference_scale.max(norm(&matrix));
     budget.check()?;
     Ok(PersistentLaplacian {
+        component,
         degree,
         scales: (k.scale(), l.scale()),
         basis,
@@ -508,6 +655,7 @@ fn finish(
         matrix,
         options,
         solver_residual: residual,
+        reference_scale,
     })
 }
 fn allocation() -> Error {

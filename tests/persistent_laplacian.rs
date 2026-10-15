@@ -3,7 +3,10 @@ use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
-use cocycle::spectral::{PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians};
+use cocycle::spectral::{
+    LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
+    fixed_endpoint_up_laplacians,
+};
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
 
@@ -124,8 +127,27 @@ fn fixed_endpoint_uses_only_upper_term_with_ties_and_empty_stages() {
             &Execution::default(),
         )
         .unwrap();
-        for (k, result) in stages.iter().zip(results) {
+        let upper = fixed_endpoint_up_laplacians(
+            &stages,
+            &stages[5],
+            q,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        for ((k, result), up) in stages.iter().zip(results).zip(upper) {
             close(result.matrix(), pair(&source, k.scale(), 3., q).matrix());
+            let direct_up = PersistentLaplacian::compute_up(
+                k,
+                &stages[5],
+                q,
+                SpectralOptions::default(),
+                &Execution::default(),
+            )
+            .unwrap();
+            close(up.matrix(), direct_up.matrix());
+            assert_eq!(up.component(), LaplacianComponent::Up);
+            assert_eq!(result.component(), LaplacianComponent::Full);
             assert_eq!(result.scales(), (k.scale(), 3.));
             let eig = result.spectrum(&Execution::default()).unwrap();
             assert!(eig.eigenvalues.iter().all(|v| *v >= -1e-9));
@@ -314,6 +336,29 @@ fn certified_missing_skeleton_is_not_an_empty_upper_boundary() -> Result<()> {
         PersistentLaplacian::compute(&k, &k, 1, SpectralOptions::default(), &Execution::default()),
         Err(Error::InsufficientSkeleton { .. })
     ));
+    assert!(matches!(
+        PersistentLaplacian::compute_up(
+            &k,
+            &k,
+            1,
+            SpectralOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
+    let lower = PersistentLaplacian::compute_down(
+        &k,
+        1,
+        SpectralOptions::default(),
+        &Execution::default(),
+    )?;
+    assert_eq!(lower.component(), LaplacianComponent::Down);
+    assert_eq!(lower.construction_dimension(), Some(1));
+    assert!(lower.source_context().is_some());
+    assert!(matches!(
+        PersistentLaplacian::compute_down(&k, 2, SpectralOptions::default(), &Execution::default()),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
     let bare = source.complex().stage(2.)?;
     assert!(
         PersistentLaplacian::compute(
@@ -340,6 +385,183 @@ fn certified_missing_skeleton_is_not_an_empty_upper_boundary() -> Result<()> {
     assert!(result.source_context().is_some());
     assert_eq!(result.construction_dimension(), Some(1));
     Ok(())
+}
+
+#[test]
+fn component_matrices_and_nonzero_spectral_multisets() {
+    // A filled triangle and a separate unfilled ring. In C1(K), up has rank 1,
+    // down has rank 4, and the full operator has one harmonic zero direction.
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 0.),
+        (&[4], 0.),
+        (&[5], 0.),
+        (&[0, 1], 1.),
+        (&[0, 2], 1.),
+        (&[1, 2], 1.),
+        (&[3, 4], 1.),
+        (&[3, 5], 1.),
+        (&[4, 5], 1.),
+        (&[0, 1, 2], 2.),
+    ]);
+    let k = source.stage(1.).unwrap();
+    let l = source.stage(2.).unwrap();
+    let options = SpectralOptions::default();
+    let execution = Execution::default();
+    let up = PersistentLaplacian::compute_up(&k, &l, 1, options, &execution).unwrap();
+    let down = PersistentLaplacian::compute_down(&k, 1, options, &execution).unwrap();
+    let full = PersistentLaplacian::compute(&k, &l, 1, options, &execution).unwrap();
+    assert_eq!(up.component(), LaplacianComponent::Up);
+    assert_eq!(down.component(), LaplacianComponent::Down);
+    assert_eq!(full.component(), LaplacianComponent::Full);
+    assert_eq!(up.scales(), (1., 2.));
+    assert_eq!(down.scales(), (1., 1.));
+    assert_eq!(up.basis(), down.basis());
+    assert_eq!(up.basis(), full.basis());
+    let n = full.basis().len();
+    for i in 0..n {
+        for j in 0..n {
+            close(
+                &[up.matrix()[i * n + j] + down.matrix()[i * n + j]],
+                &[full.matrix()[i * n + j]],
+            );
+            let product = (0..n)
+                .map(|a| up.matrix()[i * n + a] * down.matrix()[a * n + j])
+                .sum();
+            close(&[product], &[0.]);
+        }
+    }
+    let up_spec = up.spectrum(&execution).unwrap();
+    let down_spec = down.spectrum(&execution).unwrap();
+    assert_eq!(up_spec.component, LaplacianComponent::Up);
+    assert_eq!(down_spec.component, LaplacianComponent::Down);
+    close(&up_spec.eigenvalues, &[0., 0., 0., 0., 0., 3.]);
+    close(&down_spec.eigenvalues, &[0., 0., 3., 3., 3., 3.]);
+    close(
+        &full.spectrum(&execution).unwrap().eigenvalues,
+        &[0., 3., 3., 3., 3., 3.],
+    );
+    let x = [1., -2., 3., 4., -5., 6.];
+    let u = up.action(&x, &execution).unwrap();
+    let d = down.action(&x, &execution).unwrap();
+    let sum: Vec<_> = u.iter().zip(&d).map(|(a, b)| a + b).collect();
+    close(&sum, &full.action(&x, &execution).unwrap());
+    let empty = source.stage(-1.).unwrap();
+    assert!(
+        PersistentLaplacian::compute_up(&empty, &l, 1, options, &execution)
+            .unwrap()
+            .matrix()
+            .is_empty()
+    );
+    assert!(
+        PersistentLaplacian::compute_down(&empty, 1, options, &execution)
+            .unwrap()
+            .spectrum(&execution)
+            .unwrap()
+            .eigenvalues
+            .is_empty()
+    );
+    close(
+        PersistentLaplacian::compute_down(&k, 0, options, &execution)
+            .unwrap()
+            .matrix(),
+        &[0.; 36],
+    );
+}
+
+#[test]
+fn lower_component_skips_target_storage_and_schur_work() {
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 2.),
+        (&[0, 1], 1.),
+        (&[0, 2], 3.),
+        (&[1, 2], 3.),
+        (&[0, 1, 2], 4.),
+    ]);
+    let k = source.stage(1.).unwrap();
+    let l = source.stage(4.).unwrap();
+    let options = SpectralOptions {
+        max_sweeps: 0,
+        max_dense_entries: 1,
+        ..Default::default()
+    };
+    let execution = Execution::default();
+    let down = PersistentLaplacian::compute_down(&k, 1, options, &execution).unwrap();
+    close(down.matrix(), &[2.]);
+    assert_eq!(down.target_basis(), down.basis());
+    assert_eq!(down.solver_residual(), 0.);
+    assert!(PersistentLaplacian::compute_up(&k, &l, 1, options, &execution).is_err());
+    let zero_sweeps = SpectralOptions {
+        max_sweeps: 0,
+        ..Default::default()
+    };
+    assert!(matches!(
+        PersistentLaplacian::compute_up(&k, &l, 1, zero_sweeps, &execution),
+        Err(Error::NumericalFailure { .. })
+    ));
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        PersistentLaplacian::compute_down(&k, 1, options, &execution.cancellation(&flag)),
+        Err(Error::Cancelled)
+    ));
+    assert!(matches!(
+        PersistentLaplacian::compute_down(&k, 1, options, &execution.max_work(0)),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    let insufficient = SpectralOptions {
+        max_dense_entries: 0,
+        ..Default::default()
+    };
+    assert!(PersistentLaplacian::compute_down(&k, 1, insufficient, &execution).is_err());
+}
+
+#[test]
+fn upper_zero_cancellation_keeps_the_construction_scale() {
+    // K is the two-edge path 1--2--3, so its cycle space is zero and U=0.
+    // Three later triangles give a nontrivial Schur solve. Its tiny signed
+    // cancellation error must be judged against the original upper Gram.
+    let source = complex(&[
+        (&[0], 1.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 0.),
+        (&[0, 1], 2.),
+        (&[0, 2], 1.),
+        (&[0, 3], 2.),
+        (&[1, 2], 0.),
+        (&[1, 3], 2.),
+        (&[2, 3], 0.),
+        (&[0, 1, 2], 3.),
+        (&[0, 1, 3], 2.),
+        (&[1, 2, 3], 3.),
+    ]);
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(3.).unwrap();
+    let up = PersistentLaplacian::compute_up(
+        &k,
+        &l,
+        1,
+        SpectralOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    close(up.matrix(), &[0.; 4]);
+    assert_eq!(up.reference_scale(), 2.);
+    let spectrum = up.spectrum(&Execution::default()).unwrap();
+    assert_eq!(
+        spectrum.zero_threshold,
+        up.options().relative_tolerance * up.reference_scale()
+    );
+    assert!(
+        spectrum
+            .eigenvalues
+            .iter()
+            .all(|value| value.abs() <= spectrum.zero_threshold)
+    );
 }
 
 #[test]

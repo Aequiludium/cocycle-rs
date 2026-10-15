@@ -151,16 +151,17 @@ def oracle(cells, s, t, q):
         threshold = 1e-12 * (singular[0] if singular.size else 0)
         rank_f = int(np.count_nonzero(singular > threshold))
         projected = r @ vh[rank_f:].T
-        projection = projected @ projected.T + lower.T @ lower
+        upper_projection = projected @ projected.T
     else:
-        projection = (lower.T @ lower).astype(float)
+        upper_projection = np.zeros((len(k), len(k)))
+    projection = upper_projection + lower.T @ lower
     # Integer incidence ranks over Q equal ranks over R. This is independent
     # of both floating Schur and the numerical nullspace construction.
     beta = (len(k) - len(rref(lower.tolist(), len(k))[1])
             - len(rref(up.tolist(), up.shape[1])[1])
             + len(rref(f.tolist(), f.shape[1])[1]))
     exact = exact_projection(r, f, lower) if up.shape[1] <= 18 else None
-    return k, direct, projection, beta, exact, up, retained, lower
+    return k, direct, projection, beta, exact, up, retained, lower, upper_projection
 
 
 def protocol(cells, q, starts, target):
@@ -171,7 +172,7 @@ def protocol(cells, q, starts, target):
     return " ".join(words) + "\n"
 
 
-def parse_worker(text):
+def parse_worker(text, components=False):
     import numpy as np
     lines = iter(text.splitlines())
     for line in lines:
@@ -184,12 +185,19 @@ def parse_worker(text):
         for length in basis_line:
             basis.append(tuple(int(next(basis_line)) for _ in range(int(length))))
         record = {"q": q, "s": s, "t": t, "basis": basis}
-        for name in ["MATRIX", "STEPWISE", "SPECTRUM", "ACTION", "RESIDUAL"]:
+        names = ["MATRIX", "STEPWISE", "SPECTRUM", "ACTION", "RESIDUAL"]
+        if components:
+            names += ["UP", "DOWN", "UP_STEPWISE", "UP_SPECTRUM", "DOWN_SPECTRUM",
+                      "UP_ACTION", "DOWN_ACTION", "COMPONENT_RESIDUAL"]
+        for name in names:
             values = next(lines).split()
             assert values[0] == name
             record[name] = np.array([float(x) for x in values[1:]])
         record["MATRIX"] = record["MATRIX"].reshape(n, n)
         record["STEPWISE"] = record["STEPWISE"].reshape(n, n)
+        if components:
+            for name in ["UP", "DOWN", "UP_STEPWISE"]:
+                record[name] = record[name].reshape(n, n)
         yield record
 
 
@@ -232,7 +240,7 @@ def benchmark(worker, output):
         (output / f"benchmark-{label}-verified.txt").write_text(verified.stdout, encoding="utf-8")
         import numpy as np
         for record in parse_worker(verified.stdout):
-            _, _, projection, beta, _, _, _, _ = oracle(cells, record["s"], count, 0)
+            _, _, projection, beta, _, _, _, _, _ = oracle(cells, record["s"], count, 0)
             np.testing.assert_allclose(record["MATRIX"], projection, atol=2e-9, rtol=1e-9)
             np.testing.assert_allclose(record["STEPWISE"], projection, atol=2e-9, rtol=1e-9)
             assert int(np.count_nonzero(np.abs(record["SPECTRUM"]) < 1e-8)) == beta
@@ -358,6 +366,8 @@ def main():
     parser.add_argument("--reference-matlab", type=Path,
                         help="Fixed author source/data directory; needs SciPy and GUDHI")
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--components", action="store_true",
+                        help="Also verify independent up/down operators, actions and spectra")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     source_worker = args.worker.resolve()
@@ -365,6 +375,7 @@ def main():
     # this keeps Windows builds from trying to overwrite an executing example.
     worker = (args.output / source_worker.name).resolve()
     shutil.copyfile(source_worker, worker)
+    shutil.copyfile(Path(__file__).resolve(), args.output / "controller.py")
     fixture_set = fixtures()
     groups = []
     for label, cells in fixture_set:
@@ -375,7 +386,8 @@ def main():
                 groups.append((label, cells, q, [s for s in scales if s <= t], t))
     data = "".join(protocol(cells, q, starts, t) for _, cells, q, starts, t in groups)
     (args.output / "fixtures.txt").write_text(data, encoding="utf-8")
-    run = subprocess.run([str(worker), "--oracle"], input=data, capture_output=True, text=True)
+    run = subprocess.run([str(worker), "--components" if args.components else "--oracle"],
+                         input=data, capture_output=True, text=True)
     (args.output / "worker-stdout.txt").write_text(run.stdout, encoding="utf-8")
     (args.output / "worker-stderr.txt").write_text(run.stderr, encoding="utf-8")
     run.check_returncode()
@@ -388,13 +400,13 @@ def main():
         namespace = {"np": np}
         exec(compile(ast.Module(body=selected, type_ignores=[]), str(args.reference_python), "exec"), namespace)
         external = namespace["schur_complement"]
-    records = iter(parse_worker(run.stdout))
+    records = iter(parse_worker(run.stdout, args.components))
     checks = []
     for label, cells, q, starts, t in groups:
         for s in starts:
             record = next(records)
             assert (record["q"], record["s"], record["t"]) == (q, s, t)
-            basis, direct, projection, beta, exact, up, retained, lower = oracle(cells, s, t, q)
+            basis, direct, projection, beta, exact, up, retained, lower, upper_projection = oracle(cells, s, t, q)
             assert record["basis"] == basis
             n = len(basis)
             errors = {}
@@ -416,11 +428,44 @@ def main():
             assert int(np.count_nonzero(np.abs(eigenvalues) < 1e-8)) == beta
             assert np.min(eigenvalues, initial=0) >= -2e-9
             np.testing.assert_allclose(record["ACTION"], projection @ ((np.arange(n)+1)/7), atol=2e-9, rtol=1e-9)
+            component_checks = None
+            if args.components:
+                lower_gram = lower.T @ lower
+                component_errors = {}
+                for name, expected in [("UP", upper_projection), ("DOWN", lower_gram),
+                                       ("UP_STEPWISE", upper_projection)]:
+                    np.testing.assert_allclose(record[name], expected, atol=2e-9, rtol=1e-9)
+                    component_errors[name] = float(np.max(np.abs(record[name] - expected), initial=0))
+                np.testing.assert_allclose(record["MATRIX"], record["UP"] + record["DOWN"], atol=2e-9, rtol=1e-9)
+                products = [record["UP"] @ record["DOWN"], record["DOWN"] @ record["UP"]]
+                for product in products:
+                    np.testing.assert_allclose(product, np.zeros((n, n)), atol=2e-9, rtol=1e-9)
+                vector = (np.arange(n) + 1) / 7
+                for name, expected in [("UP", upper_projection), ("DOWN", lower_gram)]:
+                    np.testing.assert_allclose(record[name + "_SPECTRUM"], np.linalg.eigvalsh(expected), atol=2e-9, rtol=1e-9)
+                    np.testing.assert_allclose(record[name + "_ACTION"], expected @ vector, atol=2e-9, rtol=1e-9)
+                # Only the independent exact ranks select the nonzero tails.
+                # This check does not turn floating near-zero counts into ranks.
+                down_rank = len(rref(lower.tolist(), n)[1])
+                up_rank = n - down_rank - beta
+                union = np.sort(np.concatenate((np.zeros(beta),
+                    record["UP_SPECTRUM"][n-up_rank:], record["DOWN_SPECTRUM"][n-down_rank:])))
+                np.testing.assert_allclose(union, record["SPECTRUM"], atol=2e-9, rtol=1e-9)
+                if exact is not None:
+                    exact_up = np.array([[float(exact[i][j] - int(lower_gram[i, j]))
+                        for j in range(n)] for i in range(n)]).reshape(n, n)
+                    np.testing.assert_allclose(record["UP"], exact_up, atol=2e-9, rtol=1e-9)
+                component_checks = {"matrix_errors": component_errors,
+                    "orthogonality_error": max(float(np.max(np.abs(p), initial=0)) for p in products),
+                    "spectral_union_error": float(np.max(np.abs(union-record["SPECTRUM"]), initial=0)),
+                    "exact_up_rank": up_rank, "exact_down_rank": down_rank,
+                    "residuals": record["COMPONENT_RESIDUAL"].tolist()}
             checks.append({"fixture": label, "degree": q, "s": s, "t": t,
                            "basis": basis, "matrix": record["MATRIX"].tolist(),
                            "spectrum": eigenvalues.tolist(), "real_persistent_rank": beta,
                            "exact_matrix": [[str(x) for x in row] for row in exact] if exact is not None else None,
-                           "errors": errors, "residuals": record["RESIDUAL"].tolist()})
+                           "errors": errors, "residuals": record["RESIDUAL"].tolist(),
+                           "components": component_checks})
     assert next(records, None) is None
     topology = []
     if args.gudhi:
@@ -458,15 +503,25 @@ def main():
     result = {"python": sys.version, "numpy": np.__version__, "worker": str(worker),
               "source_worker": str(source_worker),
               "worker_sha256": hashlib.sha256(worker.read_bytes()).hexdigest(),
+              "controller_sha256": hashlib.sha256((args.output / "controller.py").read_bytes()).hexdigest(),
               "pairs": len(checks), "exact_matrices": sum(c["exact_matrix"] is not None for c in checks),
+              "component_pairs": sum(c["components"] is not None for c in checks),
               "max_matrix_error": max((max(c["errors"].values()) for c in checks), default=0),
               "checks": checks, "gudhi": topology, "benchmarks": timings,
               "matlab_author_sample": author_sample,
               "limitations": ["Numerical evidence is not an exact Betti certificate.",
                   "Peak working set includes process baseline, not allocation peak.",
                   "Bounded dense reproduction; no sparse scalability or production fast-path adoption."]}
+    if args.components:
+        components = [c["components"] for c in checks]
+        result["max_component_matrix_error"] = max(
+            max(c["matrix_errors"].values()) for c in components)
+        result["max_component_orthogonality_error"] = max(c["orthogonality_error"] for c in components)
+        result["max_component_spectral_union_error"] = max(c["spectral_union_error"] for c in components)
     (args.output / "results.json").write_text(json.dumps(result, indent=2)+"\n", encoding="utf-8")
-    print(json.dumps({k: result[k] for k in ["pairs", "exact_matrices", "max_matrix_error", "gudhi", "matlab_author_sample"]}))
+    print(json.dumps({k: result[k] for k in ["pairs", "exact_matrices", "component_pairs",
+        "max_matrix_error", "max_component_matrix_error", "max_component_orthogonality_error",
+        "max_component_spectral_union_error", "gudhi", "matlab_author_sample"] if k in result}))
 
 
 if __name__ == "__main__":
