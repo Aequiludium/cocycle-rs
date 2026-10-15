@@ -50,7 +50,7 @@ pub mod geometry;
 pub mod homology_operators;
 pub mod optimization;
 pub mod persistence;
-pub mod spectral;
+pub mod persistent_laplacian;
 
 pub use error::{Error, Result};
 

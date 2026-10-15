@@ -33,6 +33,47 @@ pub(super) fn dense(
 pub(super) fn norm(matrix: &[f64]) -> f64 {
     matrix.iter().map(|v| v.abs()).fold(0.0, f64::max)
 }
+
+pub(super) fn eliminate_last(
+    matrix: &mut [f64],
+    stride: usize,
+    active: usize,
+    scale: f64,
+    options: &SpectralOptions,
+    budget: &mut WorkBudget<'_>,
+) -> Result<()> {
+    budget.step()?;
+    let last = active - 1;
+    let pivot = matrix[last * stride + last];
+    if pivot < -options.residual_tolerance * scale {
+        return Err(numerical("negative stepwise pivot"));
+    }
+    if pivot.abs() <= options.relative_tolerance * scale {
+        // Small coupling is not a bound on c*c^T/pivot. Even a PSD rank-one
+        // block [[1, eps], [eps, eps^2]] loses a unit correction if dropped.
+        // Only an exactly uncoupled coordinate can be removed without a solve.
+        for i in 0..last {
+            budget.step()?;
+            if matrix[i * stride + last] != 0.0 {
+                return Err(numerical("coupled near-zero stepwise pivot"));
+            }
+        }
+        return Ok(());
+    }
+    for i in 0..last {
+        budget.step_by(last)?;
+        for j in 0..=i {
+            let correction = matrix[i * stride + last] * (matrix[last * stride + j] / pivot);
+            let value = matrix[i * stride + j] - correction;
+            if !value.is_finite() {
+                return Err(numerical("stepwise Schur subtraction"));
+            }
+            matrix[i * stride + j] = value;
+            matrix[j * stride + i] = value;
+        }
+    }
+    Ok(())
+}
 pub(super) fn copy_matrix(
     matrix: &[f64],
     stride: usize,
@@ -373,5 +414,40 @@ mod tests {
             ..Default::default()
         };
         assert!(eigensystem(&[2.0, -1.0, -1.0, 2.0], 2, &o, &mut b).is_err());
+    }
+
+    #[test]
+    fn small_coupling_cannot_justify_discarding_a_small_pivot() {
+        let options = SpectralOptions::default();
+        let execution = Execution::default();
+        let mut budget = WorkBudget::new(&execution).unwrap();
+        for epsilon in [1e-4_f64, 1e-8, 1e-10] {
+            for delta in [0.0, 1e-4] {
+                let original = [1.0, epsilon, epsilon, epsilon * epsilon * (1.0 + delta)];
+                let (direct, _) = schur_complement(&original, 2, 1, &options, &mut budget).unwrap();
+                assert!((direct[0] - delta / (1.0 + delta)).abs() < 1e-12);
+                let mut stepwise = original;
+                if original[3] <= options.relative_tolerance {
+                    assert!(matches!(
+                        eliminate_last(&mut stepwise, 2, 2, 1.0, &options, &mut budget),
+                        Err(Error::NumericalFailure {
+                            context: "coupled near-zero stepwise pivot"
+                        })
+                    ));
+                } else {
+                    eliminate_last(&mut stepwise, 2, 2, 1.0, &options, &mut budget).unwrap();
+                    assert!((stepwise[0] - direct[0]).abs() < 1e-12);
+                }
+            }
+        }
+        // A genuinely uncoupled zero coordinate has exactly zero correction.
+        let mut uncoupled = [1.0, 0.0, 0.0, 0.0];
+        eliminate_last(&mut uncoupled, 2, 2, 1.0, &options, &mut budget).unwrap();
+        assert_eq!(uncoupled[0], 1.0);
+        for scale in [1e-200, 1.0, 1e200] {
+            let mut matrix = [scale, -scale, -scale, scale];
+            eliminate_last(&mut matrix, 2, 2, scale, &options, &mut budget).unwrap();
+            assert_eq!(matrix[0], 0.0);
+        }
     }
 }

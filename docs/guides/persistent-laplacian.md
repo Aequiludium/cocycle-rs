@@ -2,6 +2,22 @@
 
 [Documentation](../README.md) / Usage
 
+The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
+Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
+Its private Jacobi solver retains its own convergence/error/resource policy.
+
+Reverse elimination skips a near-zero pivot only if its retained coupling is
+exactly zero. Small coupling alone cannot bound the Schur correction: the PSD
+block `[[1, eps], [eps, eps*eps]]` has a unit correction. Coupled near-zero pivots
+rebuild the original upper Gram and use the checked direct Schur solve for this
+and subsequent starts, under the same cumulative work and per-buffer storage
+limits. `used_direct_fallback()` records this route. A failed direct solve returns
+a numerical error; no tolerance is increased and no coupled correction is dropped.
+
+This is a bounded dense reference route. The default 65,536-entry per-buffer cap
+limits the target degree basis to 256; cumulative output storage is capped too.
+It does not establish a high-performance persistent spectral kernel.
+
 This **Unreleased** bounded dense implementation computes an actual stage-pair
 operator, its action and its complete numerical spectrum. It uses real
 coefficients, standard inner products, increasing-vertex orientation and ordinary
@@ -11,7 +27,7 @@ unrelated owners, reversed scales and mixed certificates are rejected.
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::{
+use cocycle::persistent_laplacian::{
     LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
 };
 

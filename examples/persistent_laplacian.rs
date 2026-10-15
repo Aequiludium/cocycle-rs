@@ -1,7 +1,7 @@
 //! A runnable path example and a whitespace protocol for independent verification.
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::spectral::{
+use cocycle::persistent_laplacian::{
     PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
 };
 use std::io::{self, Read};
@@ -84,7 +84,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|s| source.stage(*s))
             .collect::<cocycle::Result<Vec<_>>>()?;
         let options = SpectralOptions {
-            max_dense_entries: 4_000_000,
+            max_dense_entries: if benchmark.is_some() {
+                65_536
+            } else {
+                4_000_000
+            },
             ..Default::default()
         };
         let execution = Execution::default();
@@ -101,7 +105,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let elapsed = begin.elapsed().as_secs_f64();
             let checksum: f64 = results.iter().flat_map(|r| r.matrix()).sum();
             std::hint::black_box(&results);
-            println!("TIME {elapsed:.17e} CHECKSUM {checksum:.17e}");
+            let fallbacks = results.iter().filter(|r| r.used_direct_fallback()).count();
+            println!("TIME {elapsed:.17e} CHECKSUM {checksum:.17e} FALLBACK {fallbacks}");
             continue;
         }
         let steps = fixed_endpoint_laplacians(&starts, &target, degree, options, &execution)?;
@@ -161,6 +166,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         lower_spectrum.residual,
                         upper_steps[index].solver_residual(),
                     ],
+                );
+                println!(
+                    "FALLBACK {} {}",
+                    u8::from(step.used_direct_fallback()),
+                    u8::from(upper_steps[index].used_direct_fallback())
                 );
             }
         }

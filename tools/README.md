@@ -1,5 +1,16 @@
 # Developer tools
 
+The optional [spectral resource controller](benchmark_spectral_resources.py)
+runs at least ten fresh serial Windows processes per declared cell, retains one
+discarded warmup and a seeded cell order, and records solve/preparation times,
+whole-process wall time, absolute peak working set, failures and immutable source
+identities. Commit measured code first. Supply a JSON list of explicit fixture
+descriptions, commands, independent expected values and tolerances through
+`--specification PATH --output NEW_DIRECTORY`. Specifications and raw outputs stay
+under ignored `target/benchmarks/commit-<sha12>/spectral-resources/run-<NNN>/`.
+See the [performance reporting rules](../benches/reporting.md): these resource
+snapshots do not establish native cross-library rankings or general speedups.
+
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 

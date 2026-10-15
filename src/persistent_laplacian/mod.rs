@@ -95,6 +95,7 @@ pub struct PersistentLaplacian {
     options: SpectralOptions,
     solver_residual: f64,
     reference_scale: f64,
+    direct_fallback: bool,
 }
 impl PersistentLaplacian {
     /// Construct the actual pair-level Schur operator A - E C+ E^T + Bq^T Bq.
@@ -242,6 +243,15 @@ impl PersistentLaplacian {
     /// its eigensystem residual is checked separately by `spectrum`.
     pub fn solver_residual(&self) -> f64 {
         self.solver_residual
+    }
+
+    /// Whether coupled near-zero reverse pivots required a direct Schur solve.
+    ///
+    /// Only fixed-endpoint results can set this flag. The fallback rebuilds the
+    /// original upper Gram and uses the same checked direct solve, storage limits
+    /// and cumulative Execution budget. It never drops a coupled correction.
+    pub fn used_direct_fallback(&self) -> bool {
+        self.direct_fallback
     }
 
     /// Max-entry scale used for numerical PSD acceptance and near-zero guidance.
@@ -437,42 +447,26 @@ fn fixed_endpoint_components(
     let mut up = up_matrix(target, &ids, degree, &options, &mut budget)?;
     let scale = norm(&up);
     let mut active = order;
-    let mut residual: f64 = 0.0;
+    let mut direct_up = None;
     for k in starts.iter().rev() {
         let count = ids.iter().take_while(|id| id.index() < k.len()).count();
-        while active > count {
-            budget.step()?;
-            let last = active - 1;
-            let pivot = up[last * order + last];
-            if pivot < -options.residual_tolerance * scale {
-                return Err(numerical("negative stepwise pivot"));
-            }
-            if pivot.abs() <= options.relative_tolerance * scale {
-                let row = (0..last)
-                    .map(|i| up[i * order + last].abs())
-                    .fold(0.0, f64::max);
-                residual = residual.max(if scale == 0.0 { row } else { row / scale });
-                if residual > options.residual_tolerance {
-                    return Err(numerical("incompatible zero stepwise pivot"));
+        while direct_up.is_none() && active > count {
+            match schur::eliminate_last(&mut up, order, active, scale, &options, &mut budget) {
+                Ok(()) => active -= 1,
+                Err(Error::NumericalFailure {
+                    context: "coupled near-zero stepwise pivot",
+                }) => {
+                    direct_up = Some(up_matrix(target, &ids, degree, &options, &mut budget)?);
                 }
-            } else {
-                for i in 0..last {
-                    budget.step_by(last)?;
-                    for j in 0..=i {
-                        let value =
-                            up[i * order + j] - up[i * order + last] * up[last * order + j] / pivot;
-                        if !value.is_finite() {
-                            return Err(numerical("stepwise Schur subtraction"));
-                        }
-                        up[i * order + j] = value;
-                        up[j * order + i] = value;
-                    }
-                }
+                Err(error) => return Err(error),
             }
-            active -= 1;
         }
-        let matrix = copy_matrix(&up, order, count, &options, &mut budget)?;
-        result.push(finish(
+        let (matrix, residual) = if let Some(original) = &direct_up {
+            schur_complement(original, order, count, &options, &mut budget)?
+        } else {
+            (copy_matrix(&up, order, count, &options, &mut budget)?, 0.0)
+        };
+        let mut operator = finish(
             k,
             target,
             degree,
@@ -484,7 +478,9 @@ fn fixed_endpoint_components(
             component,
             scale,
             &mut budget,
-        )?);
+        )?;
+        operator.direct_fallback = direct_up.is_some();
+        result.push(operator);
     }
     result.reverse();
     budget.check()?;
@@ -656,6 +652,7 @@ fn finish(
         options,
         solver_residual: residual,
         reference_scale,
+        direct_fallback: false,
     })
 }
 fn allocation() -> Error {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep the unreleased persistent Laplacian API under `cocycle::persistent_laplacian`.
+  Coupled near-zero reverse pivots use a checked direct Schur fallback under the
+  same execution budget; results report `used_direct_fallback()`.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.

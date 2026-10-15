@@ -3,7 +3,7 @@ use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
-use cocycle::spectral::{
+use cocycle::persistent_laplacian::{
     LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
     fixed_endpoint_up_laplacians,
 };
@@ -25,6 +25,44 @@ fn close(a: &[f64], b: &[f64]) {
         assert!((x - y).abs() < 1e-9, "{a:?} != {b:?}");
     }
 }
+#[test]
+fn long_thin_filtrations_keep_direct_and_reverse_operators_consistent() {
+    for n in [16, 64, 128] {
+        let mut cells: Vec<_> = (0..n)
+            .map(|v| Simplex::new(vec![v], if v == 0 || v == n - 1 { 0. } else { 1. }).unwrap())
+            .collect();
+        cells.extend((0..n - 1).map(|v| Simplex::new(vec![v, v + 1], 2.).unwrap()));
+        let source = SimplicialComplex::new(cells).unwrap();
+        let starts: Vec<_> = [-1., 0., 1., 2.]
+            .into_iter()
+            .map(|s| source.stage(s).unwrap())
+            .collect();
+        let target = source.stage(2.).unwrap();
+        let steps = fixed_endpoint_laplacians(
+            &starts,
+            &target,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        for (k, step) in starts.iter().zip(&steps) {
+            let direct = PersistentLaplacian::compute(
+                k,
+                &target,
+                0,
+                SpectralOptions::default(),
+                &Execution::default(),
+            )
+            .unwrap();
+            close(step.matrix(), direct.matrix());
+        }
+        // The exact two-terminal Schur matrix has conductance 1/(n-1).
+        let c = 1. / (n - 1) as f64;
+        close(steps[1].matrix(), &[c, -c, -c, c]);
+    }
+}
+
 fn pair(source: &SimplicialComplex, s: f64, t: f64, q: usize) -> PersistentLaplacian {
     PersistentLaplacian::compute(
         &source.stage(s).unwrap(),

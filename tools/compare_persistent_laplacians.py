@@ -188,7 +188,7 @@ def parse_worker(text, components=False):
         names = ["MATRIX", "STEPWISE", "SPECTRUM", "ACTION", "RESIDUAL"]
         if components:
             names += ["UP", "DOWN", "UP_STEPWISE", "UP_SPECTRUM", "DOWN_SPECTRUM",
-                      "UP_ACTION", "DOWN_ACTION", "COMPONENT_RESIDUAL"]
+                      "UP_ACTION", "DOWN_ACTION", "COMPONENT_RESIDUAL", "FALLBACK"]
         for name in names:
             values = next(lines).split()
             assert values[0] == name
@@ -456,6 +456,8 @@ def main():
                         for j in range(n)] for i in range(n)]).reshape(n, n)
                     np.testing.assert_allclose(record["UP"], exact_up, atol=2e-9, rtol=1e-9)
                 component_checks = {"matrix_errors": component_errors,
+                    "direct_fallback": bool(record["FALLBACK"][0]),
+                    "upper_direct_fallback": bool(record["FALLBACK"][1]),
                     "orthogonality_error": max(float(np.max(np.abs(p), initial=0)) for p in products),
                     "spectral_union_error": float(np.max(np.abs(union-record["SPECTRUM"]), initial=0)),
                     "exact_up_rank": up_rank, "exact_down_rank": down_rank,
@@ -514,13 +516,15 @@ def main():
                   "Bounded dense reproduction; no sparse scalability or production fast-path adoption."]}
     if args.components:
         components = [c["components"] for c in checks]
+        result["direct_fallback_pairs"] = sum(c["direct_fallback"] for c in components)
+        result["upper_direct_fallback_pairs"] = sum(c["upper_direct_fallback"] for c in components)
         result["max_component_matrix_error"] = max(
             max(c["matrix_errors"].values()) for c in components)
         result["max_component_orthogonality_error"] = max(c["orthogonality_error"] for c in components)
         result["max_component_spectral_union_error"] = max(c["spectral_union_error"] for c in components)
     (args.output / "results.json").write_text(json.dumps(result, indent=2)+"\n", encoding="utf-8")
     print(json.dumps({k: result[k] for k in ["pairs", "exact_matrices", "component_pairs",
-        "max_matrix_error", "max_component_matrix_error", "max_component_orthogonality_error",
+        "max_matrix_error", "direct_fallback_pairs", "upper_direct_fallback_pairs", "max_component_matrix_error", "max_component_orthogonality_error",
         "max_component_spectral_union_error", "gudhi", "matlab_author_sample"] if k in result}))
 
 

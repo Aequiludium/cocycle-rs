@@ -39,7 +39,7 @@ implemented source tree below.
 src/
   lib.rs                         public domains and Error/Result exports
   error.rs                       shared structured errors
-  spectral/
+  persistent_laplacian/
     mod.rs                       real stage-pair Schur operators and reverse elimination
     schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
   execution/
