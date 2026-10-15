@@ -133,6 +133,83 @@ not allocated bytes. Detailed commands and counter definitions are retained in
 
 ## Optional wrapper tools
 
+The optional [persistent spectral reproduction](reproduce_persistent_spectral_features.py)
+implements ICML 2023's smallest-eigenvalue truncation, zero padding and flattening
+on real, unweighted pair spectra. It retains sample/source identities, bases,
+scale pairs, numerical origin, full/partial coverage and a padding mask. Its tiny
+Python Schur oracle, independent nullspace/rational-rank checks and GUDHI cases
+are research tools; production Persistent Laplacian and result APIs remain
+separate work. The [Rust baseline worker](reference/persistent_spectral_baseline.rs)
+calls existing Betti/lifetime descriptors; external scikit-learn training stays
+outside the crate. No dependency is added to Cargo.
+
+Use Python 3.10+ and an optional environment with the tested versions
+`numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0 scikit-learn==1.7.2 threadpoolctl==3.6.0`.
+Save the unmodified [pinned author source](https://github.com/tomogwen/persistentlaplaciandatascience/blob/b36b080f739653d84284f3f7ca9ccea5fad286ae/src/perslap.py)
+as `target/persistent-spectral-reference/perslap.py` (create that directory first).
+The command checks its Git blob before executing only the original matrix-level
+functions with explicit boundary/prefix adapters, plus the unchanged feature
+loop with trace callbacks. It does not run the author's image constructor or
+full MNIST pipeline. Rust 1.91+ is needed for the existing-descriptor worker.
+
+```sh
+python3 -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py'
+python3 tools/reproduce_persistent_spectral_features.py --author-source target/persistent-spectral-reference/perslap.py --output target/persistent-spectral-run-001
+```
+
+The default inclusive grid is `[0, 1/3, 2/3, 1]`, with degrees zero and one and
+eight retained eigenvalues per pair. Columns follow
+`(degree, start_index, end_index, eigenvalue_rank)`, including diagonal pairs;
+four points give 160 columns. Each spectrum is sorted ascending and truncated;
+only a known exhausted domain is padded. The separate mask distinguishes actual
+zero eigenvalues from padding. This uniform grid is an explicit convention:
+the pinned author's four-point loop uses `[0, 0.25, 0.5, 1]`.
+
+Outputs include 160-column spectral features, padding masks, raw spectra and
+matrices, column definitions, group-held-out predictions, dependency/source
+identities and file hashes. The output directory must be new. Tree controls add
+BFS distance, grounded-solve effective resistance and degree-zero/one ablations.
+The `higher-order/` experiment uses graph-isomorphic filtrations with one-face
+versus three-face cycle fillings and matched disjoint nuisance trees. Its
+degree-one persistent spectra distinguish pairs with equal PH, ordinary spectra
+and degree-zero persistent spectra. These constructed examples establish
+additional information; they do not reproduce MNIST accuracy or establish
+general predictive improvement. The author feature loop is audited with trace
+callbacks, with its sampling and aggregate failure retained separately.
+Hash-verified `SOURCE_SNAPSHOT.json` also supports offline review-bundle replay
+without a Git checkout. See the [paper](https://proceedings.mlr.press/v202/davies23c.html)
+and [Issue #111](https://github.com/Aequiludium/cocycle-rs/issues/111) for scope.
+Default standard-library tool tests skip the optional numerical checks if their
+packages are absent; the reproduction command requires them and fails visibly.
+
+The fixed seed is `20261012`. Each experiment has 64 matched pairs and splits
+by whole pair groups into 96 training and 32 test rows. The forest uses 100
+estimators, maximum depth four and `n_jobs=1`; IDs, labels and masks are not model
+inputs. The tree labels are defined by early-vertex distance, so shortest path
+and effective resistance supply the same separating information as the
+degree-zero persistent spectrum. In the disk control, the one-face and
+three-face fillings give degree-one spectra `{3,3,3}` and `{1,3,3}`, while
+degree-zero persistent spectra and positive-length PH agree. The shared disk
+motif occurs in both splits, so the experiment does not test new motif families.
+
+Validation combines hand-derived matrices, restricted-boundary SVD nullspaces,
+exact rational incidence ranks and GUDHI F2 corroboration on torsion-free
+examples. The main run checks 160 pair matrices; the focused tests add 400
+seeded pair comparisons. Schur `rcond=1e-12`, zero tolerance `1e-10` and absolute
+matrix tolerance `1e-9` apply to these small unweighted examples. The oracle
+computes spectra only in degrees zero and one; the tetrahedron boundary checks
+H2 topology without computing its degree-two spectrum. Production spectral
+integration remains separate under issues #124 and #109; this tool does not
+complete all #111 engineering acceptance criteria.
+
+Recorded timings describe a single traced workflow. Spectrum-generation timers
+exclude vectorization; Rust baseline time includes compilation, GUDHI interval
+export and worker processes. Parent CPU excludes child CPU, and Python
+`tracemalloc` peak is not process-tree peak RSS. The pre-import BLAS inventory
+may be empty and does not establish numerical single-thread execution; only
+the forest's `n_jobs=1` setting is certain. Treat these measurements as bounded
+workflow observations, not kernel speedups or production scaling evidence.
+
 The [legacy tools guide](legacy-benchmarks.md) documents `compare_ripser.py`,
 `benchmark_gudhi.py`, `benchmark_scaling.py`, their pinned Python environments,
 and optional correctness checks. Generate fresh inputs under `target/`; historical
