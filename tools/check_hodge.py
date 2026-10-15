@@ -92,6 +92,65 @@ def pinned_perslap(path):
     return scope
 
 
+def path_convergence_controls():
+    """Independent numerical controls, never native timing comparisons."""
+    import warnings
+    import scipy
+    from scipy.linalg import solve_banded
+    from scipy.sparse import diags
+    from scipy.sparse.linalg import LinearOperator, lobpcg
+
+    n = 1024
+    diagonal = np.full(n, 2.)
+    diagonal[[0, -1]] = 1.
+    matrix = diags([-np.ones(n-1), diagonal, -np.ones(n-1)], [-1, 0, 1], format='csr')
+    state, mask, columns = 73, (1 << 64)-1, []
+    for _ in range(8):
+        values = []
+        for _ in range(n):
+            state = (state + 0x9e3779b97f4a7c15) & mask
+            z = state
+            z = ((z ^ (z >> 30)) * 0xbf58476d1ce4e5b9) & mask
+            z = ((z ^ (z >> 27)) * 0x94d049bb133111eb) & mask
+            z ^= z >> 31
+            values.append((z >> 11)/float(1 << 53)-0.5)
+        vector = np.asarray(values)
+        for _ in range(2):
+            for column in columns:
+                vector -= column * np.dot(column, vector)
+        columns.append(vector / np.linalg.norm(vector))
+    start = np.column_stack(columns)
+    bands = np.zeros((3, n))
+    bands[0, 1:], bands[2, :-1], bands[1] = -1., -1., diagonal + 1e-3
+    controls = {
+        'identity': None,
+        'inverse-diagonal': LinearOperator((n, n),
+            matvec=lambda x: x/diagonal if x.ndim == 1 else x/diagonal[:, None],
+            matmat=lambda x: x/diagonal[:, None]),
+        'shifted-tridiagonal-inverse': LinearOperator((n, n),
+            matvec=lambda x: solve_banded((1, 1), bands, x),
+            matmat=lambda x: solve_banded((1, 1), bands, x)),
+    }
+    exact = 2-2*np.cos(np.pi*np.arange(n)/n)
+    rows = []
+    for name, preconditioner in controls.items():
+        with warnings.catch_warnings(record=True) as observed:
+            values, vectors, history = lobpcg(matrix, start.copy(), M=preconditioner,
+                largest=False, tol=1e-9, maxiter=800, retResidualNormsHistory=True)
+        residuals = np.linalg.norm(matrix @ vectors[:, :3]-vectors[:, :3]*values[:3], axis=0)
+        np.testing.assert_allclose(values[:3], exact[:3], atol=1e-8, rtol=1e-7)
+        rows.append({'control': name, 'history_length': len(history),
+            'values': values[:3].tolist(), 'residuals': residuals.tolist(),
+            'requested_three_pass': bool(np.max(residuals) < 1.0001e-9),
+            'max_index_error': float(np.max(np.abs(values[:3]-exact[:3]))),
+            'warnings': [str(w.message) for w in observed]})
+    return {'n': n, 'block': 8, 'requested': 3, 'max_iterations': 800,
+        'numpy': np.__version__, 'scipy': scipy.__version__,
+        'lambda1': float(exact[1]), 'lambda2': float(exact[2]),
+        'next_gap': float(exact[3]-exact[2]), 'rows': rows,
+        'scope': 'same SplitMix64 starting span; distinct SciPy solver/stopping semantics; no native timing ranking'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--rust', type=Path, required=True)
@@ -100,6 +159,7 @@ def main():
     parser.add_argument('--perslap', type=Path)
     parser.add_argument('--gudhi', action='store_true')
     parser.add_argument('--iterative', action='store_true', help='require and verify matrix-free Ritz pairs')
+    parser.add_argument('--path-convergence', action='store_true', help='record independent 1024-path preconditioning controls')
     args = parser.parse_args()
     top = pinned_toponetx(args.toponetx) if args.toponetx else None
     perslap = pinned_perslap(args.perslap) if args.perslap else None
@@ -256,6 +316,8 @@ def main():
               'evidence': 'numerical eigenpairs plus exact rational ranks on this finite corpus; GUDHI uses field 101, not real coefficients',
               'results': results,
               'reference_sha256': {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in [('toponetx', args.toponetx), ('perslap', args.perslap)] if path}}
+    if args.path_convergence:
+        report['path_convergence'] = path_convergence_controls()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps({k: report[k] for k in ['cases', 'windows', 'max_residual', 'max_orthogonality']}))

@@ -74,7 +74,7 @@ jobs:
       - name: Run independent comparisons
         run: |
           cargo run --locked --release --example hodge_laplacian > target/hodge-reference/rust.jsonl 2> target/hodge-reference/build.log
-          python tools/check_hodge.py --rust target/hodge-reference/rust.jsonl --output target/hodge-reference/results.json --iterative --toponetx target/hodge-sources/toponetx/toponetx/classes/simplicial_complex.py --perslap target/hodge-sources/perslap/src/perslap.py --gudhi 2>&1 | tee target/hodge-reference/check.log
+          python tools/check_hodge.py --rust target/hodge-reference/rust.jsonl --output target/hodge-reference/results.json --iterative --toponetx target/hodge-sources/toponetx/toponetx/classes/simplicial_complex.py --perslap target/hodge-sources/perslap/src/perslap.py --gudhi --path-convergence 2>&1 | tee target/hodge-reference/check.log
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

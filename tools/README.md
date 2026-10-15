@@ -1,5 +1,7 @@
 # Developer tools
 
+The [maintained resource snapshot](../benches/reports/hodge-resources.md) records measured revisions, limits and adverse cases.
+
 The optional [spectral resource controller](benchmark_spectral_resources.py)
 runs at least ten fresh serial Windows processes per declared cell, retains one
 discarded warmup and a seeded cell order, and records solve/preparation times,
@@ -13,6 +15,12 @@ snapshots do not establish native cross-library rankings or general speedups.
 
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
+
+The existing Hodge checker also accepts `--path-convergence`: it records
+independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
+controls on the 1024-node path against its complete analytic spectrum, using the
+same SplitMix64 starting span. Warnings and incomplete lookahead convergence
+remain explicit; these controls are numerical diagnosis, not native timing.
 
 ## Spectral reference CI
 
