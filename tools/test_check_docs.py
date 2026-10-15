@@ -107,6 +107,32 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("README.md:7: undefined reference [absent]", stderr)
         self.assertNotIn("missing.md", stderr)
 
+    def test_html_navigation_assets_and_encoded_fragments(self):
+        self.write("site/index.html",
+                   '<a href="guide/#a%20b">Guide</a><img src="art.svg">'
+                   '<a href="https://example.invalid/">External</a>')
+        self.write("site/guide/index.html",
+                   '<a id="a b"></a><a href="../index.html">Home</a>'
+                   '<a href="#a%20b">Here</a><script src="../code.js"></script>')
+        self.write("site/art.svg", "<svg></svg>")
+        self.write("site/code.js", "")
+        self.assertEqual(check_docs.check_html(self.root / "site"), [])
+
+    def test_html_missing_targets_anchors_and_site_escape(self):
+        self.write("site/index.html",
+                   '<a href="missing.html">Missing</a>\n'
+                   '<a href="#absent">Anchor</a>\n'
+                   '<a href="../outside.html">Escape</a>')
+        self.write("outside.html", "<p>Outside</p>")
+        errors = check_docs.check_html(self.root / "site")
+        self.assertEqual(len(errors), 3)
+        self.assertIn("index.html:1: missing HTML target missing.html", errors)
+        self.assertIn("index.html:2: missing HTML anchor #absent", errors)
+        self.assertIn("index.html:3: HTML target outside site ../outside.html", errors)
+
+    def test_html_empty_or_missing_build_is_an_error(self):
+        self.assertIn("No HTML pages", check_docs.check_html(self.root / "absent")[0])
+
     def test_angle_destinations_and_normalized_reference_labels(self):
         self.write("docs/math notes.md", "# Coverage\n")
         self.write("docs/README.md",
