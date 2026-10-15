@@ -1,7 +1,41 @@
 # Developer tools
 
+The [maintained resource snapshot](../benches/reports/dirac-resources.md) records measured revisions, limits and adverse cases.
+
+The optional [spectral resource controller](benchmark_spectral_resources.py)
+runs at least ten fresh serial Windows processes per declared cell, retains one
+discarded warmup and a seeded cell order, and records solve/preparation times,
+whole-process wall time, absolute peak working set, failures and immutable source
+identities. Commit measured code first. Supply a JSON list of explicit fixture
+descriptions, commands, independent expected values and tolerances through
+`--specification PATH --output NEW_DIRECTORY`. Specifications and raw outputs stay
+under ignored `target/benchmarks/commit-<sha12>/spectral-resources/run-<NNN>/`.
+See the [performance reporting rules](../benches/reporting.md): these resource
+snapshots do not establish native cross-library rankings or general speedups.
+
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
+
+## Spectral reference CI
+
+The `Real Dirac reference comparisons` CI job requires `--pairs --toponetx
+PATH --gudhi` on every push and pull request. It builds a fresh release worker,
+checks all fourteen fixtures with NumPy, executes the fixed TopoNetX methods on
+their supported subset and corroborates complete torsion-free kernels with
+GUDHI F3. Empty/truncated reference exclusions remain explicit in the report.
+
+The job uses Python 3.12 with NumPy 2.2.6, SciPy 1.15.3 and GUDHI 3.12.0.
+External sources are checked out at the exact revisions linked in the relevant
+oracle documentation; no runtime dependency is added. Explicitly requested
+missing packages or comparisons fail the job.
+
+The artifact named `dirac-reference-<sha>-<attempt>` retains the actual
+checkout SHA, event/run identity, reference commits and source hashes, dependency
+versions, Rust outputs and comparison results/logs, including failure evidence.
+Artifacts are uploaded even when a comparison fails and expire after 14 days.
+These are numerical correctness checks; finite-field corroboration, supported
+external function subsets and bounded learning controls do not establish exact
+real topology, whole-package compatibility or performance rankings.
 
 ## Native cross-library benchmarks
 
@@ -83,6 +117,16 @@ comparing mathematical fixtures. Outputs and fixture records include the actual
 characteristic; `environment.json` retains the protocol-check outcomes.
 Its raw unpaired endpoints are compared along with separately checked Rust coverage.
 
+## Real Dirac correctness checks
+
+[check_dirac.py](check_dirac.py) compares the fixed public-API Rust fixtures
+with independently assembled signed matrices, analytic spectra and boundary
+SVD using NumPy. Optional fixed TopoNetX methods and GUDHI F3 Betti checks
+retain their source identity and shape/field exclusions. See the
+[Dirac guide](../docs/guides/dirac.md#independent-reproduction-and-observed-results)
+for the standalone worker and commands. Keep output and external sources under
+ignored `target/`; this is a correctness check, not a timing benchmark.
+
 ## Documentation and tool verification
 
 [check_algorithm.py](check_algorithm.py) provides focused `diagram-analysis`,
@@ -99,7 +143,7 @@ python3 tools/check_source.py
 python3 tools/check_artifacts.py
 python3 tools/check_docs.py
 python3 -m unittest discover -s tools -p 'test_*.py'
-rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
+rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs tools/reference/dirac_cocycle.rs
 ```
 
 Run the artifact check after staging. It rejects generated paths and log/archive/
