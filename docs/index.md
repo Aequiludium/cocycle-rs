@@ -29,12 +29,15 @@ the Rust toolchain and how to use a source checkout.
 | Reuse stage inputs and owned results | [Interface contracts](guides/interface-contracts.md) |
 | Propose bounded F2 endpoint changes | [Critical sets](guides/critical-sets.md) |
 | Query feasible F2 homology operators | [Homology operators](guides/homology-operators.md) |
+| Review a real single-stage operator | [Hodge Laplacians](guides/hodge-laplacian.md), [Dirac operators](guides/dirac.md) (candidate interfaces) |
+| Review a two-stage real operator | [Persistent Laplacians](guides/persistent-laplacian.md) (candidate interface) |
 
 ## Versions and guarantees
 
 The site documents **main**, including additions labeled **Unreleased**.
 `cocycle = "0.1.1"` selects the released crate; it does not include every main
-API. See the [version and capability status](README.md#version-and-capability-status)
+API. Operator guides labeled **under review** describe their linked candidate
+checkouts, rather than main. See the [version and capability status](README.md#version-and-capability-status)
 before using a source-only feature, and use the [API reference](reference/api.md)
 for versioned signatures and contracts.
 
@@ -66,6 +69,15 @@ guides/diagram-distances
 guides/interface-contracts
 guides/critical-sets
 guides/homology-operators
+```
+
+```{toctree}
+:hidden:
+:caption: Operator candidates
+
+guides/hodge-laplacian
+guides/dirac
+guides/persistent-laplacian
 ```
 
 ```{toctree}
@@ -115,6 +127,7 @@ research/result-contracts
 research/data-modeling
 research/filtration-stages
 research/analysis-learning
+research/persistent-spectral-features
 research/gudhi-cpp
 research/h1-fast-to-generic
 research/big-steps

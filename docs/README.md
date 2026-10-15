@@ -23,8 +23,11 @@ Usage pages describe this checkout, including **Unreleased** borrowed stages,
 critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
 and [architecture](development/architecture.md) for source additions.
-Laplacian/Dirac solvers, persistent spectra, optimal F2 projections, non-diagram
-similarity, external learning and automatic feedback remain future contracts.
+Real Hodge, Dirac and persistent Laplacian implementations have separate PR
+candidates, documented in the guides below with pinned source interfaces.
+They are not included in this documentation branch or the released crate.
+Production spectral consumers, optimal F2 projections, non-diagram similarity,
+external-learning integration and automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
 
@@ -67,6 +70,25 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 - [Published API reference](https://docs.rs/cocycle): browse rustdoc for signatures
   and error contracts. For the current checkout's [API source](../src/lib.rs),
   build locally with `cargo doc --locked --no-deps --open`.
+
+## Review operator candidates
+
+These pages follow the same input, example, result and execution conventions as
+the usage guides. Their candidate status is explicit; use the linked checkout
+for runnable examples and local rustdoc. They do not add the implementations to
+this documentation PR.
+
+| Operation | Guide and scope |
+| --- | --- |
+| Apply a real operator at one stage | [Hodge Laplacians](guides/hodge-laplacian.md): signed chain windows, full/lower/upper terms, dense and partial spectral results |
+| Couple adjacent chain degrees | [Dirac operators](guides/dirac.md): graded coordinates, endpoint truncation and selected signed boundary modes |
+| Analyze a source/target stage pair | [Persistent Laplacians](guides/persistent-laplacian.md): checked inclusions, Schur construction, components and fixed endpoints |
+| Turn pair spectra into learning inputs | [Spectral-feature reproduction](research/persistent-spectral-features.md): external Python workflow, schema/masks, controls and evidence limits |
+
+The [API entry points](reference/api.md#operator-interfaces-under-review) identify
+the concrete types and their source contracts. Existing
+[F2 operators](guides/homology-operators.md) use a different coefficient model;
+an F2 projection is not a real Hodge or Dirac operator.
 
 ## Understand and develop the core
 
