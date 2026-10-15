@@ -969,3 +969,71 @@ RSS bound. No persistent family cache or streaming barcode is introduced.
 The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
 cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
 separates finite implementation checks from these algebraic derivations.
+
+## 22. Real persistent Laplacians
+
+For a same-source pair K included in L, use real ordinary chains with orthonormal
+increasing-vertex simplex bases. Let B denote the signed (q+1)-boundary of L,
+with rows grouped into K and its complement: B = [R; F]. The allowed domain of
+the persistent boundary is ker(F), with the inner product inherited from C_(q+1)(L).
+For any orthonormal kernel basis N, its upper term is R N N^T R^T. For a general
+full-rank kernel basis Z it is R Z (Z^T Z)^-1 Z^T R^T, not R Z Z^T R^T.
+
+Partition B B^T = [A E; E^T C]. Then the persistent operator is
+Delta_q(K,L) = B_q(K)^T B_q(K) + A - E C+ E^T, where C+ is the Moore--Penrose
+pseudoinverse. Singular C is permitted. At q=0, B_0 has zero rows: the lower
+term vanishes, with no augmentation. K=L gives the ordinary Hodge operator.
+The operator is self-adjoint and positive semidefinite; its exact nullity equals
+rank(H_q(K;R) -> H_q(L;R)). For integer boundaries an independent exact check is
+n_q(K) - rank_Q(B_q(K)) - rank_Q(B) + rank_Q(F).
+
+For a fixed endpoint L, eliminate the last active q-coordinate ell of the upper
+term M by M'_ij = M_ij - M_iell M_ellj / M_ellell when the pivot is nonzero.
+When the pivot is zero, positive semidefiniteness implies the eliminated row is
+zero and the leading principal block remains. Iterate to each requested start,
+then add its own lower term. This is reverse elimination at a fixed endpoint,
+not arbitrary online filtration updates. Tied births introduce no intermediate
+requested stage. Spectra transform by signed permutation under vertex relabeling.
+
+A floating near-zero pivot is not the exact zero-pivot case: even the PSD block
+`[[1,eps],[eps,eps^2]]` has a unit Schur correction. The numerical reverse route
+therefore skips only exactly uncoupled coordinates and otherwise uses the checked
+direct solve, or returns a numerical error under the original execution limits.
+For computed discarded positive directions, the direct solve bounds the sum of
+max-entry corrections `maxabs(c)^2/lambda`, normalized by the original upper Gram
+scale, in addition to its actual solve/range residuals. This prevents another
+large right-hand-side component from masking a lost correction. These finite
+floating checks do not supply an exact rank or general forward-error certificate.
+
+The [bounded dense implementation](../guides/persistent-laplacian.md) uses f64,
+relative cutoff, checked residuals and explicit storage limits. Numerical zeros
+and residual checks do not certify exact ranks or a forward-error bound.
+Independent rational projection and rank calculations cover finite fixtures;
+finite-field persistence only corroborates torsion-free examples.
+
+Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
+and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
+(2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
+equation 15 / Theorem 5.1. The implementation is independently written from
+these formulas, rather than copied from reference code.
+
+For U=A-E C+ E^T and D=B_q(K)^T B_q(K), the chain identity B_q(K) R N=0
+implies DU=UD=0. Thus their images are orthogonal. In this finite-dimensional
+setting, the nonzero spectral multiset of U+D is the union of those of U and D;
+its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
+z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
+exact ranks from arbitrary floating-point near-zero cutoffs.
+
+The implementation exposes full/upper/lower results and separately tagged
+spectra. The lower term depends only on K and requires its q-skeleton; it does
+not require L or a q+1 skeleton. Full and upper operators retain the stronger
+q+1 coverage check. Each result retains its owned bases and source metadata.
+Numerical spectrum tags identify the component, not the pair/source identity.
+
+Wolf, Fan and Monod, [Generalized Persistent Laplacians and their Spectral
+Properties](https://arxiv.org/html/2509.20220v1), arXiv:2509.20220v1 (2025-09-24),
+Section 5.2 / Theorems 5.6--5.7 and Section 5.3 / Theorem 5.11, study component
+spectral functions and generalize this decomposition. Their infinite-dimensional
+operator domains and stability hypotheses are not implemented here. The full
+operator does not inherit all component comparison properties; this does not
+rule out the fixed-K, increasing-L monotonicity, where D stays constant.
