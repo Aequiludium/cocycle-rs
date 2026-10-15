@@ -19,8 +19,6 @@
 //! independent test oracles verify ranks and interval semantics.
 //! Opt-in F2 critical-set workspaces retain sparse decompositions for endpoint
 //! proposals and bounded partial U queries on frozen simplicial complexes.
-//! Bounded real persistent Laplacians expose same-source stage-pair Schur
-//! operators, numerical spectra and fixed-endpoint reverse elimination.
 //! Work and memory can still grow substantially with input size and reduction
 //! fill-in. See the mathematical specification and benchmark records for limits.
 //!
