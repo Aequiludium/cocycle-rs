@@ -2,7 +2,9 @@
 use cocycle::Error;
 use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::hodge::{DEFAULT_MAX_DENSE_ENTRIES, HodgeLaplacian, HodgeSelection, SpectrumOptions};
+use cocycle::hodge::{
+    DEFAULT_MAX_DENSE_ENTRIES, HodgeLaplacian, HodgeSelection, IterativeOptions, SpectrumOptions,
+};
 use std::sync::atomic::AtomicBool;
 
 type Cell = (usize, usize, Vec<(usize, i32)>);
@@ -203,6 +205,125 @@ fn large_sparse_window_rejects_dense_defaults() {
         })
     ));
     assert_eq!(l.action(&vec![1.; n], &execution).unwrap(), vec![0.; n]);
+}
+
+#[test]
+fn iterative_pairs_preserve_multiplicity_coordinates_and_sparse_residuals() {
+    for filled in [false, true] {
+        for selection in [
+            HodgeSelection::Full,
+            HodgeSelection::Lower,
+            HodgeSelection::Upper,
+        ] {
+            let l = op(&triangle(filled), 1, selection);
+            let s = l
+                .smallest_eigenpairs(3, &IterativeOptions::default(), &Execution::default())
+                .unwrap();
+            let reference = l
+                .spectrum(0..3, &SpectrumOptions::default(), &Execution::default())
+                .unwrap();
+            close(s.values(), reference.values());
+            assert_eq!(s.basis(), l.basis());
+            assert_eq!(s.degree(), 1);
+            assert_eq!(s.selection(), selection);
+            assert!(s.orthogonality_error() < 1e-10);
+            for j in 0..3 {
+                let v: Vec<_> = (0..3).map(|i| s.vectors()[i * 3 + j]).collect();
+                let av = l.action(&v, &Execution::default()).unwrap();
+                let residual = av
+                    .iter()
+                    .zip(&v)
+                    .fold(0_f64, |r, (a, x)| r.hypot(a - s.values()[j] * x));
+                assert!((residual - s.residuals()[j]).abs() < 1e-12);
+                assert!(residual <= 1e-9 + 1e-9 * s.values()[j].abs());
+            }
+        }
+    }
+}
+
+#[test]
+fn iterative_large_sparse_zero_operator_needs_no_dense_matrix_or_full_spectrum() {
+    let source = SimplicialComplex::new(
+        (0..20_000)
+            .map(|i| Simplex::new(vec![i], 0.))
+            .collect::<cocycle::Result<_>>()
+            .unwrap(),
+    )
+    .unwrap();
+    let l = HodgeLaplacian::new(&source, 0, HodgeSelection::Full).unwrap();
+    assert!(l.matrix(&Execution::default()).is_err());
+    let s = l
+        .smallest_eigenpairs(3, &IterativeOptions::default(), &Execution::default())
+        .unwrap();
+    assert_eq!(s.values(), &[0.; 3]);
+    assert_eq!(s.residuals(), &[0.; 3]);
+    assert_eq!(s.vectors().len(), 60_000);
+    assert_eq!(s.operator_applications(), 11);
+    assert_eq!(s.peak_subspace_dimension(), 8);
+    assert_eq!(s.iterations(), 0);
+}
+
+#[test]
+fn iterative_path_matches_analytic_pairs_and_rejects_unconverged_or_unbounded_work() {
+    let n = 128;
+    let mut cells: Vec<Cell> = (0..n).map(|i| (i, 0, vec![])).collect();
+    cells.extend((0..n - 1).map(|i| (n + i, 1, vec![(i, -1), (i + 1, 1)])));
+    let l = op(&Cells(cells), 0, HodgeSelection::Full);
+    let execution = Execution::default();
+    let s = l
+        .smallest_eigenpairs(3, &IterativeOptions::default(), &execution)
+        .unwrap();
+    for (j, &value) in s.values().iter().enumerate() {
+        let expected = 2. - 2. * (std::f64::consts::PI * j as f64 / n as f64).cos();
+        assert!((value - expected).abs() < 1e-8);
+    }
+    for options in [
+        IterativeOptions {
+            max_iterations: 0,
+            ..Default::default()
+        },
+        IterativeOptions {
+            max_basis_entries: 0,
+            ..Default::default()
+        },
+    ] {
+        assert!(l.smallest_eigenpairs(3, &options, &execution).is_err());
+    }
+    assert!(matches!(
+        l.smallest_eigenpairs(3, &IterativeOptions::default(), &execution.max_work(0)),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        l.smallest_eigenpairs(
+            3,
+            &IterativeOptions::default(),
+            &execution.cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
+    let empty = l
+        .smallest_eigenpairs(
+            0,
+            &IterativeOptions {
+                max_basis_entries: 0,
+                ..Default::default()
+            },
+            &execution,
+        )
+        .unwrap();
+    assert!(empty.values().is_empty());
+    assert_eq!(empty.operator_applications(), 0);
+    assert!(
+        l.smallest_eigenpairs(9, &IterativeOptions::default(), &execution)
+            .is_err()
+    );
+    println!(
+        "iterative path n=128: iterations={}, actions={}, max residual={}",
+        s.iterations(),
+        s.operator_applications(),
+        s.residuals().iter().copied().fold(0., f64::max)
+    );
 }
 
 #[test]

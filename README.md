@@ -15,8 +15,8 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
-- **Real Hodge analysis** — sparse single-scale action, explicit matrices and
-  bounded dense eigenpairs under the standard inner product (Unreleased).
+- **Real Hodge analysis** — sparse action, explicit matrices, bounded dense
+  spectra and matrix-free partial eigenpairs under the standard inner product (Unreleased).
 - **Unreleased stage access** — borrowed sublevel stages and checked inclusions
   between increasing scales of the same frozen source, preserving IDs and signs.
 - **Sparse approximation** — deterministic sampling, modified edges and higher-simplex

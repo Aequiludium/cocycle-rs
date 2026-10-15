@@ -98,6 +98,7 @@ src/
   hodge/
     mod.rs                       real signed chain windows and sparse Hodge action
     spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
+  eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/
     mod.rs                       public exports and private computation wiring
     assembly.rs                  shared raw intervals and endpoint normalization

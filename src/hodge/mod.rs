@@ -10,7 +10,8 @@
 //! <https://doi.org/10.1137/18M1223101>.
 
 mod spectrum;
-pub use spectrum::{HodgeSpectrum, SpectrumOptions};
+pub use crate::eigensolver::IterativeOptions;
+pub use spectrum::{HodgeEigenpairs, HodgeSpectrum, SpectrumOptions};
 
 use crate::complex::FilteredComplex;
 use crate::execution::{Execution, WorkBudget};

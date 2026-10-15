@@ -1,7 +1,7 @@
 //! Reproducible standard real Hodge fixtures; stdout is one JSON record per window.
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::hodge::{HodgeLaplacian, HodgeSelection, SpectrumOptions};
+use cocycle::hodge::{HodgeLaplacian, HodgeSelection, IterativeOptions, SpectrumOptions};
 use std::collections::BTreeSet;
 
 fn from_facets(facets: &[Vec<usize>]) -> cocycle::Result<SimplicialComplex> {
@@ -43,14 +43,25 @@ fn emit(name: &str, source: &SimplicialComplex) -> cocycle::Result<()> {
             .collect();
         let action = laplacian.action(&x, &Execution::default())?;
         let kernel_columns: Vec<_> = spectrum.numerical_kernel_columns(1e-10)?.collect();
+        let iterative = laplacian.smallest_eigenpairs(
+            n.min(3),
+            &IterativeOptions::default(),
+            &Execution::default(),
+        )?;
         println!(
-            "{{\"name\":{name:?},\"degree\":{degree},\"simplices\":{simplices:?},\"basis\":{basis:?},\"matrix\":{:?},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?},\"orthogonality_error\":{},\"x\":{x:?},\"action\":{action:?},\"kernel_columns\":{kernel_columns:?},\"sweeps\":{}}}",
+            "{{\"name\":{name:?},\"degree\":{degree},\"simplices\":{simplices:?},\"basis\":{basis:?},\"matrix\":{:?},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?},\"orthogonality_error\":{},\"x\":{x:?},\"action\":{action:?},\"kernel_columns\":{kernel_columns:?},\"sweeps\":{},\"iterative_values\":{:?},\"iterative_vectors\":{:?},\"iterative_residuals\":{:?},\"iterative_iterations\":{},\"iterative_actions\":{},\"iterative_peak_subspace\":{}}}",
             spectrum.matrix(),
             spectrum.values(),
             spectrum.vectors(),
             spectrum.residuals(),
             spectrum.orthogonality_error(),
-            spectrum.sweeps()
+            spectrum.sweeps(),
+            iterative.values(),
+            iterative.vectors(),
+            iterative.residuals(),
+            iterative.iterations(),
+            iterative.operator_applications(),
+            iterative.peak_subspace_dimension()
         );
     }
     Ok(())

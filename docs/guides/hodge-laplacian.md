@@ -14,7 +14,7 @@ defines the operator and its harmonic space.
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::hodge::{HodgeLaplacian, HodgeSelection, SpectrumOptions};
+use cocycle::hodge::{HodgeLaplacian, HodgeSelection, IterativeOptions, SpectrumOptions};
 
 let source = SimplicialComplex::new(vec![
     Simplex::new(vec![0], 0.)?,
@@ -30,6 +30,9 @@ let spectrum = laplacian.spectrum(0..2, &SpectrumOptions::default(), &execution)
 assert!(spectrum.values()[0].abs() < 1e-10);
 assert!((spectrum.values()[1] - 2.).abs() < 1e-10);
 assert_eq!(spectrum.numerical_nullity(1e-10)?, 1);
+let selected = laplacian.smallest_eigenpairs(1, &IterativeOptions::default(), &execution)?;
+assert!(selected.values()[0].abs() < 1e-9);
+assert!(selected.residuals()[0] < 1e-9);
 for column in spectrum.numerical_kernel_columns(1e-10)? {
     let vector: Vec<_> = (0..spectrum.basis().len())
         .map(|row| spectrum.vectors()[row * spectrum.values().len() + column])
@@ -84,6 +87,47 @@ Only the full operator's harmonic nullity has the ordinary real Betti meaning.
 The API fixes real f64 coefficients and the standard inner product. General
 SPD/Hermitian Grams, complex coefficients and normalized operators cannot be
 expressed through this API; no input is implicitly converted to those variants.
+
+## Matrix-free partial eigenpairs
+
+`smallest_eigenpairs(count, options, execution)` targets a small number of low
+eigenpairs directly through sparse action. It uses identity-preconditioned block
+LOBPCG with the local search space spanned by current vectors X, residuals R and
+previous directions P. Two-pass orthogonalization drops relative directions
+below 1e-13; only the small symmetric Rayleigh-Ritz matrix is diagonalized.
+The private real symmetric core is shared with the Dirac boundary-spectrum
+implementation; it introduces no runtime dependency or operator normalization.
+
+`IterativeOptions` defaults to an 8-vector block, 800 updates, seed 73 and
+absolute/relative residual tolerances 1e-9. Require count <= min(n,block_size).
+With b=min(n,block_size), the search dimension is <=min(n,3*b). Each basis/image
+block and projected square buffer must fit `max_basis_entries` (default
+1,048,576 entries), checked before starting. Several buffers coexist, so this
+is not a total memory quota. Choose b much smaller than n: if b approaches n,
+the subspace itself becomes quadratic. No dense Hodge matrix is constructed.
+
+`HodgeEigenpairs` owns basis handles, degree, summands and policy, plus ascending
+Ritz values and n-by-count row-major vectors. Final residuals use fresh sparse
+actions and must satisfy `absolute_tolerance + relative_tolerance*|lambda|`.
+The result reports orthogonality, block updates, operator applications and peak
+Ritz dimension. Exceeding the iteration/workspace/work limit returns an error,
+not an apparently converged subset. Count zero makes no operator applications.
+There is no fallback to full dense materialization.
+
+Residual convergence does not certify extremal index coverage. A retained
+synthetic test uses A=I-u*u^T with u orthogonal to the fixed starting block:
+returned eigenvalues near one have tiny residuals while a zero mode was missed.
+This is an internal numerical counterexample, not an extension of the public
+integer-boundary input. Change the seed/block or use an independent reference
+when coverage matters. This result deliberately offers no nullity/Betti reader.
+Identity preconditioning can converge slowly on small-gap paths; no universal
+speedup or convergence guarantee is asserted.
+
+The three-term block iteration follows [Knyazev (2001)](https://doi.org/10.1137/S1064827500366124).
+[SciPy 1.15.3's LOBPCG](https://github.com/scipy/scipy/blob/v1.15.3/scipy/sparse/linalg/_eigen/lobpcg/lobpcg.py)
+is an independent numerical reference, not copied production code. Weighted and
+normalized higher-order Laplacians in [Horak and Jost, arXiv:1105.2712v3](https://arxiv.org/abs/1105.2712v3)
+change the mathematical model and remain explicit future capabilities.
 
 ## Spectrum and numerical evidence
 
@@ -178,7 +222,7 @@ From a source checkout, run:
 ```sh
 cargo test --locked --test hodge
 cargo run --locked --example hodge_laplacian > target/hodge-rust.jsonl
-python tools/check_hodge.py --rust target/hodge-rust.jsonl --output target/hodge-oracle.json
+python tools/check_hodge.py --rust target/hodge-rust.jsonl --output target/hodge-oracle.json --iterative
 ```
 
 The optional Python oracle requires NumPy; external probes additionally require

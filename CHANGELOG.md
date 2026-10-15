@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add matrix-free Hodge `smallest_eigenpairs` using bounded block LOBPCG and
+  the shared small Jacobi Ritz solver. Preserve numerical residuals and owned
+  coordinates without retaining a dense operator matrix. Iterative convergence
+  does not certify extremal index coverage or harmonic nullity; weighted and
+  normalized operators remain future work.
+
 - Add standard real single-scale Hodge Laplacians from supplied complexes or
   stages: sparse full/lower/upper action, explicit row-major matrices and bounded
   dense selected eigenpairs with measured residuals and orthogonality, and

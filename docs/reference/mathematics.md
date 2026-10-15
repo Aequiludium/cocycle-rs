@@ -1016,7 +1016,7 @@ and spectrum (0,3,3). Adding its oriented 2-cell contributes that vector's
 outer product, giving L1=3I. A single edge has L0=[[1,-1],[-1,1]] and
 spectrum (0,2). These expectations are independent of filtration weights.
 
-The implemented spectrum is an ordinary real symmetric eigenproblem using
+The dense reference spectrum is an ordinary real symmetric eigenproblem using
 scaled cyclic Jacobi on explicitly bounded dense matrices. Residuals, norm,
 orthogonality and tolerance are recorded; thresholded zeros provide numerical
 evidence only. Index-selected spectra cannot determine full nullity.
@@ -1024,6 +1024,13 @@ Explicit matrix construction and spectra check n² before dense allocation;
 their shared default entry limit is 1,048,576 per square buffer (8 MiB of f64),
 independent of work budgets. Spectra also retain a separate dimension limit.
 These configurable per-buffer bounds do not cap aggregate process memory.
+The matrix-free partial path instead diagonalizes S^T L S in a block space
+S=span(X,R,P), retaining approximate smallest Ritz pairs and checking actual
+sparse residuals. Its storage is O(n*b+b²) for fixed small block size b;
+no full coordinate matrix or full n-value spectrum is required. Residual
+convergence alone cannot certify extremal index coverage or missing multiplicity.
+It provides no harmonic-nullity claim. Both paths retain the same standard
+inner product and full/lower/upper operator, without weighted normalization.
 General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
 D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
 That extension, complex conjugate adjoints and persistent Laplacians are outside

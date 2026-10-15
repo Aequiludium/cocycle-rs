@@ -99,6 +99,7 @@ def main():
     parser.add_argument('--toponetx', type=Path)
     parser.add_argument('--perslap', type=Path)
     parser.add_argument('--gudhi', action='store_true')
+    parser.add_argument('--iterative', action='store_true', help='require and verify matrix-free Ritz pairs')
     args = parser.parse_args()
     top = pinned_toponetx(args.toponetx) if args.toponetx else None
     perslap = pinned_perslap(args.perslap) if args.perslap else None
@@ -113,6 +114,8 @@ def main():
     max_harmonic_difference = 0.0
     max_residual = 0.0
     max_orthogonality = 0.0
+    iterative_windows = 0
+    max_iterative_residual = 0.0
     for record in records:
         simplices = [tuple(s) for s in record['simplices']]
         k = record['degree']
@@ -131,6 +134,20 @@ def main():
         beta = n - rational_rank(a) - rational_rank(d)
         assert n - rational_rank(matrix) == beta
         np.testing.assert_allclose(record['values'], values, atol=1e-10, rtol=1e-10)
+        if args.iterative:
+            r = min(n, 3)
+            iv = np.asarray(record['iterative_values'])
+            iq = np.asarray(record['iterative_vectors']).reshape(n, r)
+            assert len(iv) == r
+            np.testing.assert_allclose(iv, values[:r], atol=1e-8, rtol=1e-8)
+            measured = np.linalg.norm(actual @ iq - iq * iv, axis=0)
+            np.testing.assert_allclose(record['iterative_residuals'], measured, atol=1e-12, rtol=1e-6)
+            assert np.all(measured <= 1.01e-9 * (1 + np.abs(iv)))
+            assert np.linalg.norm(iq.T @ iq - np.eye(r)) < 1e-8
+            assert record['iterative_peak_subspace'] <= min(n, 24)
+            if r:
+                max_iterative_residual = max(max_iterative_residual, float(max(measured)))
+            iterative_windows += 1
         rust_values = np.asarray(record['values'])
         rust_vectors = np.asarray(record['vectors']).reshape(n, n)
         assert np.count_nonzero(np.abs(rust_values) <= 1e-10) == beta
@@ -231,6 +248,7 @@ def main():
               'gudhi': gudhi.__version__ if args.gudhi else None,
               'reference_versions': {'toponetx': 'ce3d414b571fff95916c4cbc20b8d2c2c9d428e6', 'perslap': 'b36b080f739653d84284f3f7ca9ccea5fad286ae'},
               'windows': len(results), 'cases': len({r['name'] for r in results}),
+              'iterative_windows': iterative_windows, 'max_iterative_residual': max_iterative_residual,
               'max_residual': max_residual, 'max_orthogonality': max_orthogonality,
               'lim_lstsq_harmonic_checks': len(results), 'max_harmonic_difference': max_harmonic_difference,
               'torsion_rp2': torsion,

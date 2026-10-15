@@ -35,6 +35,70 @@ impl Default for SpectrumOptions {
     }
 }
 
+/// Matrix-free approximate smallest Ritz pairs in the prepared Hodge basis.
+///
+/// Owns source-local handles, degree, selection and numerical policy. No dense
+/// operator matrix is retained. Values are ascending, with n by r row-major
+/// vector columns. A successful residual test does not certify extremal index
+/// coverage, exact multiplicity outside this block or Betti numbers.
+pub struct HodgeEigenpairs<Id> {
+    degree: usize,
+    selection: HodgeSelection,
+    basis: Vec<Id>,
+    pairs: crate::eigensolver::Eigenpairs,
+    options: IterativeOptions,
+}
+impl<Id> HodgeEigenpairs<Id> {
+    /// Chain degree of the frozen coordinate problem.
+    pub fn degree(&self) -> usize {
+        self.degree
+    }
+    /// Selected summands, unchanged by the numerical method.
+    pub fn selection(&self) -> HodgeSelection {
+        self.selection
+    }
+    /// Owned domain handles; retain the source description for geometric meaning.
+    pub fn basis(&self) -> &[Id] {
+        &self.basis
+    }
+    /// Ascending approximate eigenvalues; small negative values are retained.
+    pub fn values(&self) -> &[f64] {
+        &self.pairs.values
+    }
+    /// n by r row-major paired vectors, with r=values().len().
+    pub fn vectors(&self) -> &[f64] {
+        &self.pairs.vectors
+    }
+    /// Actual ||Lv-lambda v|| from fresh sparse applications before returning.
+    pub fn residuals(&self) -> &[f64] {
+        &self.pairs.residuals
+    }
+    /// Measured Frobenius norm ||V^T V-I|| of the returned columns.
+    pub fn orthogonality_error(&self) -> f64 {
+        self.pairs.orthogonality_error
+    }
+    /// Block updates after the initial Rayleigh-Ritz step.
+    pub fn iterations(&self) -> usize {
+        self.pairs.iterations
+    }
+    /// Sparse operator calls, including the final independent residual evaluations.
+    pub fn operator_applications(&self) -> usize {
+        self.pairs.actions
+    }
+    /// Largest Rayleigh-Ritz subspace used; at most min(n,3*block_size).
+    pub fn peak_subspace_dimension(&self) -> usize {
+        self.pairs.peak_subspace
+    }
+    /// Policy retained with this numerical result.
+    pub fn options(&self) -> IterativeOptions {
+        self.options
+    }
+    /// Numerical method identity; no spectral coverage certificate is implied.
+    pub fn method(&self) -> &'static str {
+        "identity-preconditioned block LOBPCG, real f64"
+    }
+}
+
 /// Owned selected eigenpairs of an ordinary real symmetric coordinate matrix.
 ///
 /// Values are sorted algebraically with multiplicity; vector column j belongs
@@ -161,6 +225,54 @@ impl<Id> HodgeSpectrum<Id> {
 }
 
 impl<Id: Copy + Eq + Hash> HodgeLaplacian<Id> {
+    /// Approximate count smallest eigenpairs through sparse action and block LOBPCG.
+    ///
+    /// Does not construct the n by n Hodge matrix or compute its full spectrum.
+    /// Only a <=3*b Rayleigh-Ritz problem is dense, with b=min(n,block_size).
+    /// If b approaches n the subspace itself can be quadratic; workspace entries
+    /// are capped independently of the dense-reference API. No preconditioner is
+    /// applied, so small gaps may converge slowly or exhaust max_iterations.
+    ///
+    /// A deterministic starting block and small residuals do not certify that
+    /// no lower eigenvalues or additional repeated roots were missed. This API
+    /// provides approximate candidates, not numerical-nullity/Betti readout.
+    /// Count zero requests no eigenpairs; a nonempty domain remains uncomputed.
+    /// One budget covers starts, sparse actions, Ritz work and final verification.
+    /// # Errors
+    /// Rejects invalid options/counts, excessive workspace entries, cancellation,
+    /// work exhaustion, allocation/arithmetic failure and failed convergence.
+    /// No unconverged partial result is returned as a successful spectrum.
+    pub fn smallest_eigenpairs(
+        &self,
+        count: usize,
+        options: &IterativeOptions,
+        execution: &Execution<'_>,
+    ) -> Result<HodgeEigenpairs<Id>> {
+        let mut budget = WorkBudget::new(execution)?;
+        let pairs = crate::eigensolver::lobpcg(
+            self.basis.len(),
+            count,
+            false,
+            options,
+            &mut budget,
+            |x, budget| self.action_budget(x, budget),
+        )?;
+        let mut basis = Vec::new();
+        basis
+            .try_reserve_exact(self.basis.len())
+            .map_err(|_| allocation())?;
+        budget.step_by(self.basis.len())?;
+        basis.extend_from_slice(&self.basis);
+        budget.check()?;
+        Ok(HodgeEigenpairs {
+            degree: self.degree,
+            selection: self.selection,
+            basis,
+            pairs,
+            options: *options,
+        })
+    }
+
     /// Compute selected eigenpairs with one matrix/solve/verification budget.
     ///
     /// Range indexes the full algebraically sorted spectrum and may be empty.
@@ -300,102 +412,14 @@ fn jacobi(
     options: &SpectrumOptions,
     budget: &mut WorkBudget<'_>,
 ) -> Result<(Vec<f64>, Vec<f64>, usize)> {
-    let mut a = zeros(matrix.len(), budget)?;
-    let mut q = zeros(matrix.len(), budget)?;
-    budget.step_by(matrix.len())?;
-    let scale = matrix
-        .iter()
-        .fold(0.0_f64, |max, value| max.max(value.abs()));
-    for row in 0..n {
-        budget.step()?;
-        q[row * n + row] = 1.0;
-        for column in 0..n {
-            budget.step()?;
-            if matrix[row * n + column] != matrix[column * n + row] {
-                return Err(Error::NumericalFailure {
-                    context: "Hodge matrix symmetry",
-                });
-            }
-            a[row * n + column] = if scale == 0.0 {
-                0.0
-            } else {
-                matrix[row * n + column] / scale
-            };
-        }
-    }
-    let target = if scale == 0.0 {
-        0.0
-    } else {
-        budget.step_by(a.len())?;
-        options.absolute_tolerance / scale + options.relative_tolerance * norm(&a)
-    };
-    finite(target)?;
-    let mut sweeps = 0;
-    loop {
-        let mut off: f64 = 0.0;
-        for i in 0..n {
-            for j in 0..n {
-                budget.step()?;
-                if i != j {
-                    off = off.hypot(a[i * n + j]);
-                }
-            }
-        }
-        if off <= target {
-            break;
-        }
-        if sweeps == options.max_sweeps {
-            return Err(Error::NumericalFailure {
-                context: "Hodge Jacobi convergence",
-            });
-        }
-        for p in 0..n {
-            for s in p + 1..n {
-                budget.step()?;
-                let aps = a[p * n + s];
-                if aps == 0.0 {
-                    continue;
-                }
-                let delta = (a[s * n + s] - a[p * n + p]) * 0.5;
-                let t = if delta == 0.0 {
-                    1.0
-                } else {
-                    aps / (delta + delta.signum() * delta.hypot(aps))
-                };
-                let c = 1.0 / 1.0_f64.hypot(t);
-                let sn = t * c;
-                a[p * n + p] -= t * aps;
-                a[s * n + s] += t * aps;
-                a[p * n + s] = 0.0;
-                a[s * n + p] = 0.0;
-                for i in 0..n {
-                    budget.step()?;
-                    if i != p && i != s {
-                        let aip = a[i * n + p];
-                        let ais = a[i * n + s];
-                        a[i * n + p] = c * aip - sn * ais;
-                        a[p * n + i] = a[i * n + p];
-                        a[i * n + s] = sn * aip + c * ais;
-                        a[s * n + i] = a[i * n + s];
-                    }
-                    let qip = q[i * n + p];
-                    let qis = q[i * n + s];
-                    q[i * n + p] = c * qip - sn * qis;
-                    q[i * n + s] = sn * qip + c * qis;
-                }
-            }
-        }
-        sweeps += 1;
-    }
-    let mut diagonal = Vec::new();
-    for i in 0..n {
-        budget.step()?;
-        let value = a[i * n + i] * scale;
-        finite(value)?;
-        push(&mut diagonal, crate::canonical_zero(value))?;
-    }
-    budget.check()?;
-    Ok((diagonal, q, sweeps))
+    crate::eigensolver::jacobi(
+        matrix,
+        n,
+        options.absolute_tolerance,
+        options.relative_tolerance,
+        options.max_sweeps,
+        budget,
+    )
 }
 
 #[cfg(test)]
