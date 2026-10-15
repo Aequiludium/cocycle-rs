@@ -92,6 +92,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/guides/hodge-laplacian.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
@@ -132,6 +133,7 @@ jobs:
       - run: cargo run --locked --example homology_operators
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
+      - run: cargo run --locked --example hodge_laplacian > target/hodge-rust.jsonl
 
   msrv:
     name: Minimum Rust (1.91)
@@ -174,6 +176,7 @@ jobs:
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
           cargo test --locked --manifest-path "$package_manifest" --example critical_sets
+          cargo run --locked --manifest-path "$package_manifest" --example hodge_laplacian > target/hodge-package.jsonl
 
   reference:
     name: Native C++ reference comparisons

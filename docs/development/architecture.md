@@ -28,6 +28,9 @@ do not require six crates or a common source/result registry.
 Filtration is optional for single-scale consumers; diagrams and distances are
 optional for direct consumers. Signed incidence can already be read without PH,
 and supplied diagrams can already be compared/analyzed without a source owner.
+The `hodge` domain directly snapshots adjacent signed boundaries from a supplied
+complex or stage and provides standard-real action, explicit matrices and bounded
+dense eigenpairs. It does not request persistence or expand implicit Rips data.
 The [interface guide](../guides/interface-contracts.md) exercises current calls;
 the [route report](../research/route-integration.md) records composed handoffs and
 future requirements. Proposed producers and output types remain outside the
@@ -92,6 +95,9 @@ src/
       order.rs                   compact H1 entry comparison adapter
       cliques.rs                 dense/sparse clique enumeration
       expansion.rs               shared explicit clique construction
+  hodge/
+    mod.rs                       real signed chain windows and sparse Hodge action
+    spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
   persistence/
     mod.rs                       public exports and private computation wiring
     assembly.rs                  shared raw intervals and endpoint normalization
@@ -433,7 +439,7 @@ public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
 
-Future Laplacian/Dirac, true persistent spectral pairs and optimal F2 projections
+General SPD/complex Hodge, Dirac, true persistent spectral pairs and optimal F2 projections
 need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
 and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).
 Non-diagram similarities need defined coordinates and units; exporters, external

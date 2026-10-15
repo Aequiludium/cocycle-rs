@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add standard real single-scale Hodge Laplacians from supplied complexes or
+  stages: sparse full/lower/upper action, explicit row-major matrices and bounded
+  dense selected eigenpairs with measured residuals and orthogonality, and
+  borrowed numerical kernel-column reads. Integer
+  chain validation is independent of prime-field persistence. General SPD Grams,
+  complex coefficients and persistent Laplacians remain unsupported.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.

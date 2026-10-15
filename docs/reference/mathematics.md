@@ -969,3 +969,59 @@ RSS bound. No persistent family cache or streaming barcode is introduced.
 The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
 cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
 separates finite implementation checks from these algebraic derivations.
+
+## 22. Real single-scale Hodge Laplacians
+
+For a finite integer chain window C[k-1] <-A- C[k] <-D- C[k+1], require
+AD=0 over the integers before interpreting incidence over R. In ordered bases
+with standard inner products, define
+
+$$
+L_k = A^\mathsf{T} A + D D^\mathsf{T}.
+$$
+
+For k=0, A has zero rows: this is ordinary nonaugmented H0. An explicitly
+absent adjacent degree in the supplied finite topology is a zero-size map.
+Lower and upper selections retain only the respective summand.
+
+For every real vector x,
+
+$$
+x^\mathsf{T}L_kx = \|Ax\|_2^2 + \|D^\mathsf{T}x\|_2^2 \geq 0.
+$$
+
+Thus L is symmetric positive semidefinite and ker L = ker A intersect ker D^T.
+Because im D is contained in ker A and (im D) perpendicular = ker D^T,
+orthogonal decomposition inside ker A gives
+
+$$
+\ker A = \operatorname{im}D \oplus \ker L_k,
+\qquad
+\dim\ker L_k = n_k - \operatorname{rank}_{\mathbb{R}} A
+                         - \operatorname{rank}_{\mathbb{R}} D
+             = \beta_k(\mathbb{R}).
+$$
+
+The fundamental subspace decomposition then gives
+C[k] = im A^T direct-sum ker L direct-sum im D. Orthogonal projection onto ker L
+assigns each homology class its unique harmonic representative. These are Lim's
+Theorems 5.2 and 5.3, *Hodge Laplacians on Graphs*, SIAM Review 62(3), 2020,
+685–715, [DOI 10.1137/18M1223101](https://doi.org/10.1137/18M1223101),
+[author PDF](https://www.stat.uchicago.edu/~lekheng/work/hodge-graph.pdf), pp. 700–701.
+The positive-norm argument is invalid over arbitrary finite fields.
+Prime-field reduction must not certify real chain validity or harmonic nullity.
+
+In edge order (01,02,12), an unfilled triangle has harmonic vector (1,-1,1)
+and spectrum (0,3,3). Adding its oriented 2-cell contributes that vector's
+outer product, giving L1=3I. A single edge has L0=[[1,-1],[-1,1]] and
+spectrum (0,2). These expectations are independent of filtration weights.
+
+The implemented spectrum is an ordinary real symmetric eigenproblem using
+scaled cyclic Jacobi on explicitly bounded dense matrices. Residuals, norm,
+orthogonality and tolerance are recorded; thresholded zeros provide numerical
+evidence only. Index-selected spectra cannot determine full nullity.
+General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
+D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
+That extension, complex conjugate adjoints and persistent Laplacians are outside
+the initial API. See the [Hodge guide](../guides/hodge-laplacian.md) for callable
+operations, costs, exclusions and reproducible checks.
