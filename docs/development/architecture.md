@@ -160,7 +160,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `geometry` | Input validation and distance access | Error utilities |
 | `complex` | Checked graphs, simplicial incidence and filtered-cell contract | Geometry scalar validation, execution, error utilities |
 | `execution` | Immutable controls and private per-operation budget | Error utilities |
-| `spectral` | Bounded real persistent Laplacian, action, complete spectrum and fixed-endpoint elimination | Complex signed incidence, filtration stages/provenance, execution, error utilities |
+| `persistent_laplacian` | Bounded real persistent Laplacian, action, complete spectrum and fixed-endpoint elimination | Complex signed incidence, filtration stages/provenance, execution, error utilities |
 | `filtration` | Construction, source context, coverage and private coface access | Geometry, complex, execution, error utilities |
 | `persistence` | Algorithms, options, interval and representative assembly | Algebra, geometry, filtration, diagram, execution |
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
