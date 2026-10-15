@@ -3,6 +3,30 @@
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Spectral reference CI
+
+The `Real persistent Laplacian reference comparisons` CI job requires
+`--components --gudhi --reference-python PATH` on a freshly built release worker.
+It checks all 1,114 stage pairs against independent rational/NumPy Schur and
+restricted-boundary SVD expectations, including upper/lower actions, spectra,
+orthogonality and fixed-endpoint results. The pinned author's Schur function
+runs on its supported subset; GUDHI supplies the declared finite-field topology
+checks, including the explicit RP2 field counterexample. The larger optional
+MATLAB author-data replay and performance experiments remain separate.
+
+The job uses Python 3.12 with NumPy 2.2.6, SciPy 1.15.3 and GUDHI 3.12.0.
+External sources are checked out at the exact revisions linked in the relevant
+oracle documentation; no runtime dependency is added. Explicitly requested
+missing packages or comparisons fail the job.
+
+The artifact named `persistent-laplacian-reference-<sha>-<attempt>` retains the actual
+checkout SHA, event/run identity, reference commits and source hashes, dependency
+versions, Rust outputs and comparison results/logs, including failure evidence.
+Artifacts are uploaded even when a comparison fails and expire after 14 days.
+These are numerical correctness checks; finite-field corroboration, supported
+external function subsets and bounded learning controls do not establish exact
+real topology, whole-package compatibility or performance rankings.
+
 ## Real persistent Laplacian reproduction
 
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
