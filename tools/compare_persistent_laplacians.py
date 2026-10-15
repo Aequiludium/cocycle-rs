@@ -374,7 +374,7 @@ def main():
     # Freeze the executable used for this run. In addition to reproducibility,
     # this keeps Windows builds from trying to overwrite an executing example.
     worker = (args.output / source_worker.name).resolve()
-    shutil.copyfile(source_worker, worker)
+    shutil.copy2(source_worker, worker)
     shutil.copyfile(Path(__file__).resolve(), args.output / "controller.py")
     fixture_set = fixtures()
     groups = []

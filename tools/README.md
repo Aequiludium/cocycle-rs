@@ -90,8 +90,10 @@ The optional Python subset can be downloaded from the
 to `target/persistent-python-reference.py`, then supplied with
 `--reference-python target/persistent-python-reference.py`. This runs only
 `schur_complement`; it does not validate the reference application's pair,
-feature or learning pipeline. Outputs also freeze the actual worker and controller
-and record the worker hash; preserve these together with the result JSON.
+feature or learning pipeline. Outputs also freeze the actual worker and controller,
+preserving the worker's POSIX executable permissions, and record the worker hash;
+preserve these together with the result JSON. The reference CI job runs a POSIX
+regression that launches the frozen worker and checks retained failure output.
 
 ## Native cross-library benchmarks
 
