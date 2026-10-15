@@ -223,6 +223,7 @@ fn iterative_pairs_preserve_multiplicity_coordinates_and_sparse_residuals() {
                 .spectrum(0..3, &SpectrumOptions::default(), &Execution::default())
                 .unwrap();
             close(s.values(), reference.values());
+            assert!(!s.is_index_coverage_certified());
             assert_eq!(s.basis(), l.basis());
             assert_eq!(s.degree(), 1);
             assert_eq!(s.selection(), selection);

@@ -147,6 +147,7 @@ jobs:
       - run: python tools/check_docs.py
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
+      - run: rustfmt --edition 2024 --check tools/reference/hodge_resources.rs
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings

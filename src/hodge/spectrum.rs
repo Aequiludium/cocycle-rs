@@ -49,6 +49,16 @@ pub struct HodgeEigenpairs<Id> {
     options: IterativeOptions,
 }
 impl<Id> HodgeEigenpairs<Id> {
+    /// Whether the smallest algebraic indexes and their multiplicities are certified.
+    ///
+    /// Always false for this random-start residual-based iterative result. A small
+    /// residual does not exclude a missed zero mode, a repeated eigenvalue or a
+    /// smaller invariant subspace. Independent full-spectrum fixture checks do
+    /// not turn this result into a general extremal-index certificate.
+    pub fn is_index_coverage_certified(&self) -> bool {
+        false
+    }
+
     /// Chain degree of the frozen coordinate problem.
     pub fn degree(&self) -> usize {
         self.degree

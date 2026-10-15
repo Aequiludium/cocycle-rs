@@ -48,6 +48,7 @@ fn emit(name: &str, source: &SimplicialComplex) -> cocycle::Result<()> {
             &IterativeOptions::default(),
             &Execution::default(),
         )?;
+        assert!(!iterative.is_index_coverage_certified());
         println!(
             "{{\"name\":{name:?},\"degree\":{degree},\"simplices\":{simplices:?},\"basis\":{basis:?},\"matrix\":{:?},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?},\"orthogonality_error\":{},\"x\":{x:?},\"action\":{action:?},\"kernel_columns\":{kernel_columns:?},\"sweeps\":{},\"iterative_values\":{:?},\"iterative_vectors\":{:?},\"iterative_residuals\":{:?},\"iterative_iterations\":{},\"iterative_actions\":{},\"iterative_peak_subspace\":{}}}",
             spectrum.matrix(),
@@ -101,6 +102,16 @@ fn main() -> cocycle::Result<()> {
         ),
         ("empty", vec![]),
         ("path_128", (0..127).map(|v| vec![v, v + 1]).collect()),
+        (
+            "cycle_64",
+            (0..64)
+                .map(|v| vec![v.min((v + 1) % 64), v.max((v + 1) % 64)])
+                .collect(),
+        ),
+        (
+            "disconnected_edges_16",
+            (0..16).map(|v| vec![2 * v, 2 * v + 1]).collect(),
+        ),
     ] {
         emit(name, &from_facets(&facets)?)?;
     }

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Mark residual-based partial Hodge results explicitly with
+  `is_index_coverage_certified() == false`, including after successful convergence.
+
 - Add matrix-free Hodge `smallest_eigenpairs` using bounded block LOBPCG and
   the shared small Jacobi Ritz solver. Preserve numerical residuals and owned
   coordinates without retaining a dense operator matrix. Iterative convergence

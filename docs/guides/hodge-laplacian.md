@@ -2,6 +2,12 @@
 
 [Documentation](../README.md) / Guides
 
+`HodgeEigenpairs::is_index_coverage_certified()` always returns false. Residual
+convergence verifies returned Ritz pairs, not their extremal indexes, unseen zero
+modes or omitted multiplicities. Independent complete NumPy spectra check the
+selected prefix on finite fixtures, including a 128-node path, a 64-cycle and
+repeated disconnected edges. The missed-invariant-subspace regression remains.
+
 This **Unreleased** capability implements #73's initial standard-real chain
 window. It reads a finite [supplied complex or stage](filtered-complexes.md),
 keeps its signed incidence and degree order, and computes action, matrices and
