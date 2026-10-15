@@ -1020,6 +1020,10 @@ The implemented spectrum is an ordinary real symmetric eigenproblem using
 scaled cyclic Jacobi on explicitly bounded dense matrices. Residuals, norm,
 orthogonality and tolerance are recorded; thresholded zeros provide numerical
 evidence only. Index-selected spectra cannot determine full nullity.
+Explicit matrix construction and spectra check n² before dense allocation;
+their shared default entry limit is 1,048,576 per square buffer (8 MiB of f64),
+independent of work budgets. Spectra also retain a separate dimension limit.
+These configurable per-buffer bounds do not cap aggregate process memory.
 General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
 D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
 That extension, complex conjugate adjoints and persistent Laplacians are outside

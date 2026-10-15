@@ -18,6 +18,12 @@ use crate::{Error, Result};
 use std::collections::HashMap;
 use std::hash::Hash;
 
+/// Default maximum entries in each dense Hodge square buffer: 1,048,576 (8 MiB).
+///
+/// Shared by [`HodgeLaplacian::matrix`] and [`SpectrumOptions`]. This bounds
+/// each n by n f64 buffer, not aggregate allocations or process memory.
+pub const DEFAULT_MAX_DENSE_ENTRIES: usize = 1_048_576;
+
 /// Summands of the ordinary real Hodge Laplacian.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HodgeSelection {
@@ -251,19 +257,49 @@ impl<Id: Copy + Eq + Hash> HodgeLaplacian<Id> {
     /// Materialize the n by n operator in row-major [`Self::basis`] order.
     ///
     /// An empty degree returns length zero with n=0. This explicit conversion
-    /// uses O(n²) output memory and O(n * (n + sparse incidence)) work. Execution
-    /// is a work/cancellation control, not a memory quota; shape and reservations
-    /// are checked before allocation.
+    /// rejects n² above [`DEFAULT_MAX_DENSE_ENTRIES`] before dense allocation,
+    /// including with unlimited Execution. Use [`Self::matrix_with_limit`] to
+    /// explicitly adjust the entry limit. Work is O(n * (n + sparse incidence));
+    /// Execution controls work/cancellation, not aggregate memory.
     /// # Errors
-    /// Includes shape overflow, allocation/numerical failure and execution limits.
+    /// Includes excessive dense entries, shape overflow, allocation/numerical
+    /// failure and execution limits.
     pub fn matrix(&self, execution: &Execution<'_>) -> Result<Vec<f64>> {
-        let mut budget = WorkBudget::new(execution)?;
-        self.matrix_budget(&mut budget)
+        self.matrix_with_limit(DEFAULT_MAX_DENSE_ENTRIES, execution)
     }
 
-    fn matrix_budget(&self, budget: &mut WorkBudget<'_>) -> Result<Vec<f64>> {
+    /// Materialize with an explicit maximum number of n by n output entries.
+    ///
+    /// Checks n² against max_dense_entries before allocating any dense buffer.
+    /// Zero permits only an empty degree. Trusted callers can raise the limit;
+    /// this per-buffer bound is not a total memory quota. Sparse action is
+    /// unaffected, and allocation/byte-capacity checks still apply.
+    /// # Errors
+    /// Includes [`Self::matrix`] errors. Excess entries return
+    /// [`Error::InvalidParameter`] with parameter `Hodge dense entries`.
+    pub fn matrix_with_limit(
+        &self,
+        max_dense_entries: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Vec<f64>> {
+        let mut budget = WorkBudget::new(execution)?;
+        self.matrix_budget(max_dense_entries, &mut budget)
+    }
+
+    fn matrix_budget(
+        &self,
+        max_dense_entries: usize,
+        budget: &mut WorkBudget<'_>,
+    ) -> Result<Vec<f64>> {
         let n = self.basis.len();
-        let mut matrix = zeros(n.checked_mul(n).ok_or(size_error())?, budget)?;
+        let entries = n.checked_mul(n).ok_or(size_error())?;
+        if entries > max_dense_entries {
+            return Err(Error::InvalidParameter {
+                parameter: "Hodge dense entries",
+                reason: "exceeds the explicit dense entry limit",
+            });
+        }
+        let mut matrix = zeros(entries, budget)?;
         let mut x = zeros(n, budget)?;
         for column in 0..n {
             budget.step()?;

@@ -24,6 +24,7 @@ let source = SimplicialComplex::new(vec![
 let execution = Execution::default().max_work(10_000);
 let laplacian = HodgeLaplacian::new_with(&source, 0, HodgeSelection::Full, &execution)?;
 assert_eq!(laplacian.matrix(&execution)?, [1., -1., -1., 1.]);
+assert_eq!(laplacian.matrix_with_limit(4, &execution)?, [1., -1., -1., 1.]);
 assert_eq!(laplacian.action(&[2., 5.], &execution)?, [-3., 3.]);
 let spectrum = laplacian.spectrum(0..2, &SpectrumOptions::default(), &execution)?;
 assert!(spectrum.values()[0].abs() < 1e-10);
@@ -60,6 +61,10 @@ separate operation outside the Hodge preparation budget.
 
 `action` returns an owned coordinate vector; `matrix` returns an n by n
 row-major buffer. Interpret both using the prepared operator's `basis()`.
+`matrix` checks n² against `DEFAULT_MAX_DENSE_ENTRIES` (1,048,576 entries,
+8 MiB for f64) before dense allocation, even with unlimited `Execution`.
+Use `matrix_with_limit(max_dense_entries, execution)` to set a smaller cap or
+explicitly permit a larger trusted computation. Zero permits only n=0.
 `HodgeSpectrum` owns its domain basis handles, actual matrix, degree, summands
 and numeric policy alongside the values and vector columns. These define its
 coordinate eigenproblem after source release. Keep your source descriptions to
@@ -84,7 +89,8 @@ expressed through this API; no input is implicitly converted to those variants.
 
 The dense reference path uses scaled cyclic Jacobi rotations. It preserves the
 crate's absence of runtime dependencies. `SpectrumOptions` sets a checked
-dimension limit (default 128), maximum sweeps (64) and finite nonnegative
+dimension limit (default 128), `max_dense_entries` (default 1,048,576),
+maximum sweeps (64) and finite nonnegative
 absolute/relative tolerances (both 1e-12). Convergence uses the off-diagonal
 Frobenius norm in scaled coordinates, equivalent to an unscaled tolerance of
 `absolute_tolerance + relative_tolerance * ||L||_F`. Failed convergence is an
@@ -94,6 +100,9 @@ The requested index range selects from the full algebraically sorted dense
 decomposition. Multiplicity is preserved. `vectors()` contains an n by r
 row-major matrix with value j paired to vector column j; signs and repeated
 eigenspace bases are arbitrary. Small negative eigenvalues are retained.
+Both the dimension and n² entry limits are checked before dense allocation,
+including for an empty or partial eigenpair selection. Raising max_dimension
+alone does not bypass the shared dense entry cap.
 
 Results report actual absolute residuals from sparse action, relative residuals
 using `||L||_F`, returned-column Frobenius orthogonality error, sweeps and policy.
@@ -153,6 +162,9 @@ uses O(n²) output and n sparse actions. The dense solver retains O(n²) storage
 and takes O(max_sweeps * n³) work, including full decomposition for a partial
 selection. Checked shapes, byte capacities and fallible reservations precede
 dense allocation; not every standard-library allocation is recoverable.
+The entry cap bounds each dense square buffer individually. Spectra retain
+several such buffers plus selected vectors and scratch; the cap is not a total
+allocation or process-memory quota. Sparse action has no dense entry limit.
 
 Each terminal uses a fresh `Execution` budget. Constructor traversal, incidence
 and integer chain products; action coordinates and incidence; dense entries,

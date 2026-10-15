@@ -5,12 +5,17 @@ use std::ops::Range;
 ///
 /// This reference path uses scaled cyclic Jacobi rotations, O(n²) memory and
 /// O(max_sweeps * n³) work. It adds no runtime dependency and is not an iterative
-/// sparse eigensolver. Defaults limit n to 128 and sweeps to 64. Tolerances bound
+/// sparse eigensolver. Defaults limit n to 128, each dense square buffer to
+/// [`DEFAULT_MAX_DENSE_ENTRIES`] entries and sweeps to 64. Tolerances bound
 /// the off-diagonal Frobenius norm by `absolute + relative * ||L||_F`.
 #[derive(Clone, Copy, Debug)]
 pub struct SpectrumOptions {
     /// Maximum permitted domain dimension, checked before dense allocation.
     pub max_dimension: usize,
+    /// Maximum n² entries per dense square buffer, checked before allocation.
+    /// Shared with [`HodgeLaplacian::matrix_with_limit`]; not a total memory quota.
+    /// Zero permits only an empty degree, even for an empty eigenpair selection.
+    pub max_dense_entries: usize,
     /// Maximum complete cyclic sweeps; zero accepts already diagonal matrices.
     pub max_sweeps: usize,
     /// Finite nonnegative absolute convergence tolerance, in eigenvalue units.
@@ -22,6 +27,7 @@ impl Default for SpectrumOptions {
     fn default() -> Self {
         Self {
             max_dimension: 128,
+            max_dense_entries: DEFAULT_MAX_DENSE_ENTRIES,
             max_sweeps: 64,
             absolute_tolerance: 1e-12,
             relative_tolerance: 1e-12,
@@ -163,6 +169,7 @@ impl<Id: Copy + Eq + Hash> HodgeLaplacian<Id> {
     /// The result retains dense matrix storage even for a partial selection.
     /// # Errors
     /// Rejects invalid range/tolerances, dimensions exceeding max_dimension,
+    /// n² exceeding max_dense_entries (even for an empty selection),
     /// allocation failure, arithmetic failure, failed convergence, cancellation
     /// and work exhaustion. All returned residuals/orthogonality are measured.
     pub fn spectrum(
@@ -187,7 +194,7 @@ impl<Id: Copy + Eq + Hash> HodgeLaplacian<Id> {
                 reason: "exceeds the explicit dense solver limit",
             });
         }
-        let matrix = self.matrix_budget(&mut budget)?;
+        let matrix = self.matrix_budget(options.max_dense_entries, &mut budget)?;
         budget.step_by(matrix.len())?;
         let matrix_norm = norm(&matrix);
         finite(matrix_norm)?;

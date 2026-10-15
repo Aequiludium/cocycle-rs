@@ -8,6 +8,10 @@
   borrowed numerical kernel-column reads. Integer
   chain validation is independent of prime-field persistence. General SPD Grams,
   complex coefficients and persistent Laplacians remain unsupported.
+- Bound explicit Hodge matrices to 1,048,576 entries (8 MiB of f64) by default
+  before dense allocation. `matrix_with_limit` and `SpectrumOptions::max_dense_entries`
+  allow explicit per-buffer limits; sparse action remains independent. Spectrum
+  callers using full option literals must supply the new field or use `..Default::default()`.
 
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)

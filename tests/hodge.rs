@@ -2,7 +2,7 @@
 use cocycle::Error;
 use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
-use cocycle::hodge::{HodgeLaplacian, HodgeSelection, SpectrumOptions};
+use cocycle::hodge::{DEFAULT_MAX_DENSE_ENTRIES, HodgeLaplacian, HodgeSelection, SpectrumOptions};
 use std::sync::atomic::AtomicBool;
 
 type Cell = (usize, usize, Vec<(usize, i32)>);
@@ -80,6 +80,129 @@ fn edge_ordinary_h0_and_top_degree() {
             .unwrap(),
         [0.; 4]
     );
+}
+
+#[test]
+fn dense_entry_limits_precede_allocation_and_work() {
+    let l = op(&triangle(true), 1, HodgeSelection::Full);
+    let execution = Execution::default();
+    let no_work = execution.max_work(0);
+    for limit in [0, 8] {
+        assert!(matches!(
+            l.matrix_with_limit(limit, &no_work),
+            Err(Error::InvalidParameter {
+                parameter: "Hodge dense entries",
+                ..
+            })
+        ));
+        let options = SpectrumOptions {
+            max_dense_entries: limit,
+            ..Default::default()
+        };
+        for range in [0..0, 0..3] {
+            assert!(matches!(
+                l.spectrum(range, &options, &no_work),
+                Err(Error::InvalidParameter {
+                    parameter: "Hodge dense entries",
+                    ..
+                })
+            ));
+        }
+    }
+    // The inclusive bound permits the known 3I matrix, without disabling work limits.
+    assert_eq!(
+        l.matrix_with_limit(9, &execution).unwrap(),
+        [3., 0., 0., 0., 3., 0., 0., 0., 3.]
+    );
+    assert!(matches!(
+        l.matrix_with_limit(9, &no_work),
+        Err(Error::WorkLimitExceeded { limit: 0 })
+    ));
+    let options = SpectrumOptions {
+        max_dense_entries: 9,
+        ..Default::default()
+    };
+    let spectrum = l.spectrum(0..3, &options, &execution).unwrap();
+    close(spectrum.values(), &[3.; 3]);
+    assert_eq!(spectrum.options().max_dense_entries, 9);
+
+    let empty = op(&triangle(true), 4, HodgeSelection::Full);
+    let zero_entries = SpectrumOptions {
+        max_dense_entries: 0,
+        ..Default::default()
+    };
+    assert!(empty.matrix_with_limit(0, &execution).unwrap().is_empty());
+    assert!(
+        empty
+            .spectrum(0..0, &zero_entries, &execution)
+            .unwrap()
+            .is_complete()
+    );
+    let cancelled = AtomicBool::new(true);
+    assert!(matches!(
+        empty.matrix_with_limit(0, &execution.cancellation(&cancelled)),
+        Err(Error::Cancelled)
+    ));
+}
+
+#[test]
+fn explicit_dense_limit_can_exceed_default() {
+    let n = 1025;
+    let cells = Cells((0..n).map(|id| (id, 0, vec![])).collect());
+    let l = op(&cells, 0, HodgeSelection::Full);
+    let execution = Execution::default();
+    assert!(n * n > DEFAULT_MAX_DENSE_ENTRIES);
+    assert!(matches!(
+        l.matrix(&execution),
+        Err(Error::InvalidParameter {
+            parameter: "Hodge dense entries",
+            ..
+        })
+    ));
+    let matrix = l.matrix_with_limit(n * n, &execution).unwrap();
+    assert_eq!(matrix.len(), n * n);
+    assert!(matrix.iter().all(|&entry| entry == 0.));
+}
+
+#[test]
+fn large_sparse_window_rejects_dense_defaults() {
+    let n = 20_000;
+    let vertices = SimplicialComplex::new(
+        (0..n)
+            .map(|id| Simplex::new(vec![id], 0.))
+            .collect::<cocycle::Result<_>>()
+            .unwrap(),
+    )
+    .unwrap();
+    let l = HodgeLaplacian::new(&vertices, 0, HodgeSelection::Full).unwrap();
+    let execution = Execution::default();
+    assert_eq!(DEFAULT_MAX_DENSE_ENTRIES, 1_048_576);
+    assert_eq!(
+        SpectrumOptions::default().max_dense_entries,
+        DEFAULT_MAX_DENSE_ENTRIES
+    );
+    // Reject the 400-million-entry (3.2 GB) result without attempting allocation.
+    for controls in [execution, execution.max_work(0)] {
+        assert!(matches!(
+            l.matrix(&controls),
+            Err(Error::InvalidParameter {
+                parameter: "Hodge dense entries",
+                ..
+            })
+        ));
+    }
+    let options = SpectrumOptions {
+        max_dimension: n,
+        ..Default::default()
+    };
+    assert!(matches!(
+        l.spectrum(0..0, &options, &execution),
+        Err(Error::InvalidParameter {
+            parameter: "Hodge dense entries",
+            ..
+        })
+    ));
+    assert_eq!(l.action(&vec![1.; n], &execution).unwrap(), vec![0.; n]);
 }
 
 #[test]
