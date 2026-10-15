@@ -16,6 +16,68 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  dirac-reference:
+    name: Real Dirac reference comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: pyt-team/TopoNetX
+          ref: ce3d414b571fff95916c4cbc20b8d2c2c9d428e6
+          path: target/dirac-sources/toponetx
+          persist-credentials: false
+          sparse-checkout: toponetx/classes
+      - run: python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0
+      - name: Record source and dependency identities
+        run: |
+          python - <<'PY'
+          import hashlib, importlib.metadata, json, os, subprocess
+          from pathlib import Path
+          output = Path("target/dirac-reference")
+          output.mkdir(parents=True, exist_ok=True)
+          references = {"toponetx":{"path":"target/dirac-sources/toponetx","file":"toponetx/classes/simplicial_complex.py"}}
+          for reference in references.values():
+              path = Path(reference["path"])
+              reference["commit"] = subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+              source = path / reference["file"]
+              reference["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+          fields = ("GITHUB_SHA", "GITHUB_REF", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY")
+          record = {key: os.environ.get(key) for key in fields}
+          record["checkout_sha"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          record["references"] = references
+          record["toolchains"] = {name: subprocess.check_output([name, "--version"], text=True).strip() for name in ("cargo", "rustc")}
+          record["versions"] = {name: importlib.metadata.version(name) for name in ("numpy", "scipy", "gudhi",)}
+          (output / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Run independent comparisons
+        run: |
+          cargo build --locked --release 2>&1 | tee target/dirac-reference/build.log
+          rustc --edition 2024 -C opt-level=3 tools/reference/dirac_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/dirac-reference/worker
+          target/dirac-reference/worker > target/dirac-reference/rust.jsonl
+          python tools/check_dirac.py --rust target/dirac-reference/rust.jsonl --output target/dirac-reference/results.json --pairs --toponetx target/dirac-sources/toponetx/toponetx/classes/simplicial_complex.py --gudhi 2>&1 | tee target/dirac-reference/check.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: dirac-reference-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: target/dirac-reference/
+
   operator-reference:
     name: F2 operator reference comparisons
     runs-on: ubuntu-latest
@@ -84,12 +146,6 @@ jobs:
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
-      - name: Check real Dirac fixtures independently
-        run: |
-          python -m pip install numpy==2.4.6
-          rustc --edition 2024 tools/reference/dirac_cocycle.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/dirac-worker
-          target/dirac-worker > target/dirac-rust.jsonl
-          python tools/check_dirac.py --rust target/dirac-rust.jsonl --output target/dirac-oracle.json --pairs
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps

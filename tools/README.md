@@ -3,6 +3,27 @@
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Spectral reference CI
+
+The `Real Dirac reference comparisons` CI job requires `--pairs --toponetx
+PATH --gudhi` on every push and pull request. It builds a fresh release worker,
+checks all eleven fixtures with NumPy, executes the fixed TopoNetX methods on
+their supported subset and corroborates complete torsion-free kernels with
+GUDHI F3. Empty/truncated reference exclusions remain explicit in the report.
+
+The job uses Python 3.12 with NumPy 2.2.6, SciPy 1.15.3 and GUDHI 3.12.0.
+External sources are checked out at the exact revisions linked in the relevant
+oracle documentation; no runtime dependency is added. Explicitly requested
+missing packages or comparisons fail the job.
+
+The artifact named `dirac-reference-<sha>-<attempt>` retains the actual
+checkout SHA, event/run identity, reference commits and source hashes, dependency
+versions, Rust outputs and comparison results/logs, including failure evidence.
+Artifacts are uploaded even when a comparison fails and expire after 14 days.
+These are numerical correctness checks; finite-field corroboration, supported
+external function subsets and bounded learning controls do not establish exact
+real topology, whole-package compatibility or performance rankings.
+
 ## Native cross-library benchmarks
 
 Use [benchmark_native.py](benchmark_native.py) for Cocycle, GUDHI C++ and upstream
