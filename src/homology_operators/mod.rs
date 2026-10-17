@@ -1,21 +1,22 @@
 //! Exact F2 homology projections on ordered, weighted chain windows.
 //!
 //! This domain implements the feasible construction from `homology-operator`
-//! (MIT, revision `3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`). It has no Python
+//! (MIT, revision `a11bf50b8c8320651e9ac015566778d957af9c17`). It has no Python
 //! runtime dependency. `A: C[k] -> C[k-1]`, `D: C[k+1] -> C[k]`, and AD=0.
 //! The factorized action is P=(I+DU)(I+GA), with generalized inverses G/U;
 //! L=I+P is an F2 operator, not a real Hodge Laplacian.
 //!
 //! Feasibility, exact binary topology and selected integer mass are distinct
-//! from global optimization. No minimum-stretch or shortest-class solver is
-//! implied. Costs are strictly positive u64 values in caller-declared units;
+//! from global optimization. Opt-in affine searches minimize one class, filling
+//! or finite pair volume; they do not minimize projection stretch. Costs are
+//! strictly positive u64 values in caller-declared units;
 //! checked overflow is an error. Rational and floating cost domains, solver
 //! registries and Python snapshot formats are outside this initial integration.
 //! Source labels are caller assertions, not authentication of a dataset.
 mod matrix;
 pub use matrix::F2Matrix;
 mod family;
-pub use family::{OperatorFamily, StageInterval, WeightPolicy};
+pub use family::{Feature, OperatorFamily, StageInterval, WeightPolicy};
 
 use crate::complex::FilteredComplex;
 use crate::execution::{Execution, WorkBudget};
@@ -305,6 +306,50 @@ pub struct ClassQuery<Id = usize> {
     representative: Vec<u8>,
     mass: u64,
 }
+
+/// A completed exact integer minimum with its original ordered cost window.
+///
+/// Construction is private: interrupted searches return an error, never an
+/// optimal candidate. Optimality concerns the requested affine set only and
+/// does not certify the projection's stretch or any other class. Coordinates
+/// and masses remain readable after dropping the originating operator/family.
+#[derive(Clone, Debug)]
+pub struct MinimumChain<Id = usize> {
+    window: Arc<ChainWindow<Id>>,
+    chain: Vec<u8>,
+    mass: u64,
+    boundary: Vec<u8>,
+    witness: Option<Vec<u8>>,
+    examined: u64,
+}
+impl<Id> MinimumChain<Id> {
+    /// Minimizing chain in the cost window's current-degree basis.
+    pub fn chain(&self) -> &[u8] {
+        &self.chain
+    }
+    /// Exact checked integer mass in the declared cost unit.
+    pub fn mass(&self) -> u64 {
+        self.mass
+    }
+    /// Boundary of the minimizing chain in the previous-degree basis.
+    pub fn boundary(&self) -> &[u8] {
+        &self.boundary
+    }
+    /// For class minimization, next-degree c with D c = input XOR chain.
+    /// Filling/volume results have no class witness.
+    pub fn boundary_witness(&self) -> Option<&[u8]> {
+        self.witness.as_deref()
+    }
+    /// Original ordered bases, costs, source declaration and unit.
+    pub fn window(&self) -> &ChainWindow<Id> {
+        &self.window
+    }
+    /// Number of evaluated candidates. Zero/positive-cost shortcuts may finish
+    /// before a full enumeration; a returned result always proves optimality.
+    pub fn examined(&self) -> u64 {
+        self.examined
+    }
+}
 impl<Id: Clone + Eq + Hash> ClassQuery<Id> {
     /// Selected representative in the originating current basis.
     pub fn representative(&self) -> &[u8] {
@@ -562,6 +607,109 @@ impl<Id: Clone + Eq + Hash> HomologyOperator<Id> {
                 .collect::<Vec<_>>(),
         )
     }
+    /// Minimize mass in z + im(D), independently of this projection's section.
+    /// Ties use lexicographic chain coordinates, as in the pinned reference.
+    /// Exponential in rank(D); all preparation, enumeration and witness checks
+    /// share the supplied cooperative budget. Noncycles and overflow fail.
+    pub fn minimum_class_mass(
+        &self,
+        z: &[u8],
+        execution: &Execution<'_>,
+    ) -> Result<MinimumChain<Id>> {
+        self.minimum_class_work(z, true, &mut WorkBudget::new(execution)?)
+    }
+    fn minimum_class_work<const C: bool>(
+        &self,
+        z: &[u8],
+        lexicographic: bool,
+        budget: &mut WorkBudget<'_, C>,
+    ) -> Result<MinimumChain<Id>> {
+        if self.window.boundaries[0]
+            .apply_with(z, budget)?
+            .iter()
+            .any(|&x| x != 0)
+        {
+            return Err(invalid("minimum class mass requires a cycle"));
+        }
+        let d = &self.window.boundaries[1];
+        let pivots = d.reduce(budget)?.1;
+        let basis = pivots
+            .iter()
+            .map(|&j| d.column(j))
+            .collect::<Result<Vec<_>>>()?;
+        let (chain, mass, examined) =
+            minimum_affine(z, &basis, &self.window.weights, lexicographic, budget)?;
+        budget.step_by(z.len())?;
+        let residual: Vec<_> = z.iter().zip(&chain).map(|(a, b)| a ^ b).collect();
+        // Re-solve against raw D, independently of the enumeration coefficients.
+        let witness = d
+            .prepare(true, budget)?
+            .solve(&residual, budget)?
+            .ok_or(invalid("minimum class witness escaped the boundary space"))?;
+        if d.apply_with(&witness, budget)? != residual {
+            return Err(invalid("minimum class witness failed"));
+        }
+        budget.check()?;
+        Ok(MinimumChain {
+            window: self.window.clone(),
+            boundary: self.window.boundaries[0].apply_with(&chain, budget)?,
+            chain,
+            mass,
+            witness: Some(witness),
+            examined,
+        })
+    }
+    /// Minimize upper-chain mass subject to D c=z. The upper window must have
+    /// degree k+1, A=D and exactly matching ordered previous/current bases and
+    /// source. Upper costs/units are explicit and independent of lower costs.
+    /// `None` proves infeasibility; empty and zero fillings are valid minima.
+    /// Ties use the smallest original-coordinate bitset. As in the reference,
+    /// nonzero searches support kernel dimension at most 16 (65536 fillings).
+    pub fn minimum_filling(
+        &self,
+        z: &[u8],
+        upper: &ChainWindow<Id>,
+        execution: &Execution<'_>,
+    ) -> Result<Option<MinimumChain<Id>>> {
+        let mut budget = WorkBudget::new(execution)?;
+        self.window.check_upper(upper, &mut budget)?;
+        if self.window.boundaries[0]
+            .apply_with(z, &mut budget)?
+            .iter()
+            .any(|&x| x != 0)
+        {
+            return Err(invalid("fixed-boundary filling requires a cycle"));
+        }
+        let d = &self.window.boundaries[1];
+        let Some(seed) = d.prepare(true, &mut budget)?.solve(z, &mut budget)? else {
+            budget.check()?;
+            return Ok(None);
+        };
+        let kernel = if z.iter().any(|&x| x != 0) {
+            let k = d.kernel_with(&mut budget)?;
+            if k.len() > 16 {
+                return Err(invalid("exact filling requires nullity at most 16"));
+            }
+            k
+        } else {
+            Vec::new()
+        };
+        let (chain, mass, examined) =
+            minimum_affine(&seed, &kernel, &upper.weights, false, &mut budget)?;
+        let boundary = upper.boundaries[0].apply_with(&chain, &mut budget)?;
+        if boundary != z {
+            return Err(invalid("minimum filling failed its boundary equation"));
+        }
+        budget.check()?;
+        Ok(Some(MinimumChain {
+            window: Arc::new(upper.clone()),
+            chain,
+            mass,
+            boundary,
+            witness: None,
+            examined,
+        }))
+    }
     /// Independently enumerable cycle-basis generators in original coordinates.
     /// This is ker(A), not a claim that these are independent homology classes.
     pub fn cycle_basis(&self) -> Result<Vec<Vec<u8>>> {
@@ -673,4 +821,83 @@ impl<Id: Clone + Eq + Hash> HomologyOperator<Id> {
         }
         budget.check()
     }
+}
+
+impl<Id: Clone + Eq + Hash> ChainWindow<Id> {
+    fn check_upper<const C: bool>(
+        &self,
+        upper: &Self,
+        budget: &mut WorkBudget<'_, C>,
+    ) -> Result<()> {
+        budget.step_by(self.bases.iter().map(Vec::len).sum())?;
+        if self.degree.checked_add(1) != Some(upper.degree)
+            || self.boundaries[1] != upper.boundaries[0]
+            || self.bases[1] != upper.bases[0]
+            || self.bases[2] != upper.bases[1]
+            || self.source != upper.source
+        {
+            return Err(invalid(
+                "upper window must match degree, D, ordered bases and source",
+            ));
+        }
+        Ok(())
+    }
+}
+
+// Enumerate an independent affine basis without a machine-word dimension cap.
+// Every binary increment updates the chain in place; all arithmetic is checked.
+fn minimum_affine<const C: bool>(
+    seed: &[u8],
+    basis: &[Vec<u8>],
+    weights: &[u64],
+    lexicographic: bool,
+    budget: &mut WorkBudget<'_, C>,
+) -> Result<(Vec<u8>, u64, u64)> {
+    let mut chain = seed.to_vec();
+    let mut best = chain.clone();
+    let mut best_mass = u64::MAX;
+    let mut examined = 0_u64;
+    let mut coefficients = vec![0_u8; basis.len()];
+    loop {
+        budget.step()?;
+        budget.step_by(chain.len())?;
+        let mass = weights
+            .iter()
+            .zip(&chain)
+            .filter(|(_, b)| **b != 0)
+            .try_fold(0_u64, |sum, (&w, _)| {
+                sum.checked_add(w).ok_or(Error::NumericalFailure {
+                    context: "minimum integer mass overflow",
+                })
+            })?;
+        examined = examined.checked_add(1).ok_or(Error::SizeOverflow {
+            operation: "minimum enumeration count",
+        })?;
+        let earlier = if lexicographic {
+            chain < best
+        } else {
+            chain.iter().rev().cmp(best.iter().rev()).is_lt()
+        };
+        if mass < best_mass || mass == best_mass && earlier {
+            best.clone_from(&chain);
+            best_mass = mass;
+        }
+        // Positive costs prove the unique zero chain globally minimal.
+        if best_mass == 0 {
+            break;
+        }
+        let Some(i) = coefficients.iter().position(|&b| b == 0) else {
+            break;
+        };
+        coefficients[..i].fill(0);
+        coefficients[i] = 1;
+        for vector in &basis[..=i] {
+            budget.step_by(chain.len())?;
+            for (x, y) in chain.iter_mut().zip(vector) {
+                *x ^= y;
+            }
+        }
+    }
+    budget.check()?;
+    Ok((best, best_mass, examined))
 }

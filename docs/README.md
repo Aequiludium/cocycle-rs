@@ -40,7 +40,8 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 ## Use the library
 
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,
-  selected class costs and controlled finite transport from borrowed stages.
+  selected class costs, controlled finite transport, historical simplex features
+  and bounded exact integer class/filling/volume minima.
 
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
   bounded partial U and a lower-star simplification step.

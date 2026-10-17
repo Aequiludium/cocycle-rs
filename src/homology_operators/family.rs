@@ -1,10 +1,41 @@
 //! Finite nested chain windows, coordinate inclusions and rank readouts.
 use super::matrix::{Decomposition, invalid, zeros};
-use super::{ClassQuery, F2Matrix, HomologyOperator};
+use super::{ClassQuery, F2Matrix, HomologyOperator, MinimumChain, minimum_affine};
 use crate::Result;
+use crate::complex::FilteredComplex;
 use crate::execution::{Execution, WorkBudget};
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::sync::Arc;
+
+/// One deterministic interval generator, bound to the actual family run.
+///
+/// Repeated endpoints have distinct occurrences and complete corrected histories.
+/// A fresh family rejects this reference even when all its input entries agree.
+/// Cloning the family preserves the binding. No cross-process serialization or
+/// authentication of caller-declared source labels is implied.
+#[derive(Clone, Debug)]
+pub struct Feature {
+    run: Arc<()>,
+    birth: usize,
+    death: Option<usize>,
+    occurrence: usize,
+    history: Vec<Vec<u8>>,
+}
+impl Feature {
+    /// First live stage position.
+    pub fn birth(&self) -> usize {
+        self.birth
+    }
+    /// First dead stage, or unknown continuation beyond the observed family.
+    pub fn death(&self) -> Option<usize> {
+        self.death
+    }
+    /// Zero-based occurrence among equal endpoint pairs.
+    pub fn occurrence(&self) -> usize {
+        self.occurrence
+    }
+}
 
 /// Cost compatibility policy for a finite operator family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +73,8 @@ pub struct OperatorFamily<Id = usize> {
     scales: Vec<f64>,
     operators: Vec<HomologyOperator<Id>>,
     policy: WeightPolicy,
+    run: Arc<()>,
+    simplex_source: Option<Arc<crate::complex::SimplicialComplex>>,
 }
 
 impl<Id: Clone + Eq + Hash> OperatorFamily<Id> {
@@ -78,6 +111,8 @@ impl<Id: Clone + Eq + Hash> OperatorFamily<Id> {
             scales,
             operators,
             policy,
+            run: Arc::new(()),
+            simplex_source: None,
         };
         for i in 0..family.operators.len() - 1 {
             budget.step()?;
@@ -350,9 +385,502 @@ impl<Id: Clone + Eq + Hash> OperatorFamily<Id> {
         budget.check()?;
         Ok(intervals)
     }
+    /// Read interval generators from this family's adjacent induced maps.
+    /// Complete histories are corrected backwards at deaths, rather than
+    /// interpreting an endpoint pair as a unique cycle. Preparation, histories
+    /// and independent raw-boundary verification share one execution budget.
+    pub fn features(&self, execution: &Execution<'_>) -> Result<Vec<Feature>> {
+        self.features_work(&mut WorkBudget::new(execution)?)
+    }
+    fn features_work<const C: bool>(&self, budget: &mut WorkBudget<'_, C>) -> Result<Vec<Feature>> {
+        let bases = self
+            .operators
+            .iter()
+            .map(|op| {
+                F2Matrix::from_columns(
+                    &op.homology_basis_work(budget)?,
+                    op.window().weights().len(),
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let unit = |n: usize, i: usize| {
+            let mut v = vec![0; n];
+            v[i] = 1;
+            v
+        };
+        let mut alive: Vec<_> = (0..bases[0].ncols())
+            .map(|i| {
+                let v = unit(bases[0].ncols(), i);
+                (0, v.clone(), vec![v])
+            })
+            .collect();
+        let mut ended = Vec::new();
+        for stage in 1..self.operators.len() {
+            let target = bases[stage].prepare(true, budget)?;
+            let map = self.transport_bases(stage - 1, stage, &bases[stage - 1], &target, budget)?;
+            let mut following: Vec<(usize, Vec<u8>, Vec<Vec<u8>>)> = Vec::new();
+            for (birth, vector, mut history) in alive {
+                let image = map.apply_with(&vector, budget)?;
+                let span = F2Matrix::from_columns(
+                    &following.iter().map(|x| x.1.clone()).collect::<Vec<_>>(),
+                    map.nrows(),
+                )?;
+                if let Some(coefficients) = span.prepare(true, budget)?.solve(&image, budget)? {
+                    for (bit, (older_birth, _, older_history)) in
+                        coefficients.iter().zip(&following)
+                    {
+                        if *bit != 0 {
+                            for s in birth..stage {
+                                budget.step_by(history[s - birth].len())?;
+                                for (x, y) in history[s - birth]
+                                    .iter_mut()
+                                    .zip(&older_history[s - older_birth])
+                                {
+                                    *x ^= y;
+                                }
+                            }
+                        }
+                    }
+                    ended.push((birth, Some(stage), history));
+                } else {
+                    history.push(image.clone());
+                    following.push((birth, image, history));
+                }
+            }
+            for i in 0..map.nrows() {
+                let v = unit(map.nrows(), i);
+                let span = F2Matrix::from_columns(
+                    &following.iter().map(|x| x.1.clone()).collect::<Vec<_>>(),
+                    map.nrows(),
+                )?;
+                if span.prepare(true, budget)?.solve(&v, budget)?.is_none() {
+                    following.push((stage, v.clone(), vec![v]));
+                }
+            }
+            alive = following;
+        }
+        ended.extend(
+            alive
+                .into_iter()
+                .map(|(birth, _, history)| (birth, None, history)),
+        );
+        ended.sort_by_key(|(b, d, _)| (*b, d.unwrap_or(self.operators.len())));
+        let mut counts = HashMap::new();
+        let mut features = Vec::new();
+        for (birth, death, history) in ended {
+            let history = history
+                .iter()
+                .enumerate()
+                .map(|(i, v)| bases[birth + i].apply_with(v, budget))
+                .collect::<Result<Vec<_>>>()?;
+            let occurrence = counts.entry((birth, death)).or_insert(0);
+            features.push(Feature {
+                run: self.run.clone(),
+                birth,
+                death,
+                occurrence: *occurrence,
+                history,
+            });
+            *occurrence += 1;
+        }
+        // Verify against raw boundaries, rather than trusting coordinate solves.
+        for (i, op) in self.operators.iter().enumerate() {
+            let active = features
+                .iter()
+                .filter(|f| f.birth <= i && f.death.is_none_or(|d| i < d))
+                .collect::<Vec<_>>();
+            let d = &op.window().boundaries()[1];
+            let mut columns = (0..d.ncols())
+                .map(|j| d.column(j))
+                .collect::<Result<Vec<_>>>()?;
+            for f in &active {
+                let z = &f.history[i - f.birth];
+                if op.window().boundaries()[0]
+                    .apply_with(z, budget)?
+                    .iter()
+                    .any(|&x| x != 0)
+                    || op.project_work(z, budget)? != *z
+                {
+                    return Err(invalid(
+                        "feature history is not in the accepted homology image",
+                    ));
+                }
+                if i > f.birth {
+                    let previous = &self.operators[i - 1];
+                    let indices =
+                        inclusion(&previous.window().bases()[1], &op.window().bases()[1])?;
+                    let image = embed(
+                        &f.history[i - f.birth - 1],
+                        &indices,
+                        op.window().weights().len(),
+                        budget,
+                    )?;
+                    if op.project_work(&image, budget)? != *z {
+                        return Err(invalid("feature history does not commute"));
+                    }
+                }
+                columns.push(z.clone());
+            }
+            let rank_d = d.reduce(budget)?.1.len();
+            let rank_joined = F2Matrix::from_columns(&columns, d.nrows())?
+                .reduce(budget)?
+                .1
+                .len();
+            if active.len() != op.betti() || rank_joined != rank_d + op.betti() {
+                return Err(invalid("feature history is not a full quotient basis"));
+            }
+            for f in features.iter().filter(|f| f.death == Some(i)) {
+                let previous = &self.operators[i - 1];
+                let indices = inclusion(&previous.window().bases()[1], &op.window().bases()[1])?;
+                let image = embed(
+                    f.history.last().ok_or(invalid("missing feature history"))?,
+                    &indices,
+                    d.nrows(),
+                    budget,
+                )?;
+                if d.prepare(true, budget)?.solve(&image, budget)?.is_none() {
+                    return Err(invalid("feature does not die in the raw boundary space"));
+                }
+            }
+        }
+        budget.check()?;
+        Ok(features)
+    }
+    fn check_feature(&self, feature: &Feature) -> Result<()> {
+        if !Arc::ptr_eq(&feature.run, &self.run) {
+            return Err(invalid("feature belongs to another family run"));
+        }
+        Ok(())
+    }
+    /// Resolve a bound generator at a stage. `None` means not born or already
+    /// dead; a foreign reference or invalid stage is an error. The returned
+    /// query belongs to that stage's actual operator run.
+    pub fn resolve_feature(
+        &self,
+        feature: &Feature,
+        stage: usize,
+        execution: &Execution<'_>,
+    ) -> Result<Option<ClassQuery<Id>>> {
+        let mut budget = WorkBudget::new(execution)?;
+        self.check_feature(feature)?;
+        let op = self.stage(stage)?;
+        if stage < feature.birth || feature.death.is_some_and(|d| stage >= d) {
+            return Ok(None);
+        }
+        Ok(Some(op.query_work(
+            &feature.history[stage - feature.birth],
+            &mut budget,
+        )?))
+    }
 }
 
 impl OperatorFamily<crate::complex::SimplexId> {
+    /// Extract one stage per simplex insertion in the frozen source order.
+    /// Tied scales remain distinct face-first events. Costs follow the full
+    /// degree-k basis and are inherited. The owned source preserves original
+    /// vertex IDs and certifies event provenance; no PH reducer supplies results.
+    /// Unlike `from_stages`, this constructor can certify simplex pair queries.
+    pub fn from_simplices(
+        complex: &crate::complex::SimplicialComplex,
+        degree: usize,
+        weights: Vec<u64>,
+        source: &str,
+        unit: &str,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        let mut budget = WorkBudget::new(execution)?;
+        let ids = complex
+            .cells()
+            .filter(|&id| FilteredComplex::dimension(complex, id) == degree)
+            .collect::<Vec<_>>();
+        if weights.len() != ids.len() || complex.is_empty() {
+            return Err(invalid(
+                "nonempty simplex source and one cost per degree-k simplex required",
+            ));
+        }
+        let mut operators = Vec::new();
+        for i in 0..complex.len() {
+            budget.step()?;
+            let costs = ids
+                .iter()
+                .zip(&weights)
+                .filter(|(id, _)| id.index() <= i)
+                .map(|(_, &w)| w)
+                .collect();
+            let window = simplex_window(complex, degree, i + 1, costs, source, unit, &mut budget)?;
+            operators.push(HomologyOperator::feasible_work(window, &mut budget)?);
+        }
+        let mut family = Self::new_work(
+            complex.simplices().iter().map(|s| s.value()).collect(),
+            operators,
+            WeightPolicy::Inherited,
+            &mut budget,
+        )?;
+        budget.step_by(complex.len())?;
+        family.simplex_source = Some(Arc::new(complex.clone()));
+        budget.check()?;
+        Ok(family)
+    }
+    /// Certified birth/death simplex IDs for a bound feature. Algebra-only or
+    /// scale-grouped families have no one-simplex provenance and are rejected.
+    /// The IDs refer to this family's retained frozen source.
+    pub fn feature_pairing(
+        &self,
+        feature: &Feature,
+    ) -> Result<(crate::complex::SimplexId, Option<crate::complex::SimplexId>)> {
+        self.check_feature(feature)?;
+        let source = self
+            .simplex_source
+            .as_ref()
+            .ok_or(invalid("one-simplex source required"))?;
+        let degree = self.operators[0].window().degree();
+        let birth = crate::complex::SimplexId(feature.birth);
+        if FilteredComplex::dimension(source.as_ref(), birth) != degree {
+            return Err(invalid("birth event has the wrong degree"));
+        }
+        let at_birth = self.stage(feature.birth)?.window();
+        let index = at_birth.bases()[1]
+            .iter()
+            .position(|&id| id == birth)
+            .ok_or(invalid("missing birth simplex"))?;
+        if feature.history[0][index] == 0 {
+            return Err(invalid("history does not contain its birth simplex"));
+        }
+        let death = if let Some(stage) = feature.death {
+            let death = crate::complex::SimplexId(stage);
+            if FilteredComplex::dimension(source.as_ref(), death) != degree + 1 {
+                return Err(invalid("death event has the wrong degree"));
+            }
+            Some(death)
+        } else {
+            None
+        };
+        Ok((birth, death))
+    }
+    /// Original vertex lists for a raw current-degree chain at a stage.
+    /// A raw chain need not be a cycle. Geometry uses original vertex IDs;
+    /// Euclidean/periodic coordinates and their units remain caller data.
+    pub fn locate_chain(&self, stage: usize, chain: &[u8]) -> Result<Vec<Vec<usize>>> {
+        let op = self.stage(stage)?;
+        super::matrix::check_vector(chain, op.window().weights().len())?;
+        let source = self
+            .simplex_source
+            .as_ref()
+            .ok_or(invalid("one-simplex source required"))?;
+        chain
+            .iter()
+            .zip(&op.window().bases()[1])
+            .filter(|(b, _)| **b != 0)
+            .map(|(_, &id)| {
+                Ok(source
+                    .simplex(id)
+                    .ok_or(invalid("missing source simplex"))?
+                    .vertices()
+                    .to_vec())
+            })
+            .collect()
+    }
+    /// Construct the explicitly costed upper-degree window at a finite death.
+    /// Weights follow its ordered upper-simplex basis; the cost unit is separate
+    /// from both lower-chain costs and filtration scales.
+    pub fn filling_window(
+        &self,
+        feature: &Feature,
+        weights: Vec<u64>,
+        unit: &str,
+        execution: &Execution<'_>,
+    ) -> Result<super::ChainWindow<crate::complex::SimplexId>> {
+        self.feature_pairing(feature)?;
+        let stage = feature.death.ok_or(invalid("finite death required"))?;
+        let source = self
+            .simplex_source
+            .as_ref()
+            .ok_or(invalid("one-simplex source required"))?;
+        let lower = self.stage(stage)?.window();
+        simplex_window(
+            source,
+            lower.degree() + 1,
+            stage + 1,
+            weights,
+            lower.source(),
+            unit,
+            &mut WorkBudget::new(execution)?,
+        )
+    }
+    /// Exact H1 minimum in the birth-stage historical class, with unit edge
+    /// costs. This query does not change P or the interval decomposition. Ties
+    /// use the smallest bitset; boundary rank above 16 is outside replay scope.
+    pub fn optimal_1_cycle(
+        &self,
+        feature: &Feature,
+        execution: &Execution<'_>,
+    ) -> Result<MinimumChain<crate::complex::SimplexId>> {
+        let mut budget = WorkBudget::new(execution)?;
+        self.feature_pairing(feature)?;
+        let op = self.stage(feature.birth)?;
+        if op.window().degree() != 1 || op.window().weights().iter().any(|&w| w != 1) {
+            return Err(invalid("birth-pair cycle requires H1 and unit edge costs"));
+        }
+        if op.window().boundaries()[1].reduce(&mut budget)?.1.len() > 16 {
+            return Err(invalid(
+                "exact birth-cycle requires boundary rank at most 16",
+            ));
+        }
+        op.minimum_class_work(&feature.history[0], false, &mut budget)
+    }
+    /// Exact finite H1/H2 pair volume. Contains the death simplex, uses only
+    /// upper simplices strictly after birth and before death, has birth boundary
+    /// coefficient one and zero boundary on intervening degree-k simplices.
+    /// It need not represent the chosen history class. Costs come from `upper`.
+    /// `None` means no finite death (outside the volume domain).
+    pub fn optimal_volume(
+        &self,
+        feature: &Feature,
+        upper: &super::ChainWindow<crate::complex::SimplexId>,
+        execution: &Execution<'_>,
+    ) -> Result<Option<MinimumChain<crate::complex::SimplexId>>> {
+        self.pair_volume(feature, upper, None, &mut WorkBudget::new(execution)?)
+    }
+    /// Exact Definition 6 stable-volume optimization for integer-valued scales
+    /// and a positive integer epsilon, both exactly representable as f64.
+    /// `filtration_unit` declares scale units independently of upper-chain costs.
+    /// Uses the exact cutoff birth+epsilon, includes the death simplex, and
+    /// imposes no birth coefficient or history-class constraint. This result
+    /// certifies optimization only, not a geometric perturbation guarantee.
+    pub fn stable_volume(
+        &self,
+        feature: &Feature,
+        upper: &super::ChainWindow<crate::complex::SimplexId>,
+        epsilon: u64,
+        filtration_unit: &str,
+        execution: &Execution<'_>,
+    ) -> Result<Option<MinimumChain<crate::complex::SimplexId>>> {
+        let mut budget = WorkBudget::new(execution)?;
+        self.check_feature(feature)?;
+        if epsilon == 0 || epsilon > (1_u64 << 53) || filtration_unit.trim().is_empty() {
+            return Err(invalid(
+                "positive exact integer epsilon and filtration unit required",
+            ));
+        }
+        budget.step_by(self.scales.len())?;
+        if self
+            .scales
+            .iter()
+            .any(|x| x.fract() != 0. || x.abs() > (1_u64 << 53) as f64)
+        {
+            return Err(invalid(
+                "stable volume requires exact integer filtration scales within 2^53",
+            ));
+        }
+        let birth = self.scales[feature.birth] as i64;
+        let cutoff = birth
+            .checked_add(epsilon as i64)
+            .filter(|x| x.unsigned_abs() <= (1_u64 << 53))
+            .ok_or(invalid("exact stable cutoff outside 2^53"))?;
+        self.pair_volume(feature, upper, Some(cutoff), &mut budget)
+    }
+    fn pair_volume<const C: bool>(
+        &self,
+        feature: &Feature,
+        upper: &super::ChainWindow<crate::complex::SimplexId>,
+        cutoff: Option<i64>,
+        budget: &mut WorkBudget<'_, C>,
+    ) -> Result<Option<MinimumChain<crate::complex::SimplexId>>> {
+        self.feature_pairing(feature)?;
+        let Some(stage) = feature.death else {
+            return Ok(None);
+        };
+        let window = self.stage(stage)?.window();
+        if !matches!(window.degree(), 1 | 2) {
+            return Err(invalid("pair volume requires H1 or H2"));
+        }
+        window.check_upper(upper, budget)?;
+        let d = &window.boundaries()[1];
+        let after = |id: &crate::complex::SimplexId| {
+            cutoff.map_or(id.index() > feature.birth, |c| {
+                self.scales[id.index()] >= c as f64
+            })
+        };
+        let allowed: Vec<_> = window.bases()[2]
+            .iter()
+            .enumerate()
+            .filter(|(_, id)| id.index() < stage && after(id))
+            .map(|(j, _)| j)
+            .collect();
+        let mut rows: Vec<_> = window.bases()[1]
+            .iter()
+            .enumerate()
+            .filter(|(_, id)| id.index() < stage && after(id))
+            .map(|(i, _)| i)
+            .collect();
+        let birth = window.bases()[1]
+            .iter()
+            .position(|id| id.index() == feature.birth)
+            .ok_or(invalid("missing birth simplex"))?;
+        let death = window.bases()[2]
+            .iter()
+            .position(|id| id.index() == stage)
+            .ok_or(invalid("missing death simplex"))?;
+        if cutoff.is_none() {
+            rows.insert(0, birth);
+        }
+        budget.step_by(rows.len())?;
+        let mut seed = vec![0; d.ncols()];
+        seed[death] = 1;
+        let anchor = cutoff.is_some() && rows.iter().all(|&i| !d.bit(i, death));
+        let (chain, mass, examined) = if anchor {
+            budget.step()?;
+            (seed, upper.weights()[death], 1)
+        } else {
+            let constraint = F2Matrix::from_rows(
+                &rows
+                    .iter()
+                    .map(|&i| allowed.iter().map(|&j| u8::from(d.bit(i, j))).collect())
+                    .collect::<Vec<_>>(),
+                allowed.len(),
+            )?;
+            let rhs: Vec<_> = rows
+                .iter()
+                .map(|&i| u8::from(d.bit(i, death)) ^ u8::from(cutoff.is_none() && i == birth))
+                .collect();
+            let prepared = constraint.prepare(true, budget)?;
+            let free = prepared
+                .solve(&rhs, budget)?
+                .ok_or(invalid("certified pair has no feasible volume"))?;
+            let kernel = prepared.kernel(budget)?;
+            if kernel.len() > 16 {
+                return Err(invalid(
+                    "exact volume requires constraint nullity at most 16",
+                ));
+            }
+            for (&j, &bit) in allowed.iter().zip(&free) {
+                seed[j] = bit;
+            }
+            let basis = kernel
+                .iter()
+                .map(|v| embed(v, &allowed, d.ncols(), budget))
+                .collect::<Result<Vec<_>>>()?;
+            minimum_affine(&seed, &basis, upper.weights(), false, budget)?
+        };
+        let boundary = d.apply_with(&chain, budget)?;
+        if chain[death] != 1
+            || cutoff.is_none() && boundary[birth] != 1
+            || rows
+                .iter()
+                .any(|&i| boundary[i] != u8::from(cutoff.is_none() && i == birth))
+        {
+            return Err(invalid("volume failed independent boundary constraints"));
+        }
+        budget.check()?;
+        Ok(Some(MinimumChain {
+            window: Arc::new(upper.clone()),
+            chain,
+            mass,
+            boundary,
+            witness: None,
+            examined,
+        }))
+    }
     /// Extract and solve borrowed stages of one frozen simplicial source.
     ///
     /// Checks the actual [`crate::filtration::SimplicialStage::inclusion_into`]
@@ -406,6 +934,52 @@ impl OperatorFamily<crate::complex::SimplexId> {
             &mut budget,
         )
     }
+}
+
+fn simplex_window<const C: bool>(
+    complex: &crate::complex::SimplicialComplex,
+    degree: usize,
+    count: usize,
+    weights: Vec<u64>,
+    source: &str,
+    unit: &str,
+    budget: &mut WorkBudget<'_, C>,
+) -> Result<super::ChainWindow<crate::complex::SimplexId>> {
+    let next = degree.checked_add(1).ok_or(crate::Error::SizeOverflow {
+        operation: "chain degree",
+    })?;
+    let mut bases: [Vec<_>; 3] = std::array::from_fn(|_| Vec::new());
+    for id in complex.cells().take(count) {
+        budget.step()?;
+        let dim = FilteredComplex::dimension(complex, id);
+        if degree > 0 && dim == degree - 1 {
+            bases[0].push(id);
+        }
+        if dim == degree {
+            bases[1].push(id);
+        }
+        if dim == next {
+            bases[2].push(id);
+        }
+    }
+    let mut a = F2Matrix::zero(bases[0].len(), bases[1].len())?;
+    let mut d = F2Matrix::zero(bases[1].len(), bases[2].len())?;
+    for (matrix, rows, columns) in [
+        (&mut a, &bases[0], &bases[1]),
+        (&mut d, &bases[1], &bases[2]),
+    ] {
+        let positions: HashMap<_, _> = rows.iter().enumerate().map(|(i, &id)| (id, i)).collect();
+        for (j, &id) in columns.iter().enumerate() {
+            for (face, coefficient) in FilteredComplex::boundary(complex, id) {
+                budget.step()?;
+                if coefficient.rem_euclid(2) != 0 {
+                    let i = *positions.get(&face).ok_or(invalid("prefix omits a face"))?;
+                    matrix.toggle(i, j)?;
+                }
+            }
+        }
+    }
+    super::ChainWindow::new_work(degree, [a, d], bases, weights, source, unit, budget)
 }
 
 // Small rank table; no projection or persistence storage contract is exposed.

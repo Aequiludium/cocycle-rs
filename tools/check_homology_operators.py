@@ -17,7 +17,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = "3daff9bd69033d1ee9c5cba5026bfff94df8d6ac"
+PIN = "a11bf50b8c8320651e9ac015566778d957af9c17"
 
 
 def digest(paths):
@@ -255,6 +255,97 @@ def compare(first, second):
             raise RuntimeError(f"exact mismatch in {key}")
 
 
+def geometry_checks(args):
+    """Replay pinned T1--T5 with independent raw-simplex feasible-set enumeration."""
+    from itertools import combinations, product
+    sys.path[:0] = [str(args.reference / "src"), str(args.reference / "tests")]
+    from homology_operator import minimum_filling
+    from test_stable_volume import build_case, upper_costs
+    corpus_path = args.reference / "tests/fixtures/geometry_queries.json"
+    corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+    canonical = json.dumps(corpus["cases"], sort_keys=True, separators=(",", ":")).encode()
+    if hashlib.sha256(canonical).hexdigest() != corpus["corpus_sha256"]:
+        raise ValueError("geometry corpus digest differs")
+    results = []
+    for case in corpus["cases"]:
+        # Cocycle owns the frozen filtration order, including decreasing colex
+        # within tied dimensions. Give every implementation that same order.
+        events = sorted(zip(case["levels"], case["simplices"]),
+                        key=lambda x: (x[0], len(x[1]), tuple(-v for v in reversed(x[1]))))
+        case = {**case, "levels": [x[0] for x in events], "simplices": [x[1] for x in events]}
+        cells = list(map(tuple, case["simplices"]))
+        wire_values = [str(case["degree"]), str(len(cells))]
+        for level, cell in events:
+            wire_values.extend(map(str, [level, len(cell), *cell]))
+        output = invoke([str(args.worker), "geometry"], args.output / f"geometry-{case['id']}.json", " ".join(wire_values) + "\n")
+        if output.get("state") != "Computed":
+            raise RuntimeError("geometry worker failed")
+        family = build_case(case)
+        references = family.features()
+        if references.state != "Computed" or len(references.value) != len(output["features"]):
+            raise RuntimeError(f"feature count differs for {case['id']}")
+        for record, ref in zip(output["features"], references.value):
+            birth, death = record["birth"], record["death"]
+            if (birth, death, record["occurrence"]) != (ref["birth_stage"], ref["death_stage"], ref["occurrence"]):
+                raise RuntimeError(f"feature endpoints differ for {case['id']}")
+            histories = [list(family.resolve_feature(ref, i).value["representative"])
+                         for i in range(birth, len(cells) if death is None else death)]
+            if record["histories"] != histories:
+                raise RuntimeError(f"historical generators differ for {case['id']} birth={birth}")
+            minimum = family.stage(birth).minimum_class_mass(tuple(histories[0]))
+            if minimum.state != "Computed" or (record["minimum_mass"], record["minimum"]) != (minimum.value, list(minimum.details["representative"])):
+                raise RuntimeError("minimum class mass differs")
+            basis = [s for s in cells[:birth+1] if len(s) == case["degree"]+1]
+            if record["locations"] != [list(s) for s, bit in zip(basis, histories[0]) if bit]:
+                raise RuntimeError("source locations differ")
+            if case["degree"] == 1:
+                cycle = family.optimal_1_cycle(ref)
+                if cycle.state != "Computed" or record["cycle"] != list(cycle.value["chain"]):
+                    raise RuntimeError("birth-pair minimum cycle differs")
+            if death is None:
+                if record["volumes"]:
+                    raise RuntimeError("infinite feature has a finite volume")
+                continue
+            upper_cells = [s for s in cells[:death+1] if len(s) == case["degree"]+2]
+            lower_cells = [s for s in cells[:death+1] if len(s) == case["degree"]+1]
+            for weighted, actual in enumerate(record["volumes"]):
+                weights = tuple(cells.index(s) % 5 + 1 if weighted else 1 for s in upper_cells)
+                upper = upper_costs(family, ref, weights if weighted else None)
+                volume = family.optimal_volume(ref, upper)
+                stable = family.stable_volume(ref, 1, upper, epsilon_unit="filtration time")
+                z = family.inclusion(birth, death).apply(tuple(histories[0]))
+                filling = minimum_filling(family.windows[death], z, upper)
+                for query, key, mass_key in ((volume, "volume", "mass"), (stable, "stable", "stable_mass"), (filling, "filling", "filling_mass")):
+                    if query.state != "Computed" or actual[key] != list(query.value["chain"]) or actual[mass_key] != query.value["mass"]:
+                        raise RuntimeError(f"{key} differs in {case['id']} birth={birth}")
+                # Raw set boundaries enumerate *every* upper chain; no reference
+                # matrix, rank, projection or constraint solver is used here.
+                feasible = {"volume": [], "stable": [], "filling": []}
+                for bits in product((0, 1), repeat=len(upper_cells)):
+                    selected = {s for s, b in zip(upper_cells, bits) if b}
+                    boundary = set()
+                    for s in selected:
+                        boundary.symmetric_difference_update(combinations(s, len(s)-1))
+                    mass = sum(w*b for w,b in zip(weights,bits))
+                    key = (mass, sum(b << i for i,b in enumerate(bits)))
+                    if boundary == {s for s,b in zip(lower_cells,z) if b}:
+                        feasible["filling"].append(key)
+                    for name, epsilon in (("volume", None), ("stable", 1)):
+                        after = lambda s: (cells.index(s) > birth if epsilon is None else case["levels"][cells.index(s)] >= case["levels"][birth]+epsilon)
+                        allowed = {s for s in upper_cells if cells.index(s) < death and after(s)} | {cells[death]}
+                        forbidden = {s for s in lower_cells if cells.index(s) < death and after(s)}
+                        if cells[death] in selected and selected <= allowed and not boundary & forbidden and (epsilon is not None or cells[birth] in boundary):
+                            feasible[name].append(key)
+                for name, mass_key in (("volume", "mass"), ("stable", "stable_mass"), ("filling", "filling_mass")):
+                    actual_key = (actual[mass_key], sum(b << i for i,b in enumerate(actual[name])))
+                    if not feasible[name] or min(feasible[name]) != actual_key:
+                        raise RuntimeError(f"independent raw-simplex enumeration rejected {name}")
+        results.append({"case": case["id"], "features": len(output["features"]), "state": "Passed",
+                        "reference_and_raw_set_oracle": True})
+    return {"corpus_sha256": corpus["corpus_sha256"], "file_sha256": hashlib.sha256(corpus_path.read_bytes()).hexdigest(), "cases": results,
+            "scope": "Cocycle source order; integer costs and epsilon=1; unit and weighted upper chains; no perturbation guarantee"}
+
+
 def main(args):
     if args.output.exists():
         raise ValueError("output directory must be fresh")
@@ -323,9 +414,11 @@ def main(args):
         oracle = {"state": "NotRun", "reason": "oracle Python was not supplied"}
     summary = {"correctness": correctness, "gudhi": oracle, "family": family,
                "exclusions": ["GUDHI has no projection, weighted representative or abstract-chain oracle",
-                              "global optimization, rational/float costs and Python snapshot restoration are not ported",
+                              "globally minimum-stretch projections, rational/float costs and Python snapshot restoration are not ported",
                               "finite final-stage continuation is unknown; reference constant extension is not adopted"],
                "measurements": []}
+    if args.geometry:
+        summary["geometry"] = geometry_checks(args)
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     external = len(engines) - 1 - int("baseline" in engines)
     print(f"Correctness: {len(correctness)} cases, {external} external comparisons per case, "
@@ -374,6 +467,7 @@ def parse():
     parser.add_argument("--reference-python", default=sys.executable)
     parser.add_argument("--oracle-python")
     parser.add_argument("--native-dir", type=Path)
+    parser.add_argument("--geometry", action="store_true", help="also compare T1--T5 queries and an independent raw-simplex oracle")
     parser.add_argument("--samples", type=int, default=0)
     parser.add_argument("--sizes", default="8,32,65")
     parser.add_argument("--seed", type=int, default=20261009)

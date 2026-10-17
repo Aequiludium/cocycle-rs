@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: proffitteoy/homology-operator
-          ref: 3daff9bd69033d1ee9c5cba5026bfff94df8d6ac
+          ref: a11bf50b8c8320651e9ac015566778d957af9c17
           path: target/operator-reference-source
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -53,7 +53,7 @@ jobs:
           PY
       - run: cargo build --locked --release
       - run: rustc --edition 2024 -C opt-level=3 tools/reference/homology_operator.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/homology-worker
-      - run: python tools/check_homology_operators.py --reference target/operator-reference-source --worker target/homology-worker --native-dir target/operator-extension --oracle-python python --samples 0 --output target/operator-correctness
+      - run: python tools/check_homology_operators.py --reference target/operator-reference-source --worker target/homology-worker --native-dir target/operator-extension --oracle-python python --geometry --samples 0 --output target/operator-correctness
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

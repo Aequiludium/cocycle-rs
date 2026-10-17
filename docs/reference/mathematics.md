@@ -967,5 +967,44 @@ stage bases during adjacent preparation, then forms the rank table. Explicit
 maps and the rank table have quadratic worst-case storage costs; this is not an
 RSS bound. No persistent family cache or streaming barcode is introduced.
 The [operator guide](../guides/homology-operators.md) owns the input, lifetime,
-cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
+cost and execution API; the [comparison report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/homology-operators.md)
 separates finite implementation checks from these algebraic derivations.
+
+### Exact affine minima and historical generators
+
+For a cycle z, `minimum_class_mass` minimizes mass_w(x) over x=z+D c. A basis
+of im(D) enumerates every representative once. The returned original-basis
+witness solves D c=z+x independently of the search coefficients. Strictly
+positive integer costs make the zero chain uniquely minimal when attainable.
+Otherwise exhaustive completion proves optimality in this one class. This
+does not minimize stretch over legal projections and leaves P unchanged.
+
+For a fixed cycle z and an explicit upper-degree cost window, a filling solves
+D c=z. A particular solution c0 and ker(D) parameterize all feasible fillings.
+An inconsistent system proves infeasibility. Enumeration of c0+ker(D) with
+checked positive integer costs yields a minimum; ties use the smallest original
+coordinate bitset. The zero boundary has the zero filling as its unique minimum.
+
+Historical feature extraction processes adjacent maps in birth order. When a
+generator image depends on surviving older generators, XOR those combinations
+through its complete prior history so it maps to zero at death. Extend the
+surviving image basis by independent target coordinate units for new births.
+Raw A/D checks verify cycles, full quotient bases, adjacent transport and death
+membership. Endpoint multiplicities alone cannot supply these corrected chains.
+
+For a certified one-simplex insertion source, let b be the birth event and d
+the finite death event. The pair-volume chain c has c_d=1 and may use upper
+simplices with b<j<d. Its boundary has coefficient one at b and zero on every
+degree-k simplex with b<j<d. Minimize the explicitly supplied upper-chain mass
+under these linear F2 constraints. This definition need not preserve the chosen
+historical class. Stable-volume [Definition 6](bibliography.md#ob23) instead uses the exact cutoff
+scale(b)+epsilon for both allowed upper simplices and zero-boundary rows, and
+does not constrain the birth coefficient. A feasible death-only chain attains
+the lower bound given by its positive cost. Otherwise enumerate the affine
+constraint kernel. Supported nullities are bounded by 16, except the general
+class query, which relies on the caller's cooperative execution limit.
+
+The implementation certifies these finite optimization problems only. It does
+not infer a perturbation theorem from an exact minimum. Integer scale bounds,
+units, unsupported weight/location domains and failure behavior are specified
+in the [operator guide](../guides/homology-operators.md#exact-minima-and-historical-simplex-features).

@@ -4,7 +4,7 @@
 
 This protocol concerns feasible weighted F2 projections, separately from native
 persistence/diagram-distance rankings. The reference is homology-operator
-`3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`, with MIT attribution in the
+`a11bf50b8c8320651e9ac015566778d957af9c17`, with MIT attribution in the
 [third-party notices](../THIRD_PARTY_NOTICES.md). Use a clean reference checkout
 at that commit. It is external infrastructure, never a Rust runtime dependency.
 
@@ -17,7 +17,7 @@ rustc --edition 2024 -C opt-level=3 tools/reference/homology_operator.rs \
   -L dependency=target/release/deps -o target/homology-worker
 python3 tools/check_homology_operators.py --reference /path/to/pinned-reference \
   --worker target/homology-worker --oracle-python /path/to/gudhi-python \
-  --output target/operator-correctness
+  --geometry --output target/operator-correctness
 ```
 
 On Windows the worker filename ends in `.exe`. `--native-dir` may identify a
@@ -50,8 +50,24 @@ Public Rust tests check imported projections, identity mixing, cancellation,
 work exhaustion, overflow, basis permutations and variable/inherited costs.
 The example exercises the actual `FilteredComplex` extraction path.
 
+`--geometry` additionally reads the pinned `geometry_queries.json` T1--T5
+corpus, verifies its semantic digest, and gives every implementation Cocycle's
+same frozen simplex order. It compares full historical generators, endpoints,
+occurrences, source vertices, exact class minima, H1 unit birth cycles, fixed
+fillings and H1/H2 optimal/stable volumes. Upper costs include both unit counts
+and deterministic positive integer weights. Independent raw-simplex subset
+enumeration checks every filling and volume feasible set and minimum with
+epsilon=1. Raw worker output and corpus byte/semantic hashes are retained.
+The weighted queries execute the Python reference, not a new native geometry
+kernel. The optional native extension still compares feasible P/actions.
+
+The geometry comparison imports the pinned source's test builders. They are
+verification infrastructure only. The source provides exact integer/Fraction
+scales; Rust accepts the shared exact integer subset for stable volume. Neither
+this comparison nor GUDHI establishes a convex-fan perturbation guarantee.
+
 GUDHI has no comparable weighted projection/action oracle for these general
-chain windows. There are explicit exclusions for global optimization, arbitrary
+chain windows. There are explicit exclusions for globally minimum-stretch projections, arbitrary
 precision/rational/float costs, Python snapshots, general linear maps and the
 upstream's constant final extension. Ripser/Topp are not operator solvers and
 are inapplicable to this new domain. Existing persistence and distance kernels

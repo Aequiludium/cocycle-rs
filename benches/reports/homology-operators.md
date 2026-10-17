@@ -267,3 +267,51 @@ Initial Linux summary SHA256:
 Individual worker/fixture/source identities and all failures remain in their own
 group metadata. Reports are source-bound observations, not measurements of a later
 documentation commit or release.
+
+## 2026-10-17 bounded geometry-query synchronization
+
+This candidate extends the feasible F2 domain with the geometry
+queries added after the reference's PR #93. Earlier measurements and reference
+pins above remain historical; this section records correctness, not a speedup.
+
+| Item | Verified scope |
+| --- | --- |
+| Cocycle base | `30f1e0cd4ea46aae7ec0dbc4dc522ff8a4daac44`, fetched `origin/main` |
+| Reference | `a11bf50b8c8320651e9ac015566778d957af9c17`, 23 commits after `3daff9b`; no open reference PRs at inspection |
+| New queries | Exact integer class minima and raw-D witnesses; explicitly costed minimum fillings; family-bound historical generators and resolution; one-simplex provenance; unit H1 birth cycles; finite H1/H2 pair and stable volumes |
+| Public contracts | [Operator guide](../../docs/guides/homology-operators.md#exact-minima-and-historical-simplex-features) and strict rustdoc; existing selected-P readouts retain their semantics |
+| Feasible regression | 50 fixtures, exact P/actions/masses against Python `FeasibleSolver` and actual `NativeFactorizedSolver` |
+| Native source | No `native/` source changes between `3daff9b` and `a11bf50`; the retained extension's binary/source hashes remain recorded |
+| Independent topology | GUDHI 3.11.0, F2 triangle Betti stages `(3,0)/(1,1)/(1,0,0)` and H1 `[1,2)` |
+| Geometry corpus | T1--T5, 11 features in the shared Cocycle source order; exact endpoints, occurrences, histories, locations, minima and birth-cycle agreement |
+| Raw geometry control | Enumerate all upper-simplex subsets independently; compare unit and weighted fixed fillings, optimal volumes and epsilon=1 stable volumes, including bitset ties |
+| Corpus semantic SHA-256 | `86611887bbc278a9e5c28c6a31b63570bb75c2f8754ed6f247856889b1dfa24c` |
+| Corpus file SHA-256 | `babd5ec38b772c94bc0a0383dde55d4a61bb70a6c776057766b00bc0e0c44256` |
+| Rust checks | Debug/release/MSRV 1.91 each 243 passed, four existing ignored tests; all-target MSRV check, Clippy, formatting and strict rustdoc passed |
+| Usage/package | All eleven runnable examples, affected Markdown doctests, package verification, packaged documentation and packaged operator example passed |
+| Tool checks | WSL Ubuntu 105/105 passed; Windows run retains one missing Unix `resource` error and five skips |
+| Verification boundary | Local pre-submission results; CI configuration updated for the new pin and `--geometry`. Hosted checks belong to the submitted PR's exact head and are recorded there separately |
+
+The independent Rust class test additionally covers all 64 binary 3-by-2
+boundary matrices and all eight input classes with direct coset enumeration.
+Hand fixtures check cheap upper fillings, zero versus infeasible results,
+integer overflow, noncycles, work failure, corrected dying histories, repeated
+endpoint occurrences and family-run mixing.
+
+Reproduce using the [protocol](../homology-operators.md), with `--geometry`.
+Raw evidence in this checkout is retained under `target/sync-correctness-final`
+(and the earlier `target/sync-correctness-001`), with code/worker/reference
+hashes, fixtures and process output. Verification logs are under
+`target/sync-verification`; MSRV and platform tool logs remain under `target/`.
+These paths are ignored artifacts, outside the package and source history.
+
+This is the bounded native Rust contract. Costs are positive `u64`; stable
+scales and epsilon use the exact integer subset within +/-2^53. Specialized
+birth-cycle queries accept unit edges; source locations retain original vertex
+IDs. Rational/float costs, Euclidean-length certification, periodic coordinates,
+Python snapshot schemas and a convex-fan perturbation guarantee are not ported.
+General class minimization remains exponential in boundary rank. Nonzero
+fillings, birth cycles and affine volume searches retain the reference's
+rank/nullity<=16 replay domain, with the positive-cost stable-anchor shortcut.
+No partial candidate is labeled optimal after resource failure, and no global
+minimum-stretch projection, new timing result, merge or release is claimed.
