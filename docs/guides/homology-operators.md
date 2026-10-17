@@ -223,9 +223,9 @@ lists for supported raw chains. Existing `from_stages` groups by scale and
 cannot certify individual simplex pairs. Equal source labels do not establish
 such provenance.
 
-This is an **eager small-scale exact reference interface**. Source incidence is
-extracted once and each insertion restricts its ordered degree bases, but every
-stage still receives an independently solved and validated operator. All stage
+This is an **eager small-scale exact reference interface**. Each insertion
+extracts its chain window and receives an independently solved and validated
+operator. All stage
 windows/actions are retained. For N insertions, retained basis/matrix data can
 grow quadratically or worse with N and degree sizes; no input-size-independent
 memory bound follows from a successful query. `Execution` limits counted work,

@@ -115,28 +115,6 @@ impl F2Matrix {
     pub fn ncols(&self) -> usize {
         self.n
     }
-    // A face-first insertion prefix restricts each ordered degree basis to a
-    // prefix. Copy its nonzeros without rereading source incidence or dense rows.
-    pub(super) fn prefix<const C: bool>(
-        &self,
-        nrows: usize,
-        ncols: usize,
-        budget: &mut WorkBudget<'_, C>,
-    ) -> Result<Self> {
-        if nrows > self.m || ncols > self.n {
-            return Err(invalid("matrix prefix exceeds its source"));
-        }
-        let mut output = Self::zero(nrows, ncols)?;
-        for i in 0..nrows {
-            budget.step_by(self.words)?;
-            for j in self.indices(i).take_while(|&j| j < ncols) {
-                budget.step()?;
-                output.set(i, j)?;
-            }
-        }
-        budget.check()?;
-        Ok(output)
-    }
     /// Read one logical row; an out-of-range position is an error.
     pub fn row(&self, row: usize) -> Result<Vec<u8>> {
         if row >= self.m {
@@ -765,28 +743,5 @@ mod tests {
             assert_eq!(&dependency[..2], &[1, 1]);
             assert!(dependency[2..].iter().all(|&b| b == 0));
         }
-    }
-
-    #[test]
-    fn prefix_preserves_sparse_and_empty_shapes() {
-        let mut columns = vec![vec![]; 513];
-        columns[0] = vec![0, 2];
-        columns[64] = vec![1];
-        columns[512] = vec![2];
-        let source = F2Matrix::from_sparse_columns(&columns, 3).unwrap();
-        for rows in 0..=3 {
-            for cols in [0, 1, 64, 65, 512, 513] {
-                let prefix = source
-                    .prefix(rows, cols, &mut WorkBudget::unlimited())
-                    .unwrap();
-                assert_eq!((prefix.nrows(), prefix.ncols()), (rows, cols));
-                for i in 0..rows {
-                    for j in 0..cols {
-                        assert_eq!(prefix.bit(i, j), source.bit(i, j));
-                    }
-                }
-            }
-        }
-        assert!(source.prefix(4, 1, &mut WorkBudget::unlimited()).is_err());
     }
 }

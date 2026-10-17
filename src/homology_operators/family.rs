@@ -516,7 +516,9 @@ impl<Id: Clone + Eq + Hash> OperatorFamily<Id> {
                 }
                 columns.push(z.clone());
             }
-            let boundary_space = d.prepare(true, budget)?;
+            // Only dying histories need a raw-D solve. Rank-only stages must
+            // not allocate a full row transform merely to certify independence.
+            let boundary_space = d.prepare(features.iter().any(|f| f.death == Some(i)), budget)?;
             let rank_d = boundary_space.rank();
             let rank_joined = F2Matrix::from_columns(&columns, d.nrows())?
                 .reduce(budget)?
@@ -575,7 +577,7 @@ impl OperatorFamily<crate::complex::SimplexId> {
     /// degree-k basis and are inherited. The owned source preserves original
     /// vertex IDs and certifies event provenance; no PH reducer supplies results.
     /// Unlike `from_stages`, this constructor can certify simplex pair queries.
-    /// This eager small-scale reference extracts source incidence once, then
+    /// This eager small-scale reference extracts each insertion window, then
     /// independently constructs and retains one operator per insertion. Total
     /// storage is the sum of all stage windows/actions and can grow quadratically
     /// or worse. Work controls are cooperative, not a memory quota; callers must
@@ -589,47 +591,25 @@ impl OperatorFamily<crate::complex::SimplexId> {
         execution: &Execution<'_>,
     ) -> Result<Self> {
         let mut budget = WorkBudget::new(execution)?;
-        if complex.is_empty() {
+        let ids = complex
+            .cells()
+            .filter(|&id| FilteredComplex::dimension(complex, id) == degree)
+            .collect::<Vec<_>>();
+        if weights.len() != ids.len() || complex.is_empty() {
             return Err(invalid(
                 "nonempty simplex source and one cost per degree-k simplex required",
             ));
         }
-        // Source extraction is performed once. Each face-first stage restricts
-        // these three ordered bases; feasible actions are still independently
-        // solved/validated and retained, as documented for this bounded API.
-        let full = super::ChainWindow::from_complex_work(
-            complex,
-            degree,
-            None,
-            weights,
-            source,
-            unit,
-            &mut budget,
-        )?;
-        let mut counts = [0; 3];
         let mut operators = Vec::new();
         for i in 0..complex.len() {
             budget.step()?;
-            for (count, basis) in counts.iter_mut().zip(full.bases()) {
-                while *count < basis.len() && basis[*count].index() <= i {
-                    budget.step()?;
-                    *count += 1;
-                }
-            }
-            let boundaries = [
-                full.boundaries()[0].prefix(counts[0], counts[1], &mut budget)?,
-                full.boundaries()[1].prefix(counts[1], counts[2], &mut budget)?,
-            ];
-            let bases = std::array::from_fn(|d| full.bases()[d][..counts[d]].to_vec());
-            let window = super::ChainWindow::new_work(
-                degree,
-                boundaries,
-                bases,
-                full.weights()[..counts[1]].to_vec(),
-                source,
-                unit,
-                &mut budget,
-            )?;
+            let costs = ids
+                .iter()
+                .zip(&weights)
+                .filter(|(id, _)| id.index() <= i)
+                .map(|(_, &w)| w)
+                .collect();
+            let window = simplex_window(complex, degree, i + 1, costs, source, unit, &mut budget)?;
             operators.push(HomologyOperator::feasible_work(window, &mut budget)?);
         }
         let mut family = Self::new_work(

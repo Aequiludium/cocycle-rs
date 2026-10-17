@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Reuse source incidence and incremental adjacent column bases in exact F2
-  family/history queries; retain independent raw-boundary validation and document
+- Reuse incremental adjacent column bases in exact F2 family/history queries;
+  retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and
   nullity boundary tests, and isolate CI checkout credentials from reference code.
 
