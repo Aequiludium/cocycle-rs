@@ -161,7 +161,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `persistence` | Algorithms, options, interval and representative assembly | Algebra, geometry, filtration, diagram, execution |
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
 | `descriptors` | Read diagrams without recomputing persistence | Diagram, error utilities |
-| `homology_operators` | Validate ordered F2 windows, construct feasible projections and read integer class costs/finite maps | Complex/stage access, execution and error utilities; no persistence engine dependency |
+| `homology_operators` | Validate ordered F2 windows, construct feasible projections, minimize integer chain costs and read finite maps/historical features with simplex pair volumes | Complex/stage access, execution and error utilities; no persistence engine dependency |
 | `diagram_distances` | Match complete diagrams with bottleneck/L-infinity, W1/L-infinity or W2/Euclidean costs | Diagram and filtration scale types, execution, error utilities |
 | `optimization` | Critical sets and maximum-displacement targets on a frozen simplicial source | Complex, algebra sparse reduction, execution, error utilities |
 

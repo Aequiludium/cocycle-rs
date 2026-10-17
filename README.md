@@ -121,7 +121,8 @@ without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
 The unreleased source API also provides [F2 homology operators](docs/guides/homology-operators.md):
-run `cargo run --locked --example homology_operators` for class queries and finite transport.
+run `cargo run --locked --example homology_operators` for class queries, finite
+transport and bounded exact integer geometry queries on historical features.
 
 Read the [published API reference](https://docs.rs/cocycle), or build it locally
 with `cargo doc --no-deps --open`. From a repository

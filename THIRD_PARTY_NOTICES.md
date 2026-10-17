@@ -2,10 +2,11 @@
 
 ## homology-operator
 
-The F2 generalized-inverse, stable packed elimination and factorized projection
+The F2 generalized-inverse, stable packed elimination, factorized projection,
+affine minimum searches, historical interval correction and pair-volume constraints
 in `src/homology_operators/` are adapted from
 [homology-operator](https://github.com/proffitteoy/homology-operator) at
-`3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`. Its Python/PyO3 interface is not a
+`a11bf50b8c8320651e9ac015566778d957af9c17`. Its Python/PyO3 interface is not a
 runtime dependency. The original MIT notice follows.
 
 MIT License

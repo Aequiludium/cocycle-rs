@@ -45,5 +45,32 @@ fn main() -> Result<()> {
         query.selected_mass(),
         family.barcode()?
     );
+    let controls = Execution::default().max_work(1_000_000);
+    let inserted =
+        OperatorFamily::from_simplices(&source, 1, vec![1; 3], "triangle-v1", "edges", &controls)?;
+    let features = inserted.features(&controls)?;
+    let feature = &features[0];
+    let cycle = inserted.optimal_1_cycle(feature, &controls)?;
+    assert_eq!(cycle.mass(), 3);
+    let upper = inserted.filling_window(feature, vec![7], "face cost", &controls)?;
+    let volume = inserted
+        .optimal_volume(feature, &upper, &controls)?
+        .unwrap();
+    assert_eq!(volume.mass(), 7);
+    let stable = inserted
+        .stable_volume(feature, &upper, 1, "filtration time", &controls)?
+        .unwrap();
+    assert_eq!(stable.chain(), volume.chain());
+    let death = feature.death().unwrap();
+    let minimum = inserted
+        .stage(death)?
+        .minimum_filling(volume.boundary(), &upper, &controls)?
+        .unwrap();
+    assert_eq!(minimum.mass(), 7);
+    println!(
+        "minimum cycle edges: {:?}; minimum upper mass: {}",
+        inserted.locate_chain(feature.birth(), cycle.chain())?,
+        volume.mass()
+    );
     Ok(())
 }

@@ -267,3 +267,154 @@ Initial Linux summary SHA256:
 Individual worker/fixture/source identities and all failures remain in their own
 group metadata. Reports are source-bound observations, not measurements of a later
 documentation commit or release.
+
+## 2026-10-17 bounded geometry-query synchronization
+
+This candidate extends the feasible F2 domain with the geometry
+queries added after the reference's PR #93. Earlier measurements and reference
+pins above remain historical; this section records correctness, not a speedup.
+
+| Item | Verified scope |
+| --- | --- |
+| Cocycle base | `30f1e0cd4ea46aae7ec0dbc4dc522ff8a4daac44`, fetched `origin/main` |
+| Reference | `a11bf50b8c8320651e9ac015566778d957af9c17`, 23 commits after `3daff9b`; no open reference PRs at inspection |
+| New queries | Exact integer class minima and raw-D witnesses; explicitly costed minimum fillings; family-bound historical generators and resolution; one-simplex provenance; unit H1 birth cycles; finite H1/H2 pair and stable volumes |
+| Public contracts | [Operator guide](../../docs/guides/homology-operators.md#exact-minima-and-historical-simplex-features) and strict rustdoc; existing selected-P readouts retain their semantics |
+| Feasible regression | 50 fixtures, exact P/actions/masses against Python `FeasibleSolver` and actual `NativeFactorizedSolver` |
+| Native source | No `native/` source changes between `3daff9b` and `a11bf50`; the retained extension's binary/source hashes remain recorded |
+| Independent topology | GUDHI 3.11.0, F2 triangle Betti stages `(3,0)/(1,1)/(1,0,0)` and H1 `[1,2)` |
+| Geometry corpus | T1--T5, 11 features in the shared Cocycle source order; exact endpoints, occurrences, histories, locations, minima and birth-cycle agreement |
+| Raw geometry control | Enumerate all upper-simplex subsets independently; compare unit and weighted fixed fillings, optimal volumes and epsilon=1 stable volumes, including bitset ties |
+| Corpus semantic SHA-256 | `86611887bbc278a9e5c28c6a31b63570bb75c2f8754ed6f247856889b1dfa24c` |
+| Corpus file SHA-256 | `babd5ec38b772c94bc0a0383dde55d4a61bb70a6c776057766b00bc0e0c44256` |
+| Rust checks | Debug/release/MSRV 1.91 each 243 passed, four existing ignored tests; all-target MSRV check, Clippy, formatting and strict rustdoc passed |
+| Usage/package | All eleven runnable examples, affected Markdown doctests, package verification, packaged documentation and packaged operator example passed |
+| Tool checks | WSL Ubuntu 105/105 passed; Windows run retains one missing Unix `resource` error and five skips |
+| Verification boundary | Local pre-submission results; CI configuration updated for the new pin and `--geometry`. Hosted checks belong to the submitted PR's exact head and are recorded there separately |
+
+The independent Rust class test additionally covers all 64 binary 3-by-2
+boundary matrices and all eight input classes with direct coset enumeration.
+Hand fixtures check cheap upper fillings, zero versus infeasible results,
+integer overflow, noncycles, work failure, corrected dying histories, repeated
+endpoint occurrences and family-run mixing.
+
+Reproduce using the [protocol](../homology-operators.md), with `--geometry`.
+Raw evidence in this checkout is retained under `target/sync-correctness-final`
+(and the earlier `target/sync-correctness-001`), with code/worker/reference
+hashes, fixtures and process output. Verification logs are under
+`target/sync-verification`; MSRV and platform tool logs remain under `target/`.
+These paths are ignored artifacts, outside the package and source history.
+
+This is the bounded native Rust contract. Costs are positive `u64`; stable
+scales and epsilon use the exact integer subset within +/-2^53. Specialized
+birth-cycle queries accept unit edges; source locations retain original vertex
+IDs. Rational/float costs, Euclidean-length certification, periodic coordinates,
+Python snapshot schemas and a convex-fan perturbation guarantee are not ported.
+General class minimization remains exponential in boundary rank. Nonzero
+fillings, birth cycles and affine volume searches retain the reference's
+rank/nullity<=16 replay domain, with the positive-cost stable-anchor shortcut.
+No partial candidate is labeled optimal after resource failure, and no global
+minimum-stretch projection, new timing result, merge or release is claimed.
+
+
+## 2026-10-17 review follow-up: owned family resources
+
+This addresses the review's credential, repeated-elimination, boundary-test and
+resource-evidence concerns. Both checkouts in the operator-reference CI job now
+use `persist-credentials: false`. Feature construction maintains incremental
+packed column spans, retains only adjacent temporary homology bases, and runs
+independent raw A/D verification in a separate included pass. Row transforms
+are prepared only for stages with dying histories. Complete output histories
+and every eager stage operator remain owned; this is still a small-scale exact
+reference interface rather than a general scalable persistence backend.
+
+| Identity / boundary | Recorded value |
+| --- | --- |
+| Original PR baseline | `a9939fe5833d489a8d3c7f421dc7691fea9bd68d` |
+| Measured candidate | `afe06f279f86e436b6c0c0d714cb0c9c7db1e8b0`, clean measured source |
+| Protocol / harness | `cocycle-f2-family-resources-v1`; shared worker/controller committed in `051bb4404349f6769aac7d47522d2dbb65ce5d61` |
+| Environment | WSL2 Ubuntu, Linux 6.6.87.2 x86_64; Core Ultra 7 155H; Rust 1.91.0; Python 3.12.3 |
+| Build | Release rlibs; shared worker compiled twice with `rustc --edition 2024 -C opt-level=3` |
+| Algebra / input | Supplied exact F2 H1, unit costs; face-first insertions, including repeated values; no point/metric construction |
+| Sampling | 10 fixtures x 2 operations x 2 engines x 10 fresh measured processes = 400; 40 warmups retained/discarded; seeded position-balanced serial order |
+| Limits / controls | 30 seconds and 512 MiB address space per worker; all 20 cells completed; affinity CPUs 0--21, host load/frequency uncontrolled |
+| Output validation | Every stage Betti sequence and interval list against an independent raw-simplex PH reducer; raw cycle/transport/death equations and exact before/after complete histories |
+| Timing | Construction includes all stage solves/validation and retention. Features start with an owned prepared family and include historical output plus independent validation. Fixture parsing/source validation/startup/JSON export excluded |
+| Memory | Linux pre-call RSS/HWM, post-call retained RSS and absolute pre-export HWM; source, runtime, prepared families and temporaries are included |
+
+Values below are median [minimum, maximum] over ten processes. Time ratio is
+baseline/candidate: above one means the candidate was faster in that cell.
+RSS is absolute process peak in MiB, not algorithm allocation or a memory cap.
+
+| Input (vertices / simplices) | Operation | Baseline ms | Candidate ms | Time ratio | Baseline peak MiB | Candidate peak MiB |
+| --- | --- | --- | --- | --- | --- | --- |
+| fan 4 / 11 | construct | 0.046 [0.044, 0.076] | 0.052 [0.047, 0.085] | 0.89 | 2.062 [2.062, 2.062] | 2.062 [2.062, 2.062] |
+| fan 4 / 11 | features | 0.133 [0.123, 0.194] | 0.027 [0.025, 0.031] | 4.93 | 2.234 [2.062, 2.406] | 2.062 [2.062, 2.234] |
+| fan 8 / 27 | construct | 0.216 [0.210, 0.223] | 0.342 [0.320, 0.569] | 0.63 | 2.234 [2.234, 2.234] | 2.234 [2.234, 2.234] |
+| fan 8 / 27 | features | 0.305 [0.289, 0.462] | 0.160 [0.158, 0.236] | 1.90 | 2.406 [2.234, 2.406] | 2.406 [2.234, 2.406] |
+| fan 16 / 59 | construct | 1.320 [1.265, 1.460] | 1.427 [1.394, 1.580] | 0.92 | 2.234 [2.234, 2.234] | 2.234 [2.234, 2.234] |
+| fan 16 / 59 | features | 1.724 [1.627, 3.576] | 1.219 [1.167, 2.573] | 1.41 | 2.492 [2.406, 2.578] | 2.406 [2.234, 2.406] |
+| fan 32 / 123 | construct | 9.930 [9.533, 10.457] | 10.199 [9.718, 11.483] | 0.97 | 2.578 [2.578, 2.578] | 2.578 [2.578, 2.578] |
+| fan 32 / 123 | features | 14.346 [13.457, 20.508] | 9.548 [9.240, 10.193] | 1.50 | 2.750 [2.750, 2.922] | 2.836 [2.750, 2.922] |
+| fan 64 / 251 | construct | 76.548 [72.355, 80.399] | 76.622 [73.783, 79.145] | 1.00 | 3.266 [3.266, 3.266] | 3.266 [3.266, 3.266] |
+| fan 64 / 251 | features | 148.035 [141.066, 152.017] | 79.953 [75.341, 82.829] | 1.85 | 4.469 [4.469, 4.641] | 4.469 [4.297, 4.469] |
+| graph 4 / 10 | construct | 0.039 [0.037, 0.060] | 0.041 [0.040, 0.044] | 0.94 | 2.062 [2.062, 2.062] | 2.062 [2.062, 2.062] |
+| graph 4 / 10 | features | 0.140 [0.134, 0.164] | 0.025 [0.025, 0.029] | 5.53 | 2.234 [2.062, 2.234] | 2.062 [2.062, 2.234] |
+| graph 6 / 21 | construct | 0.139 [0.138, 0.151] | 0.258 [0.240, 0.352] | 0.54 | 2.234 [2.234, 2.234] | 2.234 [2.234, 2.234] |
+| graph 6 / 21 | features | 0.328 [0.284, 0.477] | 0.155 [0.154, 0.164] | 2.12 | 2.406 [2.234, 2.406] | 2.406 [2.234, 2.406] |
+| graph 8 / 36 | construct | 0.451 [0.441, 0.522] | 0.566 [0.545, 0.609] | 0.80 | 2.234 [2.234, 2.234] | 2.234 [2.234, 2.234] |
+| graph 8 / 36 | features | 1.393 [1.279, 1.862] | 0.764 [0.723, 0.840] | 1.82 | 2.406 [2.234, 2.406] | 2.320 [2.234, 2.406] |
+| graph 12 / 78 | construct | 3.756 [3.588, 4.242] | 3.850 [3.755, 4.531] | 0.98 | 2.406 [2.406, 2.406] | 2.406 [2.406, 2.406] |
+| graph 12 / 78 | features | 23.182 [21.579, 25.611] | 9.224 [8.050, 11.035] | 2.51 | 2.578 [2.578, 2.750] | 2.578 [2.578, 2.750] |
+| graph 16 / 136 | construct | 18.882 [18.297, 20.202] | 18.899 [18.384, 20.852] | 1.00 | 2.578 [2.578, 2.578] | 2.578 [2.578, 2.578] |
+| graph 16 / 136 | features | 237.247 [214.590, 250.233] | 58.067 [53.359, 66.231] | 4.09 | 3.781 [3.609, 3.781] | 3.609 [3.438, 3.609] |
+
+Prepared-family RSS is part of the feature-call baseline. For the largest inputs:
+
+| Input | Baseline pre-feature RSS MiB | Candidate pre-feature RSS MiB |
+| --- | --- | --- |
+| fan 251 simplices | 3.266 [3.266, 3.266] | 3.266 [3.266, 3.266] |
+| graph 136 simplices | 2.578 [2.578, 2.578] | 2.578 [2.578, 2.578] |
+
+Feature medians improved by 1.41--5.53x on these ten inputs. At 251 fan simplices,
+construction remained about 77 ms and the feature query fell from about 148 to
+80 ms. The complete 16-vertex graph has 136 insertions and 105 surviving H1
+generators; its feature query fell from about 237 to 58 ms. These observations
+cover the named 10--251-stage families only. They do not establish a universal
+acceptable size, an asymptotic speedup, H2 performance, production admission or
+a general TDA workload guarantee.
+
+Construction has no measured general speedup: small inputs regress, including
+27-stage fans (0.216 to 0.342 ms) and 21-stage graphs (0.139 to 0.258 ms).
+These unfavorable results are retained. Peak RSS does not uniformly improve;
+for example, the 123-stage fan feature call increases from median 2.750 to
+2.836 MiB. High-water snapshots can be dominated by preparation or allocator
+retention; small quantized differences are not allocation savings.
+
+An earlier clean experiment at `051bb44` extracted full incidence once and
+copied degree prefixes. The same 20-cell protocol showed no full-construction
+benefit and larger small-input regressions (the 11-stage fan rose from 0.049 to
+0.213 ms). That constructor change was withdrawn in `afe06f2`; its metadata,
+all raw samples and original binaries remain under the separate ignored
+`target/benchmarks/commit-051bb4404349/operator-family/run-001`. It is not the
+candidate used in the table above, and no unfavorable run was discarded.
+
+The final correctness suite additionally covers 24 seeded small filtrations in
+H0/H1/H2, comparing feature multiplicities with the separate rank-based barcode
+and checking original-vertex subset incidence and all histories. Filling nullity
+16 completes 65536 candidates; 17 is rejected. T1--T5 covers epsilon=1,2,3,
+including repeated scales, H2 and multiple active classes: 15 case/epsilon
+combinations and 11 distinct features, with reference and raw-subset agreement.
+Final Rust debug/release/MSRV suites passed 246 tests each (four existing ignored);
+Linux tools passed 107. GUDHI 3.11.0 triangle and the 50 feasible Python/native
+comparisons passed. Hosted CI for subsequent report commits is separate.
+
+Reproduce with the [owned-family protocol](../homology-operators.md#owned-family-and-history-resources).
+The final raw run is retained at ignored
+`target/benchmarks/commit-afe06f279f86/operator-family/run-001`, including every
+fixture, warmup, stdout/stderr and environment/source/worker/harness identity.
+This is local evidence, not a public durable raw-data archive. The committed
+protocol, exact source revisions, table and source-bound generator support replay.
+
+Final metadata SHA-256: `031df466c6641fe0af4ab722f6274dbc67c3eb86de12688d8704610f77c5cd93`.
+Final summary SHA-256: `8bf0cf7f779998a212dd86ef92b61b732eec2a4ef7c07279424a48fe8cb32932`.

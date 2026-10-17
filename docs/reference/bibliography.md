@@ -133,11 +133,22 @@ are separate forms of evidence.
 
 ## HO
 
-[homology-operator](https://github.com/proffitteoy/homology-operator/tree/3daff9bd69033d1ee9c5cba5026bfff94df8d6ac),
-MIT source revision `3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`. The feasible
+[homology-operator](https://github.com/proffitteoy/homology-operator/tree/a11bf50b8c8320651e9ac015566778d957af9c17),
+MIT source revision `a11bf50b8c8320651e9ac015566778d957af9c17`. The feasible
 generalized-inverse construction and deterministic packed native route are the
 implementation reference. The [specification](mathematics.md#21-feasible-f2-homology-projections)
 gives the algebraic proof and finite-stage convention used in Cocycle. Source
-agreement is not a global-optimality proof; Python result schemas and global
-optimization solvers are not ported. This is a source citation, not a claimed
-peer-reviewed algorithm publication or a Rust runtime dependency.
+agreement is not a global-optimality proof. Bounded affine geometry queries and
+historical feature correction follow this reference's contracts; Python result
+schemas and globally minimum-stretch solvers are not ported. This is a source
+citation, not a claimed peer-reviewed algorithm publication or a Rust runtime
+dependency.
+
+## OB23
+
+Stable-volume Definition 6 and the separate conditional perturbation results in
+Theorems 3.1/4.1: [published source](https://doi.org/10.1007/s41468-023-00119-8).
+The pinned [HO](#ho) implementation specifies its F2 constraints and finite replay
+domain. Cocycle's `stable_volume` implements the bounded integer optimization
+contract; it does not certify the geometric hypotheses of those theorems or
+claim a perturbation/resampling guarantee.

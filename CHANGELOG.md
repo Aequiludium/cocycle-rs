@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Reuse incremental adjacent column bases in exact F2 family/history queries;
+  retain independent raw-boundary validation and document
+  eager stage storage. Extend seeded properties, integer epsilon coverage and
+  nullity boundary tests, and isolate CI checkout credentials from reference code.
+
+- Synchronize bounded integer geometry queries with homology-operator main at
+  `a11bf50`: exact class minima with boundary witnesses, costed minimum fillings,
+  family-bound historical features, one-simplex provenance, birth-pair H1 unit
+  cycles and finite H1/H2 optimal/stable volumes. Searches share execution
+  controls and return errors on interruption; selected-P readouts are unchanged.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
