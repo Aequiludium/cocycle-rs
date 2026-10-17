@@ -57,7 +57,7 @@ occurrences, source vertices, exact class minima, H1 unit birth cycles, fixed
 fillings and H1/H2 optimal/stable volumes. Upper costs include both unit counts
 and deterministic positive integer weights. Independent raw-simplex subset
 enumeration checks every filling and volume feasible set and minimum with
-epsilon=1. Raw worker output and corpus byte/semantic hashes are retained.
+epsilon=1,2,3. Raw worker output and corpus byte/semantic hashes are retained.
 The weighted queries execute the Python reference, not a new native geometry
 kernel. The optional native extension still compares feasible P/actions.
 
@@ -72,6 +72,64 @@ precision/rational/float costs, Python snapshots, general linear maps and the
 upstream's constant final extension. Ripser/Topp are not operator solvers and
 are inapplicable to this new domain. Existing persistence and distance kernels
 are unchanged.
+
+## Owned family and history resources
+
+`tools/benchmark_operator_family.py` implements `cocycle-f2-family-resources-v1`
+on Linux/WSL. It compares two clean, committed Rust source snapshots with the
+same standalone worker source. Build the library at the candidate and baseline
+roots with `cargo build --locked --release` and compile
+`tools/reference/homology_operator.rs` twice using `rustc --edition 2024
+-C opt-level=3`, linking each root's release rlib/dependency directory. Keep the
+executables separate and pass their actual paths:
+
+```sh
+python3 tools/benchmark_operator_family.py \
+  --worker /path/to/candidate-worker \
+  --baseline-worker /path/to/baseline-worker \
+  --baseline-root /path/to/clean-baseline \
+  --samples 10 --output target/benchmarks/commit-SHA/operator-family/run-001
+```
+
+The default supplied complexes are triangulated disk fans with 4/8/16/32/64
+vertices (11--251 simplices) and complete graphs with 4/6/8/12/16 vertices
+(10--136 simplices). Values are 0/1/2 for vertices/edges/faces, and same-value
+insertions use Cocycle's face-first order. F2 H1 and unit costs are fixed.
+These two families exercise finite deaths and many simultaneous surviving
+generators; they do not represent every complex or establish large-TDA admission.
+
+The `construct` mode times `from_simplices` from an already validated source,
+including extraction, every stage's solve/validation, family checks and owned
+result retention. The `features` mode prepares that owned family before timing,
+then measures complete feature construction, backward correction, owned history
+output and independent validation. Neither timer includes fixture parsing,
+source validation, process startup or JSON export. Both keep the result alive
+at the last memory reading. Features' prepared-family cost is not subtracted
+from construction medians or described as free.
+
+Each cell uses one retained/discarded warmup per engine and ten fresh serial
+processes per engine, with seeded position-balanced order. Do not run other
+builds/tests concurrently with the measurement. Default process limits are 30
+seconds and 512 MiB address space; these are distinct from cooperative library
+controls. CPU affinity, environment/compiler, source/worker/harness hashes,
+fixture bytes, warmups and every measured stdout/stderr are retained. Host load
+and CPU frequency are uncontrolled. Report median and min/max, retaining
+regressions, timeouts and failures. Fewer than ten samples are resource snapshots.
+
+Linux `/proc/self/status` supplies pre-call RSS/HWM, post-call retained RSS and
+absolute HWM before export. Peaks include source, process runtime, prepared
+families, workspaces and retained results; they are not live algorithm bytes.
+In particular, prepared-family HWM can dominate a feature call, so zero HWM
+growth does not mean zero allocations. Windows RSS fields are unavailable and
+must not be reported as zero.
+
+Every measured stage Betti sequence and feature interval list is checked against
+an independent raw-simplex PH reducer. Historical chains are checked for cycles,
+adjacent homology preservation and death in raw boundary spans. Candidate and
+baseline export all histories for exact comparison. The oracle never supplies
+library results. The [report](reports/homology-operators.md) identifies the
+measured commits and their actual envelope, separately from historical solve
+measurements and new correctness tests.
 
 ## Timing scope
 

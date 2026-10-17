@@ -223,6 +223,27 @@ lists for supported raw chains. Existing `from_stages` groups by scale and
 cannot certify individual simplex pairs. Equal source labels do not establish
 such provenance.
 
+This is an **eager small-scale exact reference interface**. Source incidence is
+extracted once and each insertion restricts its ordered degree bases, but every
+stage still receives an independently solved and validated operator. All stage
+windows/actions are retained. For N insertions, retained basis/matrix data can
+grow quadratically or worse with N and degree sizes; no input-size-independent
+memory bound follows from a successful query. `Execution` limits counted work,
+not bytes, and cannot prevent every large allocation. Bound source size and
+use a process memory/time cap when measuring untrusted or exploratory inputs.
+Use the existing persistence APIs when only a large diagram is needed.
+
+Feature construction maintains one incremental packed column basis for each
+adjacent map and keeps only the two adjacent temporary homology bases. Backward
+correction still owns complete original-coordinate chain histories. Independent
+verification remains a separate pass over raw A/D, with one reusable boundary
+decomposition per stage. That pass is included in `features()` runtime and its
+cooperative budget; it is not an optional unchecked fast path. Full output size
+can itself be quadratic or larger. Neither API is a streaming persistence engine.
+The [family resource protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/homology-operators.md#owned-family-and-history-resources)
+records growing inputs and distinguishes measured workloads from general
+scalability or a universal acceptable-size guarantee.
+
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;

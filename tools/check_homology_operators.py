@@ -267,7 +267,7 @@ def geometry_checks(args):
     if hashlib.sha256(canonical).hexdigest() != corpus["corpus_sha256"]:
         raise ValueError("geometry corpus digest differs")
     results = []
-    for case in corpus["cases"]:
+    for case, epsilon in [(case, epsilon) for case in corpus["cases"] for epsilon in (1, 2, 3)]:
         # Cocycle owns the frozen filtration order, including decreasing colex
         # within tied dimensions. Give every implementation that same order.
         events = sorted(zip(case["levels"], case["simplices"]),
@@ -277,7 +277,7 @@ def geometry_checks(args):
         wire_values = [str(case["degree"]), str(len(cells))]
         for level, cell in events:
             wire_values.extend(map(str, [level, len(cell), *cell]))
-        output = invoke([str(args.worker), "geometry"], args.output / f"geometry-{case['id']}.json", " ".join(wire_values) + "\n")
+        output = invoke([str(args.worker), "geometry", str(epsilon)], args.output / f"geometry-{case['id']}-epsilon-{epsilon}.json", " ".join(wire_values) + "\n")
         if output.get("state") != "Computed":
             raise RuntimeError("geometry worker failed")
         family = build_case(case)
@@ -312,7 +312,7 @@ def geometry_checks(args):
                 weights = tuple(cells.index(s) % 5 + 1 if weighted else 1 for s in upper_cells)
                 upper = upper_costs(family, ref, weights if weighted else None)
                 volume = family.optimal_volume(ref, upper)
-                stable = family.stable_volume(ref, 1, upper, epsilon_unit="filtration time")
+                stable = family.stable_volume(ref, epsilon, upper, epsilon_unit="filtration time")
                 z = family.inclusion(birth, death).apply(tuple(histories[0]))
                 filling = minimum_filling(family.windows[death], z, upper)
                 for query, key, mass_key in ((volume, "volume", "mass"), (stable, "stable", "stable_mass"), (filling, "filling", "filling_mass")):
@@ -330,20 +330,20 @@ def geometry_checks(args):
                     key = (mass, sum(b << i for i,b in enumerate(bits)))
                     if boundary == {s for s,b in zip(lower_cells,z) if b}:
                         feasible["filling"].append(key)
-                    for name, epsilon in (("volume", None), ("stable", 1)):
-                        after = lambda s: (cells.index(s) > birth if epsilon is None else case["levels"][cells.index(s)] >= case["levels"][birth]+epsilon)
+                    for name, offset in (("volume", None), ("stable", epsilon)):
+                        after = lambda s: (cells.index(s) > birth if offset is None else case["levels"][cells.index(s)] >= case["levels"][birth]+offset)
                         allowed = {s for s in upper_cells if cells.index(s) < death and after(s)} | {cells[death]}
                         forbidden = {s for s in lower_cells if cells.index(s) < death and after(s)}
-                        if cells[death] in selected and selected <= allowed and not boundary & forbidden and (epsilon is not None or cells[birth] in boundary):
+                        if cells[death] in selected and selected <= allowed and not boundary & forbidden and (offset is not None or cells[birth] in boundary):
                             feasible[name].append(key)
                 for name, mass_key in (("volume", "mass"), ("stable", "stable_mass"), ("filling", "filling_mass")):
                     actual_key = (actual[mass_key], sum(b << i for i,b in enumerate(actual[name])))
                     if not feasible[name] or min(feasible[name]) != actual_key:
                         raise RuntimeError(f"independent raw-simplex enumeration rejected {name}")
-        results.append({"case": case["id"], "features": len(output["features"]), "state": "Passed",
+        results.append({"case": case["id"], "epsilon": epsilon, "features": len(output["features"]), "state": "Passed",
                         "reference_and_raw_set_oracle": True})
     return {"corpus_sha256": corpus["corpus_sha256"], "file_sha256": hashlib.sha256(corpus_path.read_bytes()).hexdigest(), "cases": results,
-            "scope": "Cocycle source order; integer costs and epsilon=1; unit and weighted upper chains; no perturbation guarantee"}
+            "scope": "Cocycle source order; integer costs and epsilon=1,2,3; unit and weighted upper chains; no perturbation guarantee"}
 
 
 def main(args):

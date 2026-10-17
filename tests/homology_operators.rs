@@ -351,6 +351,192 @@ fn triangle(filled: bool) -> ChainWindow<usize> {
 }
 
 #[test]
+fn seeded_small_filtrations_match_rank_barcodes_and_raw_history_equations() {
+    use cocycle::complex::{Simplex, SimplicialComplex};
+    use std::collections::BTreeMap;
+    for seed in 0..24_u64 {
+        let mut state = seed + 0x1234_5678;
+        let mut next = || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            state >> 32
+        };
+        let vertices = 5 + (seed % 2) as usize;
+        let mut values = BTreeMap::new();
+        for size in 1..=4 {
+            for mask in 1..1_usize << vertices {
+                if mask.count_ones() as usize != size {
+                    continue;
+                }
+                let faces = (0..vertices)
+                    .filter(|i| mask & (1 << i) != 0)
+                    .map(|i| mask ^ (1 << i))
+                    .collect::<Vec<_>>();
+                if size > 1 && (faces.iter().any(|f| !values.contains_key(f)) || next() % 4 == 0) {
+                    continue;
+                }
+                let earliest = if size == 1 {
+                    -2.
+                } else {
+                    faces
+                        .iter()
+                        .map(|f| values[f])
+                        .fold(f64::NEG_INFINITY, f64::max)
+                };
+                values.insert(mask, earliest + (next() % 3) as f64);
+            }
+        }
+        let source = SimplicialComplex::new(
+            values
+                .iter()
+                .map(|(&mask, &value)| {
+                    Simplex::new(
+                        (0..vertices)
+                            .filter(|i| mask & (1 << i) != 0)
+                            .map(|i| 10 + 7 * i)
+                            .collect(),
+                        value,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        )
+        .unwrap();
+        for degree in 0..=2 {
+            let costs = vec![
+                1;
+                source
+                    .simplices()
+                    .iter()
+                    .filter(|s| s.dimension() == degree)
+                    .count()
+            ];
+            let controls = Execution::default().max_work(100_000_000);
+            let family =
+                OperatorFamily::from_simplices(&source, degree, costs, "seeded", "unit", &controls)
+                    .unwrap();
+            let features = family.features(&controls).unwrap();
+            let mut actual = BTreeMap::new();
+            for feature in &features {
+                *actual
+                    .entry((feature.birth(), feature.death()))
+                    .or_insert(0) += 1;
+            }
+            let expected = family
+                .barcode()
+                .unwrap()
+                .into_iter()
+                .map(|bar| ((bar.birth, bar.death), bar.multiplicity))
+                .collect::<BTreeMap<_, _>>();
+            assert_eq!(actual, expected, "seed={seed} degree={degree}");
+            for feature in &features {
+                family.feature_pairing(feature).unwrap();
+                let end = feature.death().unwrap_or(source.len());
+                for stage in 0..source.len() {
+                    let resolved = family.resolve_feature(feature, stage, &controls).unwrap();
+                    assert_eq!(resolved.is_some(), stage >= feature.birth() && stage < end);
+                    let Some(query) = resolved else { continue };
+                    let op = family.stage(stage).unwrap();
+                    assert!(op.is_cycle(query.representative()).unwrap());
+                    if stage + 1 < end || feature.death() == Some(stage + 1) {
+                        let target = family.stage(stage + 1).unwrap();
+                        let mut embedded = vec![0; target.window().weights().len()];
+                        for (&bit, id) in query.representative().iter().zip(&op.window().bases()[1])
+                        {
+                            embedded[target.window().bases()[1]
+                                .iter()
+                                .position(|x| x == id)
+                                .unwrap()] = bit;
+                        }
+                        if stage + 1 < end {
+                            let following = family
+                                .resolve_feature(feature, stage + 1, &controls)
+                                .unwrap()
+                                .unwrap();
+                            assert_eq!(
+                                target.project(&embedded).unwrap(),
+                                following.representative()
+                            );
+                        } else {
+                            let witness = target.boundary_preimage(&embedded).unwrap().unwrap();
+                            assert_eq!(
+                                target.window().boundaries()[1].apply(&witness).unwrap(),
+                                embedded
+                            );
+                        }
+                    }
+                }
+            }
+            // Independent prefix incidence check uses original vertex subsets,
+            // not the new matrix-prefix copier or source boundary accessor.
+            for stage in 0..source.len() {
+                let window = family.stage(stage).unwrap().window();
+                for (matrix, lower, upper) in [
+                    (
+                        &window.boundaries()[0],
+                        &window.bases()[0],
+                        &window.bases()[1],
+                    ),
+                    (
+                        &window.boundaries()[1],
+                        &window.bases()[1],
+                        &window.bases()[2],
+                    ),
+                ] {
+                    for (i, &lower) in lower.iter().enumerate() {
+                        let face = source.simplex(lower).unwrap().vertices();
+                        for (j, &upper) in upper.iter().enumerate() {
+                            let cell = source.simplex(upper).unwrap().vertices();
+                            let incidence = u8::from(
+                                face.len() + 1 == cell.len()
+                                    && face.iter().all(|v| cell.contains(v)),
+                            );
+                            assert_eq!(matrix.column(j).unwrap()[i], incidence);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn minimum_filling_enforces_the_exact_nullity_boundary() {
+    for nullity in [16, 17] {
+        let columns = nullity + 1;
+        let d = F2Matrix::from_rows(&[vec![1; columns]], columns).unwrap();
+        let lower = ChainWindow::new(
+            0,
+            [F2Matrix::zero(0, 1).unwrap(), d.clone()],
+            [vec![], vec![0], (1..=columns).collect()],
+            vec![1],
+            "nullity",
+            "lower",
+        )
+        .unwrap();
+        let upper = ChainWindow::new(
+            1,
+            [d, F2Matrix::zero(columns, 0).unwrap()],
+            [vec![0], (1..=columns).collect(), vec![]],
+            vec![1; columns],
+            "nullity",
+            "upper",
+        )
+        .unwrap();
+        let op = HomologyOperator::feasible(lower).unwrap();
+        let result = op.minimum_filling(&[1], &upper, &Execution::default().max_work(50_000_000));
+        if nullity == 16 {
+            let result = result.unwrap().unwrap();
+            assert_eq!(result.examined(), 65536);
+            assert_eq!(result.mass(), 1);
+            assert_eq!(result.chain()[0], 1);
+            assert!(result.chain()[1..].iter().all(|&b| b == 0));
+        } else {
+            assert!(matches!(result, Err(Error::InvalidParameter { .. })));
+        }
+    }
+}
+
+#[test]
 fn ring_and_filling_have_hand_derived_class_queries_and_transport() {
     let ring = HomologyOperator::feasible(triangle(false)).unwrap();
     let filled = HomologyOperator::feasible(triangle(true)).unwrap();
