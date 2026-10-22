@@ -26,7 +26,7 @@ fn dirac_square_hodge_and_same_stage_persistent_agree() -> cocycle::Result<()> {
         let stage = source.stage(scale)?;
         let dirac = DiracOperator::new(&stage, 0..=2)?;
         let n = dirac.basis().len();
-        let matrix = dirac.matrix(n * n, &execution)?;
+        let matrix = dirac.matrix(n * n)?;
         let square: Vec<f64> = (0..n * n)
             .map(|entry| {
                 let (i, j) = (entry / n, entry % n);
