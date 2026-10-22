@@ -1,6 +1,7 @@
 ![Cocycle — topology, computed in Rust](assets/banner.svg)
 
 [![CI](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml)
+[![Documentation](https://github.com/Aequiludium/cocycle-rs/actions/workflows/pages.yml/badge.svg?branch=main)](https://aequiludium.github.io/cocycle-rs/)
 [![Rust 1.91+](https://img.shields.io/badge/Rust-1.91%2B-102D32?style=flat-square)](Cargo.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-087D70?style=flat-square)](LICENSE)
 
@@ -110,7 +111,8 @@ for certified sources, errors and the distinction from general chain maps.
 
 ## Explore
 
-[API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
+[Documentation website](https://aequiludium.github.io/cocycle-rs/) ·
+[API reference](https://docs.rs/cocycle) · [Documentation map](docs/README.md) ·
 [Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
 [Architecture](docs/development/architecture.md) · [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) ·
 [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)

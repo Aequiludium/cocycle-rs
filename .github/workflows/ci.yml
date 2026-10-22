@@ -54,7 +54,7 @@ jobs:
       - run: cargo build --locked --release
       - run: rustc --edition 2024 -C opt-level=3 tools/reference/homology_operator.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/homology-worker
       - run: python tools/check_homology_operators.py --reference target/operator-reference-source --worker target/homology-worker --native-dir target/operator-extension --oracle-python python --samples 0 --output target/operator-correctness
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: operator-correctness-${{ github.sha }}-${{ github.run_attempt }}
@@ -78,6 +78,12 @@ jobs:
       - run: python tools/check_source.py
       - run: python tools/check_artifacts.py
       - run: python tools/check_docs.py
+      - name: Install documentation dependencies
+        run: python -m pip install -r docs/requirements.txt
+      - name: Check the documentation website
+        run: |
+          python -m sphinx -q -E -a -W --keep-going -b html docs target/docs/html
+          python tools/check_docs.py --html target/docs/html
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
@@ -85,6 +91,8 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/getting-started/quickstart.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/guides/diagram-distances.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 --test docs/guides/rips-representatives.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -235,7 +243,7 @@ jobs:
             --rustc "$(command -v rustc)" --cpu "$cpu" \
             --oineus-source target/optimization-sources/oineus \
             --boost-include /usr/include --output target/critical-set-smoke
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: native-reference-${{ github.sha }}-${{ github.run_attempt }}
@@ -297,7 +305,7 @@ jobs:
       - run: python -m pip install gudhi==3.11.0 numpy==2.4.6 POT==0.9.6.post1
       - run: python tools/compare_distances.py --quick --output target/distance-reference
       - run: python tools/benchmark_distances.py --quick --samples 1 --groups baseline arena --families uniform sparse --sizes 8 32 --output target/distance-smoke
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: distance-reference-${{ github.sha }}-${{ github.run_attempt }}

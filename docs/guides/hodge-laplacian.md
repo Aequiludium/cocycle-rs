@@ -1,12 +1,14 @@
 # Real single-scale Hodge Laplacians
 
-[Documentation](../README.md) / Guides
+[Documentation](../index.md) / Guides
 
 `HodgeEigenpairs::is_index_coverage_certified()` always returns false. Residual
 convergence verifies returned Ritz pairs, not their extremal indexes, unseen zero
 modes or omitted multiplicities. Independent complete NumPy spectra check the
 selected prefix on finite fixtures, including a 128-node path, a 64-cycle and
 repeated disconnected edges. The missed-invariant-subspace regression remains.
+
+The [API entry points](../reference/api.md#operator-interfaces-under-review) list the callable interfaces.
 
 This **Unreleased** capability implements #73's initial standard-real chain
 window. It reads a finite [supplied complex or stage](filtered-complexes.md),
