@@ -5,7 +5,7 @@
 This page describes the standalone reproduction introduced in
 [PR #129](https://github.com/Aequiludium/cocycle-rs/pull/129). It is available in
 this source checkout at
-[`tools/reproduce_persistent_spectral_features.py`](../../tools/reproduce_persistent_spectral_features.py).
+[`tools/reproduce_persistent_spectral_features.py`](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/reproduce_persistent_spectral_features.py).
 It uses existing Rust descriptor workers, with no new public Rust spectral-feature
 or classifier interface. Production integration with the
 [persistent Laplacian](../guides/persistent-laplacian.md) remains separate.
