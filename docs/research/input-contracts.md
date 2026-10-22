@@ -528,14 +528,39 @@ general sheaves must check every face-chain composition. Result identity include
 stalk bases and restriction maps, not merely the underlying graph identity.
 This is sheaf cohomology, not a claim that an ordinary PH class has changed.
 
-A future operation can receive `(borrowed graph, ordered stalk bases,
-restriction maps, grams)` directly; no six-crate model hierarchy is justified.
-Its implementation gate is actual restriction assembly/action, the constant
-sheaf specialization, zero/rectangular stalk cases, independent residual and
-kernel checks, resource/error behavior and a source/fixture-bound cost report.
-No sheaf engine is approved or delivered here. The other candidates remain
-deferred for the model-specific gaps above, not cancelled and not blockers of
-old PH migration. As a separate hand counterexample, maps `C2->C1->C0` all equal
+The bounded investigation now executes in
+[`sheaf_probe`](../../examples/sheaf_probe.rs). It supplies the restrictions,
+assembles their dual chain boundary `delta^T`, then reuses the existing Hodge
+action/spectrum terminal. This algebraic coordinate adapter does not reinterpret
+the graph's ordinary cellular boundary or run ordinary PH on the sheaf.
+Standard Grams and integer restrictions are explicit. Its six fixtures include
+the nonconstant example, the constant specialization, rectangular vertex stalks,
+zero edge stalks, zero vertex stalks and the empty case. Tests check the known
+kernel, retained ownership, bad map shapes, signed overflow and work/cancellation.
+
+Decision for #76: retain this runnable small investigation and defer a general
+sheaf API until a consumer needs arbitrary restrictions, stalk bases and Grams.
+The existing terminal suffices for these fixtures; no universal model hierarchy
+is introduced. The selected definitions are [HG19](../reference/bibliography.md#hg19),
+sections 2.2.2/3.2, not a new ordinary-homology interpretation. Dense matrices
+here have at most nine entries and each controlled terminal has 100,000 work
+units; this is not a process memory quota. The independent command is:
+
+```sh
+cargo build --locked --release --example sheaf_probe --example filtration_feedback
+python3 tools/check_research_routes.py --sheaf target/release/examples/sheaf_probe \
+  --feedback target/release/examples/filtration_feedback --gudhi \
+  --output target/research-routes-001
+```
+
+Use `.exe` worker suffixes on Windows and a fresh output directory. GUDHI checks
+the ordinary constant specialization and feedback PH; explicit hand matrices
+and spectra check nonconstant restrictions. Raw process outputs, binary/source
+hashes and process durations are retained; durations include startup and are
+not a speedup study. General real restrictions, higher cells and nonstandard
+Grams are not delivered. The other candidates remain deferred for the specific
+model gaps in the table. This completes the candidate investigation/decision,
+not every candidate's implementation. As a separate hand counterexample, maps `C2->C1->C0` all equal
 to [1] and zero outside satisfy `d^3=0` but `d^2:C2->C0=[1]`; feeding them to
 `FilteredComplex` would violate its contract rather than extend it.
 

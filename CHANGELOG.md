@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add bounded, runnable graph-sheaf and application-owned filtration-feedback
+  investigations, independent hand/GUDHI checks, and an F2 stage-transport
+  regression against separate ordinary persistence. These examples add no
+  generalized-sheaf, autodiff or global projection-optimization API.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

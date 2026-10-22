@@ -88,6 +88,27 @@ Cocycle's natural logarithms, finite-only selection, and empty-result `None` are
 explicit project conventions. The paper's title is not an unconditional stability
 guarantee for every entropy variant.
 
+## HG19
+
+Jakob Hansen and Robert Ghrist. **Toward a Spectral Theory of Cellular Sheaves**.
+[arXiv:1808.01513v2](https://arxiv.org/html/1808.01513v2), sections 2.2.2 and 3.2:
+restriction-valued coboundaries, adjoints and harmonic cochains. The bounded
+[sheaf investigation](../research/input-contracts.md#generalized-model-comparison-and-selected-first-investigation)
+uses standard real stalk coordinates; its fixture calculations are derived
+explicitly and do not establish a general sheaf implementation.
+
+## CCGIKU21
+
+Mathieu Carriere, Frederic Chazal, Marc Glisse, Yuichi Ike, Hariprasad Kannan
+and Yuhei Umeda. **Optimizing persistent homology based functions**.
+ICML 2021, PMLR 139:1294-1303.
+[Published full text](https://proceedings.mlr.press/v139/carriere21a/carriere21a.pdf),
+section 3.2 and Propositions 3.2/3.4 for fixed-order regions and differentiability;
+section 4.2 for total persistence. Theorem 4.2 has additional Lipschitz, step-size,
+boundedness and noise hypotheses. The [feedback experiment](../research/route-integration.md#optional-feedback-and-invalidation-decision-93)
+proves its own scalar contraction and makes no claim of general stochastic
+convergence or differentiability at ties.
+
 ## Architecture references
 
 | Project | Source | Design lesson |
