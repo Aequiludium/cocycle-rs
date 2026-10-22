@@ -12,6 +12,128 @@ fn matrix(rows: &[&[u8]], n: usize) -> F2Matrix {
 }
 
 #[test]
+fn same_source_transport_matches_separate_ph_and_replays_every_class_witness() -> cocycle::Result<()>
+{
+    use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
+    use cocycle::descriptors::betti_curve;
+    use cocycle::diagram::IntervalEnd;
+    use cocycle::persistence::PersistenceExt;
+
+    let mut simplices = Vec::new();
+    for (vertices, death) in [
+        ([10, 20, 30], Some(2.)),
+        ([40, 50, 60], Some(3.)),
+        ([70, 80, 90], None),
+    ] {
+        for vertex in vertices {
+            simplices.push(Simplex::new(vec![vertex], 0.)?);
+        }
+        for edge in [
+            [vertices[0], vertices[1]],
+            [vertices[0], vertices[2]],
+            [vertices[1], vertices[2]],
+        ] {
+            simplices.push(Simplex::new(edge.to_vec(), 1.)?);
+        }
+        if let Some(death) = death {
+            simplices.push(Simplex::new(vertices.to_vec(), death)?);
+        }
+    }
+    let source = SimplicialComplex::new(simplices)?;
+    let scales = [0., 1., 1., 2., 3.];
+    let stages = scales.map(|scale| source.stage(scale).unwrap());
+    let costs = stages
+        .iter()
+        .map(|stage| {
+            vec![
+                1;
+                stage
+                    .cells()
+                    .filter(|&cell| stage.dimension(cell) == 1)
+                    .count()
+            ]
+        })
+        .collect();
+    let family = OperatorFamily::from_stages(
+        &stages,
+        1,
+        costs,
+        "three-rings",
+        "edges",
+        &Execution::default(),
+    )?;
+    // This is the separate ordinary-PH reducer, not the family rank algorithm.
+    let ph = source.persistence().max_homology_dimension(1).compute()?;
+    assert_eq!(
+        betti_curve(ph.diagram(), 1, &[0., 1., 2., 3.])?,
+        [0, 3, 2, 1]
+    );
+    let bars = family.barcode()?;
+    assert_eq!(
+        bars,
+        [
+            StageInterval {
+                birth: 1,
+                death: Some(3),
+                multiplicity: 1
+            },
+            StageInterval {
+                birth: 1,
+                death: Some(4),
+                multiplicity: 1
+            },
+            StageInterval {
+                birth: 1,
+                death: None,
+                multiplicity: 1
+            },
+        ]
+    );
+    let h1: Vec<_> = ph
+        .diagram()
+        .intervals()
+        .filter(|bar| bar.dimension() == 1)
+        .collect();
+    for death in [2., 3.] {
+        assert_eq!(
+            h1.iter()
+                .filter(|bar| bar.birth() == 1. && bar.end() == IntervalEnd::Finite(death))
+                .count(),
+            1
+        );
+    }
+    assert_eq!(
+        h1.iter()
+            .filter(|bar| bar.end() == IntervalEnd::Essential)
+            .count(),
+        1
+    );
+    // The family's None certifies only terminal survival, not unseen continuation.
+    for i in 0..scales.len() {
+        let s = family.stage(i)?;
+        assert_eq!(s.betti(), betti_curve(ph.diagram(), 1, &[scales[i]])?[0]);
+        for z in s.cycle_basis()? {
+            let query = s.class_query(&z)?;
+            for j in i..scales.len() {
+                let target = family.stage(j)?;
+                let tracked = family.track_query(&query, i, j)?;
+                let mut residual = tracked.representative().to_vec();
+                for (&bit, id) in query.representative().iter().zip(&s.window().bases()[1]) {
+                    let position = target.window().bases()[1]
+                        .iter()
+                        .position(|t| t == id)
+                        .unwrap();
+                    residual[position] ^= bit;
+                }
+                let witness = target.boundary_preimage(&residual)?.unwrap();
+                assert_eq!(target.window().boundaries()[1].apply(&witness)?, residual);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn minimum_class_matches_independent_coset_enumeration_and_lexicographic_ties() {
     let controls = Execution::default();
     for mask in 0..64_u32 {

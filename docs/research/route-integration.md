@@ -10,10 +10,10 @@ own the unified checkout scope. This report composes the
 [input](input-contracts.md) and [result](result-contracts.md) proposals; its
 handoff tables are route requirements, not additional authoritative APIs.
 
-This 2026-10-11 record separates existing pipeline acceptance from future
-algorithm integration. The current issue scopes require interface preparation
-for #88-#93, while keeping their later running goals open. Contract examples,
-hand calculations and ordinary PH are not executions of future algorithms.
+The 2026-10-11 baseline separated interface preparation from later algorithm
+integration. Its hand calculations are not algorithm executions. The current
+finite F2 workflow and bounded research experiments are identified in the
+#90/#93 sections and coverage table below; historical stack states remain dated.
 
 On 2026-10-12, main `c85ef24853fb19d510602e7339f82065a3dafdba` already contains
 #102-#107 and #112 through [PR #122](https://github.com/Aequiludium/cocycle-rs/pull/122).
@@ -373,6 +373,17 @@ future work. The fixed reference is an external oracle, not a runtime dependency
 frozen public-workflow timings do not measure this new composed stage terminal.
 Main merge, hosted acceptance and release remain separate from local validation.
 
+The bounded #75/#90 route is implemented on main through #123/#134. The public
+`homology_operators` example executes both single-scale readout and finite
+transport. The separate-PH integration test uses three disjoint rings, two
+different finite deaths, terminal survival and a repeated observed scale. It
+checks the family against ordinary PH and replays every source cycle-basis
+representative's target-boundary witness. Owner/run mixing, cost changes,
+noncycles, overflow, cancellation and retries remain covered by existing tests.
+Accepting this finite coordinate-inclusion route does not adopt global minimum
+stretch or arbitrary chain maps. Those extensions need their own selected
+definitions and consumers; they are not hidden functionality of this API.
+
 ## Direct comparison and consumption handoff: #91
 
 Use #81's [existing comparison contract](result-contracts.md#existing-distance-boundaries-and-migration-decision-on-main-a7ee9e9).
@@ -530,12 +541,11 @@ This local roundtrip is interface evidence, not either running route.
 
 ## Optional feedback and invalidation decision: #93
 
-Current decision: defer automatic/differentiable learning feedback. Retain an
-application's explicit parameter-update-and-recompute route as the compatibility
-boundary. There is no selected external training/loss/derivative producer yet,
-and ties can change topology, pairing and result ordinals. This is a reasoned
-deferral of optional research, not deletion of its later scientific goal or a
-proof that all differentiable TDA is impossible. It does not block #94.
+Current decision: adopt an explicit application-owned update/recompute experiment
+on a stated differentiable region; defer a general automatic-gradient or training
+API. Ties can change topology, pairing and result ordinals. This completes #93's
+bounded research/decision scope, not all differentiable TDA or external-learning
+integration. It does not block #94.
 
 | Update | Applicable invalidation and ownership |
 | --- | --- |
@@ -601,26 +611,43 @@ Cache invalidation cannot be replaced by a finite-difference number. Persist
 selected parameters/source IDs and the actual mathematical question with each
 run; errors or missing outputs must not feed a fabricated loss.
 
-Stage A is complete with this invalidation contract and deferral decision.
-If optional stage B is selected later, first choose the actual model/parameter
-map and loss, justify differentiability on its stated domain or an explicit
-nonsmooth method, and check gradients against independent finite differences
-away from ties and dedicated degeneracy cases. Run one fixed input through the
-actual update/export/compute loop with old/new identities and cost boundaries.
-The current fixture is existing PH plus a hand slope check, not an implemented
-learning feedback loop or production gradient API.
+The runnable [`filtration_feedback`](../../examples/filtration_feedback.rs)
+now closes the small experiment. Define `J(theta)=(m(theta)-1)^2/2`, where
+`m(theta)=max(0,theta)` is the actually recomputed finite H0 persistence above.
+On `theta>0`, `J'=theta-1`. Starting at 2 with step 1/2 gives
+`theta_k=1+2^-k` and `J_k=4^-k/2`, so all nine recorded samples stay in that
+region. Three dyadic finite-difference scales independently check the derivative
+in tests. Every iteration rebuilds the source and result with a distinct sample
+key; an old owned diagram still has mass 2 after updates. These keys describe
+application samples, not authenticated dataset identity or reusable cell IDs.
+
+At zero the left/right loss slopes tend to 0/-1, and the negative half-line is
+flat with loss 1/2. The example rejects its gradient request outside the positive
+region. Thus neither smoothness at ties nor global optimization from arbitrary
+starts is asserted. [CCGIKU21](../reference/bibliography.md#ccgiku21), section 3.2,
+motivates fixed-order differentiability and section 4.2 gives total persistence;
+the scalar contraction here is derived directly rather than attributed to its
+more general stochastic theorem. The independent research checker replays all
+12 PH outputs with GUDHI and checks exact contraction/tie expectations.
+
+This is an actual application feedback loop without new library gradient,
+cache or trainer APIs. A general extension still needs a selected loss and
+parameter map, tie/subgradient semantics and independent derivative evidence.
+Fresh result construction, source validation and process overhead are included
+in the retained example-process duration; there is no comparative timing claim.
 
 ## Current route coverage and later running goals
 
 | Issue | Current delivered evidence in this stack | Later running gate |
 | --- | --- | --- |
 | #87 | Closed fixed-main baseline, reused inputs/expectations and consumer/cost boundaries | Each migration's own review; not a future algorithm prerequisite. |
-| #88 | Signed source/basis/Gram/Dirac contract; exact triangle/edge expectations | Real #73/#74 producers and #109 reader; action/result/error/cost checks. |
-| #89 | Existing stage/inclusion doctest; persistent-pair definition and exact induced-Gram counterexample | Actual restricted-domain persistent spectrum; independent real persistent rank/nullity. |
-| #90 | Three-degree F2/maps/cost/query contract; exhaustive declared-matrix legality and fill witness | Actual #75 class/query and transport workflows; legal versus optimal evidence. |
+| #88 | Real Hodge/Dirac action and owned numerical results integrated through #134; direct examples and independent references | General Grams, full Dirac spectra and numerical index certification remain separate. |
+| #89 | Bounded real persistent operators integrated through #134, with actual same-source pairs, spectra and independent exact/numerical controls | Scalable sparse persistent spectra remain outside the bounded dense route. |
+| #90 | Actual #75 class queries, finite transport, barcode and raw-D witnesses; separate-PH integration regression | Bounded coordinate-inclusion route accepted; no global stretch or arbitrary-map claim. |
 | #91 | Existing diagram comparison/scalar-consumer doctest and direct-object comparability table | #110's selected non-diagram data/result comparison and relevant analysis. |
 | #92 | Ordered topology/stage/feature exchange contract and local JSON roundtrip | #111 real export plus external call on both routes, with complete key joins. |
-| #93 | Invalidation/ownership contract; actual PH tie fixture and exact slope counterexample; defer automatic feedback | Optional justified model/loss and real experiment, or separately reviewed deferral. |
+| #93 | Explicit application update/recompute loop, analytic contraction, finite differences and GUDHI PH; tie counterexample | Research decision complete; general gradient/training APIs deferred with stated conditions. |
+| #109 | Owned actual spectral/F2 results and independent direct example consumers integrated through #134 | Unified serialization and Rust-to-external-learning feature production remain separate. |
 | #94 | Fixed combined source disposition/cost audit; owned-stage/F3/witness/consumer regression and full local checks | Approved main integration and exact-head hosted/native acceptance; no release claim. |
 
 The table covers the planned direct edges: topology-to-single-scale computation,

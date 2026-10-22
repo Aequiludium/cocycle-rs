@@ -56,6 +56,15 @@ jobs:
       - run: cargo build --locked --release
       - run: rustc --edition 2024 -C opt-level=3 tools/reference/homology_operator.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/homology-worker
       - run: python tools/check_homology_operators.py --reference target/operator-reference-source --worker target/homology-worker --native-dir target/operator-extension --oracle-python python --geometry --samples 0 --output target/operator-correctness
+      - run: cargo build --locked --release --example sheaf_probe --example filtration_feedback
+      - run: python tools/check_research_routes.py --sheaf target/release/examples/sheaf_probe --feedback target/release/examples/filtration_feedback --gudhi --output target/research-routes-correctness
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: research-routes-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: target/research-routes-correctness/
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -140,6 +149,10 @@ jobs:
       - run: cargo run --locked --example diagram_distances
       - run: cargo run --locked --example critical_sets
       - run: cargo run --locked --example homology_operators
+      - run: cargo run --locked --example sheaf_probe
+      - run: cargo run --locked --example filtration_feedback
+      - run: cargo test --locked --example sheaf_probe --example filtration_feedback
+      - run: cargo test --locked --release --example sheaf_probe --example filtration_feedback
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
 
@@ -154,6 +167,7 @@ jobs:
           toolchain: 1.91.0
       - run: cargo test --locked --all-features
       - run: cargo check --locked --all-targets --all-features
+      - run: cargo test --locked --example sheaf_probe --example filtration_feedback
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --example critical_sets
 
@@ -179,11 +193,12 @@ jobs:
           package = metadata["packages"][0]
           print("{}/package/{}-{}/Cargo.toml".format(metadata["target_directory"], package["name"], package["version"]))')"
           python3 tools/check_docs.py --root "$(dirname "$package_manifest")"
-          for example in square diagram_analysis diagram_distances complex_construction critical_sets homology_operators; do
+          for example in square diagram_analysis diagram_distances complex_construction critical_sets homology_operators sheaf_probe filtration_feedback; do
             cargo run --locked --manifest-path "$package_manifest" --example "$example"
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
           cargo test --locked --manifest-path "$package_manifest" --example critical_sets
+          cargo test --locked --manifest-path "$package_manifest" --example sheaf_probe --example filtration_feedback
           cargo run --locked --manifest-path "$package_manifest" --example hodge_laplacian > target/hodge-package.jsonl
 
   reference:

@@ -42,6 +42,9 @@ and the release documentation gate remain in CONTRIBUTING.
 | `tests/sparse_rips.rs` | Metric hypotheses, sampling provenance, blocker topology, original IDs, approximate coverage and computation parity |
 | `tests/descriptors.rs` | Formula, endpoint, exclusion, overflow, empty-result behavior and translation/rescaling properties |
 | `tests/filtered_complex.rs` | Supplied simplicial/cell inputs, signed scales, unequal vertex births, oriented boundaries, source coverage and invalid contracts |
+| `tests/homology_operators.rs` | Four projection identities, integer geometry minima, source/run identity, repeated stages and finite transport checked against separate ordinary PH and raw boundary witnesses |
+| `examples/sheaf_probe.rs`, `examples/filtration_feedback.rs` tests | Bounded stalk restrictions, constant/rectangular/zero controls; analytic feedback contraction, tie slopes and retained results. Run explicitly with `cargo test --example sheaf_probe --example filtration_feedback` |
+| `tools/check_research_routes.py` | Hand matrices/spectra and exact feedback expectations; optional GUDHI recomputation. Emits raw output, binary/source hashes and process durations into a fresh output directory |
 | `tests/persistent_laplacian.rs`, `src/persistent_laplacian/schur.rs` tests | Hand-derived Kron/path and Hodge matrices, singular blocks, basis/sign conjugacy, missing skeletons, resource controls and nonconvergence |
 | `tools/compare_persistent_laplacians.py` | Independent NumPy Schur/SVD, exact rational projection and real persistent ranks; optional torsion-free GUDHI checks and bounded route timings |
 | `examples/complex_construction.rs` tests | Lower-star construction, analytic circle persistence, triangle incidence, ties, isolates and invalid topology; run with `--example complex_construction` |

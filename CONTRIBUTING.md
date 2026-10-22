@@ -97,6 +97,10 @@ cargo run --locked --example diagram_distances
 cargo run --locked --example dirac
 cargo run --locked --example critical_sets
 cargo run --locked --example homology_operators
+cargo run --locked --example sheaf_probe
+cargo run --locked --example filtration_feedback
+cargo test --locked --example sheaf_probe --example filtration_feedback
+cargo test --locked --release --example sheaf_probe --example filtration_feedback
 cargo run --locked --example persistent_laplacian
 cargo test --locked --example critical_sets
 cargo test --locked --release --example critical_sets
