@@ -221,6 +221,13 @@ maps and multi-parameter filtrations are outside this first capability. The
 [source comparison and decisions](../research/filtration-stages.md) explain those
 limits, units, ordering and independent validation.
 
+## Apply a real Dirac operator
+
+`dirac::DiracOperator` reads this signed source directly for sparse real
+action and bounded matrix export. Pass a stage to choose a scale; filtration
+values do not become weights. The [Dirac guide](dirac.md) covers runnable
+usage, graded coordinates, endpoint truncation and independent verification.
+
 ## Supplied topology versus certified construction
 
 A supplied complex is the mathematical source in its entirety. A triangle's

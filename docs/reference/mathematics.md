@@ -1008,3 +1008,223 @@ The implementation certifies these finite optimization problems only. It does
 not infer a perturbation theorem from an exact minimum. Integer scale bounds,
 units, unsupported weight/location domains and failure behavior are specified
 in the [operator guide](../guides/homology-operators.md#exact-minima-and-historical-simplex-features).
+
+## 22. Real single-scale Hodge Laplacians
+
+For a finite integer chain window C[k-1] <-A- C[k] <-D- C[k+1], require
+AD=0 over the integers before interpreting incidence over R. In ordered bases
+with standard inner products, define
+
+$$
+L_k = A^\mathsf{T} A + D D^\mathsf{T}.
+$$
+
+For k=0, A has zero rows: this is ordinary nonaugmented H0. An explicitly
+absent adjacent degree in the supplied finite topology is a zero-size map.
+Lower and upper selections retain only the respective summand.
+
+For every real vector x,
+
+$$
+x^\mathsf{T}L_kx = \|Ax\|_2^2 + \|D^\mathsf{T}x\|_2^2 \geq 0.
+$$
+
+Thus L is symmetric positive semidefinite and ker L = ker A intersect ker D^T.
+Because im D is contained in ker A and (im D) perpendicular = ker D^T,
+orthogonal decomposition inside ker A gives
+
+$$
+\ker A = \operatorname{im}D \oplus \ker L_k,
+\qquad
+\dim\ker L_k = n_k - \operatorname{rank}_{\mathbb{R}} A
+                         - \operatorname{rank}_{\mathbb{R}} D
+             = \beta_k(\mathbb{R}).
+$$
+
+The fundamental subspace decomposition then gives
+C[k] = im A^T direct-sum ker L direct-sum im D. Orthogonal projection onto ker L
+assigns each homology class its unique harmonic representative. These are Lim's
+Theorems 5.2 and 5.3, *Hodge Laplacians on Graphs*, SIAM Review 62(3), 2020,
+685–715, [DOI 10.1137/18M1223101](https://doi.org/10.1137/18M1223101),
+[author PDF](https://www.stat.uchicago.edu/~lekheng/work/hodge-graph.pdf), pp. 700–701.
+The positive-norm argument is invalid over arbitrary finite fields.
+Prime-field reduction must not certify real chain validity or harmonic nullity.
+
+In edge order (01,02,12), an unfilled triangle has harmonic vector (1,-1,1)
+and spectrum (0,3,3). Adding its oriented 2-cell contributes that vector's
+outer product, giving L1=3I. A single edge has L0=[[1,-1],[-1,1]] and
+spectrum (0,2). These expectations are independent of filtration weights.
+
+The dense reference spectrum is an ordinary real symmetric eigenproblem using
+scaled cyclic Jacobi on explicitly bounded dense matrices. Residuals, norm,
+orthogonality and tolerance are recorded; thresholded zeros provide numerical
+evidence only. Index-selected spectra cannot determine full nullity.
+Explicit matrix construction and spectra check n² before dense allocation;
+their shared default entry limit is 1,048,576 per square buffer (8 MiB of f64),
+independent of work budgets. Spectra also retain a separate dimension limit.
+These configurable per-buffer bounds do not cap aggregate process memory.
+The matrix-free partial path instead diagonalizes S^T L S in a block space
+S=span(X,R,P), retaining approximate smallest Ritz pairs and checking actual
+sparse residuals. Its storage is O(n*b+b²) for fixed small block size b;
+no full coordinate matrix or full n-value spectrum is required. Residual
+convergence alone cannot certify extremal index coverage or missing multiplicity.
+It provides no harmonic-nullity claim. Both paths retain the same standard
+inner product and full/lower/upper operator, without weighted normalization.
+General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
+D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
+That extension, complex conjugate adjoints and persistent Laplacians are outside
+the initial API. See the [Hodge guide](../guides/hodge-laplacian.md) for callable
+operations, costs, exclusions and reproducible checks.
+
+## 23. Real persistent Laplacians
+
+For a same-source pair K included in L, use real ordinary chains with orthonormal
+increasing-vertex simplex bases. Let B denote the signed (q+1)-boundary of L,
+with rows grouped into K and its complement: B = [R; F]. The allowed domain of
+the persistent boundary is ker(F), with the inner product inherited from C_(q+1)(L).
+For any orthonormal kernel basis N, its upper term is R N N^T R^T. For a general
+full-rank kernel basis Z it is R Z (Z^T Z)^-1 Z^T R^T, not R Z Z^T R^T.
+
+Partition B B^T = [A E; E^T C]. Then the persistent operator is
+Delta_q(K,L) = B_q(K)^T B_q(K) + A - E C+ E^T, where C+ is the Moore--Penrose
+pseudoinverse. Singular C is permitted. At q=0, B_0 has zero rows: the lower
+term vanishes, with no augmentation. K=L gives the ordinary Hodge operator.
+The operator is self-adjoint and positive semidefinite; its exact nullity equals
+rank(H_q(K;R) -> H_q(L;R)). For integer boundaries an independent exact check is
+n_q(K) - rank_Q(B_q(K)) - rank_Q(B) + rank_Q(F).
+
+For a fixed endpoint L, eliminate the last active q-coordinate ell of the upper
+term M by M'_ij = M_ij - M_iell M_ellj / M_ellell when the pivot is nonzero.
+When the pivot is zero, positive semidefiniteness implies the eliminated row is
+zero and the leading principal block remains. Iterate to each requested start,
+then add its own lower term. This is reverse elimination at a fixed endpoint,
+not arbitrary online filtration updates. Tied births introduce no intermediate
+requested stage. Spectra transform by signed permutation under vertex relabeling.
+
+A floating near-zero pivot is not the exact zero-pivot case: even the PSD block
+`[[1,eps],[eps,eps^2]]` has a unit Schur correction. The numerical reverse route
+therefore skips only exactly uncoupled coordinates and otherwise uses the checked
+direct solve, or returns a numerical error under the original execution limits.
+For computed discarded positive directions, the direct solve bounds the sum of
+max-entry corrections `maxabs(c)^2/lambda`, normalized by the original upper Gram
+scale, in addition to its actual solve/range residuals. This prevents another
+large right-hand-side component from masking a lost correction. These finite
+floating checks do not supply an exact rank or general forward-error certificate.
+
+The [bounded dense implementation](../guides/persistent-laplacian.md) uses f64,
+relative cutoff, checked residuals and explicit storage limits. Numerical zeros
+and residual checks do not certify exact ranks or a forward-error bound.
+Independent rational projection and rank calculations cover finite fixtures;
+finite-field persistence only corroborates torsion-free examples.
+
+Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
+and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
+(2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
+equation 15 / Theorem 5.1. The implementation is independently written from
+these formulas, rather than copied from reference code.
+
+For U=A-E C+ E^T and D=B_q(K)^T B_q(K), the chain identity B_q(K) R N=0
+implies DU=UD=0. Thus their images are orthogonal. In this finite-dimensional
+setting, the nonzero spectral multiset of U+D is the union of those of U and D;
+its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
+z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
+exact ranks from arbitrary floating-point near-zero cutoffs.
+
+The implementation exposes full/upper/lower results and separately tagged
+spectra. The lower term depends only on K and requires its q-skeleton; it does
+not require L or a q+1 skeleton. Full and upper operators retain the stronger
+q+1 coverage check. Each result retains its owned bases and source metadata.
+Numerical spectrum tags identify the component, not the pair/source identity.
+
+Wolf, Fan and Monod, [Generalized Persistent Laplacians and their Spectral
+Properties](https://arxiv.org/html/2509.20220v1), arXiv:2509.20220v1 (2025-09-24),
+Section 5.2 / Theorems 5.6--5.7 and Section 5.3 / Theorem 5.11, study component
+spectral functions and generalize this decomposition. Their infinite-dimensional
+operator domains and stability hypotheses are not implemented here. The full
+operator does not inherit all component comparison properties; this does not
+rule out the fixed-K, increasing-L monotonicity, where D stays constant.
+
+## 24. Standard real discrete Dirac
+
+For a finite supplied chain complex with ordered bases, use ordinary,
+nonaugmented chains: C[-1]=0. Signed integer boundary matrices
+B[j]:C[j]->C[j-1] satisfy B[j-1]B[j]=0 over the integers, before any modular
+reduction. The standard real inner product has Gram I in every degree, so the
+adjoint is the transpose. Filtration values select stages and are not matrix
+weights. See [CSB23](bibliography.md#csb23), section 2.
+
+On C[a] + ... + C[b], let d be the degree-lowering block matrix retaining only
+B[a+1], ..., B[b], and let K=d+d^T. Thus
+`(Kx)[j] = B[j]^T x[j-1] + B[j+1] x[j+1]`, with terms outside [a,b] zero.
+Since d^2=0 and (d^T)^2=0, K^2=dd^T+d^Td is block diagonal, with degree-j
+block `B[j]^T B[j] + B[j+1] B[j+1]^T` under the **same endpoint truncation**.
+K is real symmetric. Replacing oriented incidence by absolute values or lifting
+F2 coefficients to 0/1 may break d^2=0 and this identity.
+
+Let Gamma multiply degree-j coordinates by (-1)^j. Adjacent degrees have
+opposite parity, so Gamma K=-K Gamma. Therefore each nonzero eigenvalue lambda
+pairs with -lambda, with equal multiplicity. The nonzero spectrum is the union
+of +/- the nonzero singular values of the retained adjacent B[j]: each singular
+pair gives coupled vectors in degrees j-1 and j, and the chain condition makes
+these boundary summands orthogonal. Each resulting vector retains its complete
+graded coordinates. It must not be labeled as one homology degree.
+
+Also `x^T K^2 x = ||dx||^2 + ||d^T x||^2`; hence ker K is the direct sum of
+the graded harmonic spaces. On a complete ordinary finite real chain complex,
+its dimension is the sum of the real Betti numbers. For a truncated interval,
+the kernel belongs to that interval, and generally differs from the source's
+homology. A floating eigenvalue threshold is numerical evidence, not an exact
+homology certificate; F2 Betti numbers need not equal the real ones.
+
+For one edge ordered (v0,v1,e01),
+
+```text
+K   = [[0,0,-1], [0,0,1], [-1,1,0]]
+K^2 = [[1,-1,0], [-1,1,0], [0,0,2]]
+spectrum = (-sqrt(2), 0, sqrt(2))
+```
+
+The unfilled triangle has two +/-sqrt(3) pairs and two zero eigenvalues;
+the filled triangle has three pairs and one zero eigenvalue. Restricting the
+single edge to C1 instead gives K=[0], while its full edge Laplacian is [2].
+These fixed matrices, independent Hodge blocks, orientation/parity, empty
+degrees and exact integer-chain rejection are exercised in
+[`tests/dirac.rs`](../../tests/dirac.rs).
+
+`DiracOperator` groups coordinates by degree while preserving source traversal
+within each degree. The implementation accepts at most `MAX_DIRAC_DEGREES`
+(4096) consecutive degrees, rejecting longer intervals before offset allocation
+or source access even when the source is empty or execution is unlimited. This
+bounds degree metadata, not source size, and does not restrict absolute labels.
+Duplicate signed terms are summed in checked i64 arithmetic;
+zero sums are removed. Coefficients must lie in [-2^53,2^53] for exact f64
+conversion. Retained two-step sums use checked i128 arithmetic. Numeric overflow
+is an error, including validation overflow; no modular or tolerance-based chain
+test substitutes for integer zero. Selected cells' nonzero boundary references
+must be earlier existing cells of degree one less, even when a bottom-endpoint
+map is discarded. Unselected boundaries are not read or certified.
+
+Sparse action visits incidence once and accumulates both its downward and
+transpose contributions with finite f64 products/partial sums. No dense matrix
+is needed. Explicit row-major export checks n*n and the caller's scalar-entry
+cap before allocation. Cooperative work/cancellation errors return no partial
+operator or buffer. The API supports only this real standard-inner-product
+operator: no Gram conversion, complex conjugate adjoint, general global spectrum,
+augmentation, persistent Dirac, mass term or signal filter is inferred.
+
+For a retained boundary B[j] and a positive singular value sigma, let
+B[j]v=sigma*u and B[j]^T u=sigma*v. Then u lies in im B[j] and v lies in
+im B[j]^T. The integer chain condition gives B[j-1]u=0 and B[j+1]^T v=0
+inside this same selected interval. Consequently w+=(u,v)/sqrt(2) is an
+eigenvector of the entire retained K with eigenvalue sigma; Gamma*w+ has
+eigenvalue -sigma, where Gamma is absolute-degree parity. Different retained
+boundaries contribute orthogonal nonzero chain subspaces, so their nonzero
+singular values contribute separate signed multiplicities. This recovers the
+nonzero spectrum without independently diagonalizing the entire Dirac matrix.
+
+The implemented boundary-spectrum path approximates selected largest singular
+modes through matrix-free B[j]^T B[j] block LOBPCG and a small Ritz problem.
+It verifies the reconstructed signed residuals with the actual truncated K.
+Thresholded positive modes do not certify rank, the kernel or extremal coverage.
+Normal-map tolerances have sigma² units; division by |sigma| translates the
+absolute error scale to signed Dirac residual units and reflects conditioning.

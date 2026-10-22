@@ -1,6 +1,7 @@
 ![Cocycle — topology, computed in Rust](assets/banner.svg)
 
 [![CI](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml)
+[![Documentation](https://github.com/Aequiludium/cocycle-rs/actions/workflows/pages.yml/badge.svg?branch=main)](https://aequiludium.github.io/cocycle-rs/)
 [![Rust 1.91+](https://img.shields.io/badge/Rust-1.91%2B-102D32?style=flat-square)](Cargo.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-087D70?style=flat-square)](LICENSE)
 
@@ -15,6 +16,8 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
+- **Real Hodge analysis** — sparse action, explicit matrices, bounded dense
+  spectra and matrix-free partial eigenpairs under the standard inner product (Unreleased).
 - **Unreleased stage access** — borrowed sublevel stages and checked inclusions
   between increasing scales of the same frozen source, preserving IDs and signs.
 - **Sparse approximation** — deterministic sampling, modified edges and higher-simplex
@@ -27,10 +30,16 @@ dependencies and no unsafe code.
   diagram/context data can be shared by specialized result types.
 - **Useful summaries** — finite lifetimes, persistence entropy in nats, and Betti
   curves, computed directly from a diagram.
+- **Unreleased Dirac operators** — sparse real action and bounded matrix export
+  on signed chains, selected signed boundary modes, explicit degree truncation
+  and source-local coordinates.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
 - **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
   with bounded Partial U; updates and differentiation remain caller-owned.
+- **Unreleased persistent Laplacians** — bounded real stage-pair Schur operators,
+  action, complete numerical spectra and fixed-endpoint reverse elimination.
+  See the [usage and limits](docs/guides/persistent-laplacian.md).
 
 ![A square's Rips filtration: points, a loop at edge length 1, and filled triangles at sqrt(2).](assets/filtration.svg)
 
@@ -108,7 +117,8 @@ for certified sources, errors and the distinction from general chain maps.
 
 ## Explore
 
-[API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
+[Documentation website](https://aequiludium.github.io/cocycle-rs/) ·
+[API reference](https://docs.rs/cocycle) · [Documentation map](docs/README.md) ·
 [Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
 [Architecture](docs/development/architecture.md) · [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) ·
 [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)
@@ -120,9 +130,13 @@ Run `cargo run --locked --example diagram_analysis` to analyze supplied interval
 without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
+Run `cargo run --locked --example dirac` for real Dirac action on a filled triangle;
+see the [Dirac guide](docs/guides/dirac.md).
 The unreleased source API also provides [F2 homology operators](docs/guides/homology-operators.md):
 run `cargo run --locked --example homology_operators` for class queries, finite
 transport and bounded exact integer geometry queries on historical features.
+Run `cargo run --locked --example hodge_laplacian` for standard real Hodge
+matrices and spectra; see the [Hodge guide](docs/guides/hodge-laplacian.md).
 
 Read the [published API reference](https://docs.rs/cocycle), or build it locally
 with `cargo doc --no-deps --open`. From a repository
@@ -144,7 +158,7 @@ comparison and analysis. Filtration selects scales when needed; computation
 produces concrete results that comparison and analysis can borrow independently.
 See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
 [roadmap](docs/design/roadmap.md#phase-4-priorities) and
-[interface guide](docs/guides/interface-contracts.md). Laplacian/Dirac solvers,
+[interface guide](docs/guides/interface-contracts.md). Laplacian operators and general Dirac spectra,
 persistent spectra, optimal F₂ projections, non-diagram similarity and external
 learning remain future contracts, described in the [route report](docs/research/route-integration.md).
 

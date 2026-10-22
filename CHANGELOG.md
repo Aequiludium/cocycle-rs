@@ -13,10 +13,70 @@
   cycles and finite H1/H2 optimal/stable volumes. Searches share execution
   controls and return errors on interruption; selected-P readouts are unchanged.
 
+- Keep the unreleased Dirac API under `cocycle::dirac`, separate from persistent
+  Laplacians. Partial results expose `is_index_coverage_certified() == false`.
+
+- Add matrix-free Dirac `boundary_spectrum`: selected nonzero singular modes of
+  retained B[j] reconstruct signed eigenpairs of the same truncated operator.
+  Share block LOBPCG and the small Ritz solver with Hodge; verify full sparse
+  residuals, chirality and multiplicity. Kernel/rank and global spectrum coverage
+  are not certified; normal maps square conditioning.
+- Keep the unreleased persistent Laplacian API under `cocycle::persistent_laplacian`.
+  Coupled near-zero reverse pivots use a checked direct Schur fallback under the
+  same execution budget; results report `used_direct_fallback()`.
+- Mark residual-based partial Hodge results explicitly with
+  `is_index_coverage_certified() == false`, including after successful convergence.
+
+- Add matrix-free Hodge `smallest_eigenpairs` using bounded block LOBPCG and
+  the shared small Jacobi Ritz solver. Preserve numerical residuals and owned
+  coordinates without retaining a dense operator matrix. Iterative convergence
+  does not certify extremal index coverage or harmonic nullity; weighted and
+  normalized operators remain future work.
+
+- Add standard real single-scale Hodge Laplacians from supplied complexes or
+  stages: sparse full/lower/upper action, explicit row-major matrices and bounded
+  dense selected eigenpairs with measured residuals and orthogonality, and
+  borrowed numerical kernel-column reads. Integer
+  chain validation is independent of prime-field persistence. General SPD Grams,
+  complex coefficients remain outside the Hodge domain. Persistent Laplacians
+  use their separate domain.
+- Bound explicit Hodge matrices to 1,048,576 entries (8 MiB of f64) by default
+  before dense allocation. `matrix_with_limit` and `SpectrumOptions::max_dense_entries`
+  allow explicit per-buffer limits; sparse action remains independent. Spectrum
+  callers using full option literals must supply the new field or use `..Default::default()`.
+
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
+- Add `dirac::DiracOperator` for standard real, nonaugmented signed chains:
+  owned graded bases, integer chain validation, sparse action and explicitly
+  bounded matrix export, including degree truncation and execution controls.
+  Degree intervals are capped at `dirac::MAX_DIRAC_DEGREES` (4096)
+  before offset allocation or source access, including empty inputs.
+  Nonstandard Gram, complex and persistent Dirac remain outside this API.
+- Add hand-matrix and resource/error regressions, a runnable `dirac` example,
+  an independent NumPy fixture checker with optional fixed TopoNetX/GUDHI
+  probes, and the corresponding mathematical/usage contracts.
+- Add bounded real `persistent_laplacian::PersistentLaplacian` for same-source stages:
+  generalized Schur construction, owned matrix/action and numerical spectrum,
+  plus explicitly selected fixed-endpoint reverse elimination. Standard inner
+  products only; storage limits, numeric residuals and execution controls are
+  explicit. Includes an independent rational/NumPy reproduction tool.
+  Independent upper/lower constructors share the owned result type and expose
+  separate matrix/action/spectrum requests. `LaplacianComponent` tags results
+  and spectra; lower-only computation needs no endpoint or q+1 skeleton.
+  Spectrum struct literals must now supply the new `component` field.
+  PSD acceptance and suggested near-zero thresholds retain the original Gram
+  scale through Schur cancellation; raw eigenvalues are not clipped.
+
+- Add a Sphinx/MyST/Furo documentation website with task-based navigation,
+  installation, a released-crate quickstart and a diagram-distance guide.
+  Check PR builds and publish main documentation through GitHub Pages Actions.
+- Document the separate Hodge, Dirac and persistent Laplacian candidates with
+  worked examples, concrete interfaces, coordinate/result ownership and numerical
+  resource limits. Add the external spectral-feature reproduction and schema;
+  keep these candidate descriptions distinct from main and released APIs.
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.
 - Consolidate stage usage, the six-responsibility architecture and Phase-4
