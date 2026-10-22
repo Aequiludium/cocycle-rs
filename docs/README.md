@@ -1,5 +1,8 @@
 # Documentation
 
+[Website home](index.md) · [Installation](getting-started/installation.md) ·
+[Quickstart](getting-started/quickstart.md) · [API reference](reference/api.md)
+
 Cocycle is a native Rust TDA library. It computes dimension-generic ordinary Rips
 persistence over prime fields, constructs exact threshold graphs and frozen
 simplicial complexes, and accepts supplied flag filtrations. Sparse Rips
@@ -19,23 +22,24 @@ proposed APIs and remaining acceptance gates.
 Usage pages describe this checkout, including **Unreleased** borrowed stages,
 critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
-and [architecture](development/architecture.md) for candidate additions.
-The bounded real [persistent Laplacian](guides/persistent-laplacian.md) reproduction
-is also Unreleased. General Hodge/Dirac solvers, scalable sparse persistent spectra,
-optimal F2 projections, non-diagram
-similarity, external learning and automatic feedback remain future contracts.
+and [architecture](development/architecture.md) for source additions.
+Standard real Hodge action and eigenpairs, and bounded real persistent Laplacians
+are available in this checkout. The Dirac implementation remains a separate PR
+candidate. None of these operators is included in released 0.1.1. Production
+spectral consumers, general SPD/complex Hodge, scalable sparse persistent spectra,
+optimal F2 projections, non-diagram similarity, external-learning integration and
+automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
 
-This revision is prepared from [#119 at
-`a2a1841c`](https://github.com/Aequiludium/cocycle-rs/commit/a2a1841c3d566758497f377da5a72f422b8728be),
-observed open on 2026-10-11, including the later accessor-contract clarification.
-The original audit used `64ab5fdc`. The [route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
-lists the migration/source/contract inputs. Those hashes, PR states and checks
-remain historical evidence after integration; they are not a live release status.
-Main integration and release follow the [release procedure](../CONTRIBUTING.md#release-procedure).
+The website follows main. Versioned APIs are documented on docs.rs; main
+integration does not publish a crate version. The
+[route record](research/route-integration.md#integrated-existing-pipeline-87-and-94)
+retains the dated #119 audit, migration/source/contract inputs and their checks.
+Those historical hashes and PR states do not describe the current branch or
+release. Releases follow the [release procedure](../CONTRIBUTING.md#release-procedure).
 
-The candidate excludes #26/#49's paused preparation and #56's experimental adaptive
+The adopted scope excludes #26/#49's paused preparation and #56's experimental adaptive
 H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
 do not supply its unmeasured direct-graph and H2/H3 performance gates.
 
@@ -46,6 +50,8 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 
 - [Real persistent Laplacians](guides/persistent-laplacian.md): same-source pairs,
   Schur operators, complete numerical spectra and fixed-endpoint elimination.
+- [Real Hodge Laplacians](guides/hodge-laplacian.md): sparse action, explicit
+  matrices, dense/partial spectra, numeric evidence and independent reproduction.
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
   bounded partial U and a lower-star simplification step.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
@@ -60,7 +66,7 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
   sampling provenance and implicit/explicit computation.
 - [Fields and representatives](guides/rips-representatives.md): select a prime
   field and request owned cycle/cocycle bases associated with intervals.
-- [Diagram-distance example](../examples/diagram_distances.rs): compare complete
+- [Diagram-distance guide](guides/diagram-distances.md): compare complete
   diagrams with bottleneck, W1 or W2; run `cargo run --locked --example diagram_distances`.
   The [matching specification](reference/mathematics.md#16-diagram-matching-distances)
   defines the metrics, supported endpoints and context requirements.
@@ -69,6 +75,24 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 - [Published API reference](https://docs.rs/cocycle): browse rustdoc for signatures
   and error contracts. For the current checkout's [API source](../src/lib.rs),
   build locally with `cargo doc --locked --no-deps --open`.
+
+## Review operator candidates
+
+These pages follow the same input, example, result and execution conventions as
+the usage guides. Hodge and persistent Laplacians are available in this checkout. The Dirac guide
+identifies its separate candidate checkout for runnable examples and rustdoc.
+
+| Operation | Guide and scope |
+| --- | --- |
+| Apply a real operator at one stage | [Hodge Laplacians](guides/hodge-laplacian.md): signed chain windows, full/lower/upper terms, dense and partial spectral results |
+| Couple adjacent chain degrees | [Dirac operators](guides/dirac.md): graded coordinates, endpoint truncation and selected signed boundary modes |
+| Analyze a source/target stage pair | [Persistent Laplacians](guides/persistent-laplacian.md): checked inclusions, Schur construction, components and fixed endpoints |
+| Turn pair spectra into learning inputs | [Spectral-feature reproduction](research/persistent-spectral-features.md): external Python workflow, schema/masks, controls and evidence limits |
+
+The [API entry points](reference/api.md#operator-interfaces-under-review) identify
+the concrete types and their source contracts. Existing
+[F2 operators](guides/homology-operators.md) use a different coefficient model;
+an F2 projection is not a real Hodge or Dirac operator.
 
 ## Understand and develop the core
 
@@ -128,6 +152,7 @@ the performance of unmeasured code.
 
 | Directory | Owns |
 | --- | --- |
+| `getting-started/` | Installation and a minimal released-crate calculation |
 | `guides/` | Task-oriented usage of implemented capabilities |
 | `reference/` | Mathematical contracts, derivations, and bibliography |
 | `development/` | Current architecture, coding conventions, and validation strategy |
@@ -135,6 +160,8 @@ the performance of unmeasured code.
 | `research/` | Upstream investigations tied to a source revision and scope |
 
 Add a document to the directory matching its purpose and link it from this index.
+Also add it to the website navigation in [index.md](index.md); the strict Sphinx
+build checks that every maintained page belongs to the navigation.
 Use descriptive capability names such as `guides/rips.md`; add subdirectories
 when a subject has multiple documents that need their own navigation. Do not
 create empty sections for unimplemented capabilities or duplicate the source tree

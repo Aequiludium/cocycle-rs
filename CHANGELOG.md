@@ -5,6 +5,25 @@
 - Keep the unreleased persistent Laplacian API under `cocycle::persistent_laplacian`.
   Coupled near-zero reverse pivots use a checked direct Schur fallback under the
   same execution budget; results report `used_direct_fallback()`.
+- Mark residual-based partial Hodge results explicitly with
+  `is_index_coverage_certified() == false`, including after successful convergence.
+
+- Add matrix-free Hodge `smallest_eigenpairs` using bounded block LOBPCG and
+  the shared small Jacobi Ritz solver. Preserve numerical residuals and owned
+  coordinates without retaining a dense operator matrix. Iterative convergence
+  does not certify extremal index coverage or harmonic nullity; weighted and
+  normalized operators remain future work.
+
+- Add standard real single-scale Hodge Laplacians from supplied complexes or
+  stages: sparse full/lower/upper action, explicit row-major matrices and bounded
+  dense selected eigenpairs with measured residuals and orthogonality, and
+  borrowed numerical kernel-column reads. Integer
+  chain validation is independent of prime-field persistence. General SPD Grams,
+  complex coefficients and persistent Laplacians remain unsupported.
+- Bound explicit Hodge matrices to 1,048,576 entries (8 MiB of f64) by default
+  before dense allocation. `matrix_with_limit` and `SpectrumOptions::max_dense_entries`
+  allow explicit per-buffer limits; sparse action remains independent. Spectrum
+  callers using full option literals must supply the new field or use `..Default::default()`.
 
 These entries describe implemented candidate changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
@@ -22,6 +41,13 @@ for the integration provenance and separate future capability contracts.
   PSD acceptance and suggested near-zero thresholds retain the original Gram
   scale through Schur cancellation; raw eigenvalues are not clipped.
 
+- Add a Sphinx/MyST/Furo documentation website with task-based navigation,
+  installation, a released-crate quickstart and a diagram-distance guide.
+  Check PR builds and publish main documentation through GitHub Pages Actions.
+- Document the separate Hodge, Dirac and persistent Laplacian candidates with
+  worked examples, concrete interfaces, coordinate/result ownership and numerical
+  resource limits. Add the external spectral-feature reproduction and schema;
+  keep these candidate descriptions distinct from main and released APIs.
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.
 - Consolidate stage usage, the six-responsibility architecture and Phase-4

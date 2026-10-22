@@ -1,6 +1,7 @@
 ![Cocycle — topology, computed in Rust](assets/banner.svg)
 
 [![CI](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aequiludium/cocycle-rs/actions/workflows/ci.yml)
+[![Documentation](https://github.com/Aequiludium/cocycle-rs/actions/workflows/pages.yml/badge.svg?branch=main)](https://aequiludium.github.io/cocycle-rs/)
 [![Rust 1.91+](https://img.shields.io/badge/Rust-1.91%2B-102D32?style=flat-square)](Cargo.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-087D70?style=flat-square)](LICENSE)
 
@@ -15,6 +16,8 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
+- **Real Hodge analysis** — sparse action, explicit matrices, bounded dense
+  spectra and matrix-free partial eigenpairs under the standard inner product (Unreleased).
 - **Unreleased stage access** — borrowed sublevel stages and checked inclusions
   between increasing scales of the same frozen source, preserving IDs and signs.
 - **Sparse approximation** — deterministic sampling, modified edges and higher-simplex
@@ -111,7 +114,8 @@ for certified sources, errors and the distinction from general chain maps.
 
 ## Explore
 
-[API reference](https://docs.rs/cocycle) · [Guides and documentation](docs/README.md) ·
+[Documentation website](https://aequiludium.github.io/cocycle-rs/) ·
+[API reference](https://docs.rs/cocycle) · [Documentation map](docs/README.md) ·
 [Filtered complexes](docs/guides/filtered-complexes.md) · [Rips guide](docs/guides/rips.md) · [Graph construction](docs/guides/rips-construction.md) · [Mathematics](docs/reference/mathematics.md) ·
 [Architecture](docs/development/architecture.md) · [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) ·
 [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/design/roadmap.md)
@@ -125,6 +129,8 @@ Run `cargo run --locked --example complex_construction` to construct a lower-sta
 filtration, inspect its simplices and compute persistence using existing APIs.
 The unreleased source API also provides [F2 homology operators](docs/guides/homology-operators.md):
 run `cargo run --locked --example homology_operators` for class queries and finite transport.
+Run `cargo run --locked --example hodge_laplacian` for standard real Hodge
+matrices and spectra; see the [Hodge guide](docs/guides/hodge-laplacian.md).
 
 Read the [published API reference](https://docs.rs/cocycle), or build it locally
 with `cargo doc --no-deps --open`. From a repository

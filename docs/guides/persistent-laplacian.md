@@ -1,6 +1,6 @@
 # Real persistent Laplacians
 
-[Documentation](../README.md) / Usage
+[Documentation](../index.md) / Usage
 
 The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
 Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
@@ -151,7 +151,7 @@ chain maps, multiparameter spectra and dynamic insertion/deletion have no entry
 point in this API. Multiscale consumers and spectral feature learning remain
 separate integration work.
 
-See the [mathematical specification](../reference/mathematics.md#22-real-persistent-laplacians)
+See the [mathematical specification](../reference/mathematics.md#23-real-persistent-laplacians)
 and [independent reproduction tool](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/compare_persistent_laplacians.py).
 The tool uses NumPy Schur and SVD nullspace routes, exact rational restricted-domain
 matrices and real persistent ranks. Its optional GUDHI checks use explicitly

@@ -1,0 +1,90 @@
+name: Hodge references
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  hodge-reference:
+    name: Real Hodge reference comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: pyt-team/TopoNetX
+          ref: ce3d414b571fff95916c4cbc20b8d2c2c9d428e6
+          path: target/hodge-sources/toponetx
+          persist-credentials: false
+          sparse-checkout: toponetx/classes
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tomogwen/persistentlaplaciandatascience
+          ref: b36b080f739653d84284f3f7ca9ccea5fad286ae
+          path: target/hodge-sources/perslap
+          persist-credentials: false
+          sparse-checkout: src
+      - run: python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0
+      - name: Record source and dependency identities
+        run: |
+          python - <<'PY'
+          import hashlib, importlib.metadata, json, os, subprocess
+          from pathlib import Path
+          output = Path("target/hodge-reference")
+          output.mkdir(parents=True, exist_ok=True)
+          references = {"toponetx":{"path":"target/hodge-sources/toponetx","file":"toponetx/classes/simplicial_complex.py"},"perslap":{"path":"target/hodge-sources/perslap","file":"src/perslap.py"}}
+          for reference in references.values():
+              path = Path(reference["path"])
+              reference["commit"] = subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+              source = path / reference["file"]
+              reference["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+          fields = ("GITHUB_SHA", "GITHUB_REF", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY")
+          record = {key: os.environ.get(key) for key in fields}
+          record["checkout_sha"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          record["references"] = references
+          record["toolchains"] = {name: subprocess.check_output([name, "--version"], text=True).strip() for name in ("cargo", "rustc")}
+          record["versions"] = {name: importlib.metadata.version(name) for name in ("numpy", "scipy", "gudhi",)}
+          (output / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Run independent comparisons
+        run: |
+          cargo run --locked --release --example hodge_laplacian > target/hodge-reference/rust.jsonl 2> target/hodge-reference/build.log
+          python tools/check_hodge.py --rust target/hodge-reference/rust.jsonl --output target/hodge-reference/results.json --iterative --toponetx target/hodge-sources/toponetx/toponetx/classes/simplicial_complex.py --perslap target/hodge-sources/perslap/src/perslap.py --gudhi --path-convergence 2>&1 | tee target/hodge-reference/check.log
+      - name: Check domain worker, guide and example
+        run: |
+          rustfmt --edition 2024 --check tools/reference/hodge_resources.rs
+          cargo build --locked --release
+          rustdoc --edition 2024 -D warnings --test docs/guides/hodge-laplacian.md --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps
+          cargo run --locked --example hodge_laplacian > target/hodge-reference/example.jsonl
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: hodge-reference-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: target/hodge-reference/
