@@ -2,9 +2,27 @@
 
 import unittest
 from check_homology_operators import compare, expected_span, fixture, wire
+from benchmark_operator_family import PROTOCOL, fixture as family_fixture, oracle, validate_result
 
 
 class OperatorProtocolTests(unittest.TestCase):
+    def test_family_fixture_oracle_distinguishes_filled_disk_and_many_live_classes(self):
+        disk = oracle(family_fixture("fan", 4))
+        graph = oracle(family_fixture("graph", 4))
+        self.assertEqual(disk[0][-1], 0)
+        self.assertEqual(max(disk[0]), 2)
+        self.assertEqual(sum(death is None for _, death in disk[1]), 0)
+        self.assertEqual(graph[0][-1], 3)
+        self.assertEqual(sum(death is None for _, death in graph[1]), 3)
+
+    def test_family_resource_failures_and_wrong_betti_cannot_pass(self):
+        cells = family_fixture("fan", 4)
+        with self.assertRaises(ValueError):
+            validate_result({"state": "ResourceExhausted"}, cells, "construct")
+        result = {"state": "Computed", "protocol": PROTOCOL, "mode": "construct",
+                  "stages": len(cells), "betti": [0] * len(cells), "bars": [], "histories": []}
+        with self.assertRaises(ValueError):
+            validate_result(result, cells, "construct")
     def test_generator_preserves_chain_equation_across_word_boundaries(self):
         for n in (0, 1, 5, 63, 64, 65, 129):
             data = fixture(n, 20261009)

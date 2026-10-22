@@ -1,24 +1,37 @@
 # Real persistent Laplacians
 
-[Documentation](../index.md) / Guides
+[Documentation](../index.md) / Usage
 
-This guide describes the interface under review in
-[PR #131](https://github.com/Aequiludium/cocycle-rs/pull/131), checked against
-[source 867d9ac](https://github.com/Aequiludium/cocycle-rs/tree/867d9acfddde3cd68f9ad24a8a17a36574220acc/src/persistent_laplacian).
-It is absent from this documentation branch and the released 0.1.1 crate.
-The example requires that candidate checkout. Rustdoc in that checkout owns the
-complete signatures and errors; the [API reference](../reference/api.md#operator-interfaces-under-review)
-records the interface entry points.
+The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
+Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
+Its private Jacobi solver retains its own convergence/error/resource policy.
 
-A persistent Laplacian belongs to an inclusion $K_s\subseteq L_t$, rather than
-one ordinary stage. It uses real coefficients, standard inner products and
-ordinary nonaugmented chains. The candidate computes a bounded dense matrix,
-action and complete numerical eigenvalues while preserving the pair's bases
-and source metadata.
+Reverse elimination skips a near-zero pivot only if its retained coupling is
+exactly zero. Small coupling alone cannot bound the Schur correction: the PSD
+block `[[1, eps], [eps, eps*eps]]` has a unit correction. Coupled near-zero pivots
+rebuild the original upper Gram and use the checked direct Schur solve for this
+and subsequent starts, under the same cumulative work and per-buffer storage
+limits. `used_direct_fallback()` records this route. A failed direct solve returns
+a numerical error; no tolerance is increased and no coupled correction is dropped.
 
-## Compute a two-stage operator
+The direct solve also bounds the accumulated max-entry correction of discarded
+positive eigenmodes against the existing residual tolerance and original Gram
+scale. A small solve residual relative to another large right-hand-side entry
+cannot justify dropping a large correction. A separate PSD Gram regression
+exposes this failure before the guard; it now returns a numerical error. These
+floating checks remain numerical evidence, not a forward-error/rank certificate.
 
-```rust,ignore
+This is a bounded dense reference route. The default 65,536-entry per-buffer cap
+limits the target degree basis to 256; cumulative output storage is capped too.
+It does not establish a high-performance persistent spectral kernel.
+
+This **Unreleased** bounded dense implementation computes an actual stage-pair
+operator, its action and its complete numerical spectrum. It uses real
+coefficients, standard inner products, increasing-vertex orientation and ordinary
+nonaugmented chains. It requires a checked same-source inclusion; cloned or
+unrelated owners, reversed scales and mixed certificates are rejected.
+
+```rust
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
@@ -32,126 +45,114 @@ let source = SimplicialComplex::new(vec![
 ])?;
 let k = source.stage(0.)?;
 let l = source.stage(2.)?;
-let execution = Execution::default();
 let options = SpectralOptions::default();
+let execution = Execution::default();
 let operator = PersistentLaplacian::compute(&k, &l, 0, options, &execution)?;
 assert_eq!(operator.matrix(), &[0.5, -0.5, -0.5, 0.5]);
 assert_eq!(operator.action(&[1., -1.], &execution)?, [1., -1.]);
 let spectrum = operator.spectrum(&execution)?;
 assert!(spectrum.eigenvalues[0].abs() < 1e-10);
 assert!((spectrum.eigenvalues[1] - 1.).abs() < 1e-10);
-
+let up = PersistentLaplacian::compute_up(&k, &l, 0, options, &execution)?;
 let down = PersistentLaplacian::compute_down(&k, 0, options, &execution)?;
-assert_eq!(down.component(), LaplacianComponent::Down);
-assert_eq!(down.scales(), (0., 0.));
+assert_eq!(up.matrix(), operator.matrix()); // ordinary B0 is zero
 assert_eq!(down.matrix(), &[0.; 4]);
+assert_eq!(down.scales(), (0., 0.)); // no endpoint L is required
+assert_eq!(up.component(), LaplacianComponent::Up);
+assert_eq!(down.spectrum(&execution)?.component, LaplacianComponent::Down);
 let starts = [source.stage(-1.)?, k, l];
 let reverse = fixed_endpoint_laplacians(&starts, &l, 0, options, &execution)?;
 assert_eq!(reverse[1].matrix(), operator.matrix());
 # Ok::<(), cocycle::Error>(())
 ```
 
-Run `cargo run --locked --example persistent_laplacian` in the candidate
-checkout for additional pair and component output.
+Run `cargo run --locked --example persistent_laplacian`. Matrix rows and action
+coordinates follow `basis()`, whose simplices retain original labels and births.
+The owned result also carries the target q-basis, degree, pair scales, source
+context, source coverage and construction dimension. It survives source release.
+Metadata describes the source and requested pair, not cross-source equality.
+No persistence diagram conversion is implicit.
 
-## Establish the inclusion and operator
+`compute_up` and `compute_down` return the same owned result type with an
+explicit `LaplacianComponent` tag. Each has its own matrix, action and spectrum.
+The lower constructor accepts K alone, records (s,s) and K as both bases, and
+requires only the certified q-skeleton. It does not form a target upper Gram or
+run Schur elimination. This allows the lower result/spectrum to be reused across
+different endpoints. Full and upper constructors still require the certified
+q+1 skeleton. Spectrum component tags distinguish Full/Up/Down, but do not
+authenticate a pair: consumers must retain the operator's degree, ordered bases
+and source metadata. Spectra of equally sized or numerically equal matrices
+from different requests are not implicitly identified.
 
-Inputs are borrowed `SimplicialStage` values from the same original owner,
-with source scale <= target scale and checked inclusion. Equal cloned complexes
-or equal integer IDs do not establish common ownership. Certified constructions
-must contain the required skeleton: full/upper need degree $q+1$ unless expansion
-exhausted the source; lower-only needs degree $q$. Bare supplied complexes define
-their entire mathematical source. Missing certified cofaces are errors.
+In this finite-dimensional standard-inner-product setting, write U for the
+persistent upper term and D for the lower term. The chain identity gives
+UD=DU=0. The nonzero spectrum of U+D is the multiset union of the two nonzero
+component spectra; the full zero multiplicity is z(U)+z(D)-dim(C_q(K)).
+Concatenating both complete spectra would incorrectly double the dimension.
+See Wolf--Fan--Monod, [arXiv:2509.20220v1](https://arxiv.org/html/2509.20220v1#S5.SS3),
+Theorem 5.11. The current `spectrum` implementation diagonalizes the selected
+matrix and never infers exact ranks or merges near-zero eigenvalues implicitly.
+Only the full operator's exact nullity is the persistent Betti number; component
+nullities need not be. This API does not assert arbitrary eigenvalue arrays are
+monotone or stable: the paper's spectral-function theorems have their stated
+filtration, inclusion and comparison conditions. In particular, fixing K and
+enlarging L keeps D fixed, so it does not lose the upper term's monotonicity.
 
-Reorder the target upper Gram by the retained $q$-basis of $K$ and the eliminated
-coordinates of $L$. With blocks $A,E,C$, the standard real operator is
+The direct route follows the author's [SchurComp.m](https://github.com/ndag/Persistent-Laplacian/blob/ebff6e3ad6f5eb90eb8058e4f5567755b62f0c3e/SchurComp.m): solve C X = E^T in minimum
+norm, then form A - E X without materializing C+. A cyclic symmetric Jacobi
+eigensystem supplies the retained solve directions. This order avoids squaring
+couplings before division, which can lose a representable correction at extreme
+scales. Relative eigenvalue cutoff, eigensystem, discarded-range, actual solve
+and reconstructed symmetry residuals are checked. The complete spectrum retains multiplicity and small
+signed roundoff values. Neither a thresholded pseudoinverse nor a near-zero count
+is an exact Betti certificate. `solver_residual()` describes the Schur solve;
+`LaplacianSpectrum::residual` describes the final eigensystem. These are max-entry
+residuals normalized by their respective scales, not forward-error or
+condition-number certificates. Solve error uses max(abs(E)); a zero denominator
+keeps the absolute error. Reconstruction symmetry uses the original upper Gram
+scale. See the exact policy in the source rustdoc.
 
-$$
-L_q^{s,t}=\underbrace{A-EC^+E^\top}_{U_q^{s,t}}
-          +\underbrace{B_q(K)^\top B_q(K)}_{D_q^s}.
-$$
+`reference_scale()` is the larger max-entry scale of the assembled matrix and
+its original target upper Gram; lower-only results use their own Gram scale.
+PSD acceptance uses `residual_tolerance` times this reference, and the suggested
+near-zero threshold uses `relative_tolerance` times it. Thus an exactly zero
+upper term with tiny signed Schur cancellation errors is not judged solely at
+the scale of that rounding noise. Eigenvalues remain unclipped. Eigensystem
+residuals are still normalized by the selected matrix, and neither these
+thresholds nor the reference scale certify forward error or exact ranks.
 
-The direct implementation solves $CX=E^\top$ in minimum norm before forming
-$A-EX$; it does not materialize $C^+$. When $K=L$, the result is the ordinary
-[full Hodge operator](hodge-laplacian.md). Exact full nullity has the persistent
-Betti interpretation. Numerical threshold counts and component nullities do not
-supply that certificate.
+`fixed_endpoint_laplacians` builds the target upper term once and removes
+q-coordinates in reverse filtration order. It adds each start's own lower term,
+including ties, repeated scales and empty stages, and returns input order.
+Near-zero pivots require a small eliminated row; incompatible rows fail explicitly.
+The algorithm is caller-selected. Performance evidence does not automatically
+adopt it as the default or establish online endpoint-update support.
+`fixed_endpoint_up_laplacians` performs the same elimination while returning
+only the tagged upper results, without constructing any source lower terms.
 
-## Choose components and read results
+The default cap is 65,536 f64 entries per dense buffer, limiting the target
+q-basis to 256 entries. Fixed-endpoint results additionally cap their cumulative
+matrix entries. Buffers coexist; the cap is not a total RAM quota. Storage is
+quadratic. Each Jacobi sweep on an m-by-m matrix costs O(m^3); the configured
+`max_sweeps` bounds the number of sweeps, and residual evaluation also requires
+matrix products. Schur construction, incidence traversal and owned output have
+additional costs. A paper's construction bound is not an end-to-end bound for
+this iterative implementation or its complete spectrum.
+Large inputs are rejected before Gram allocation. This is a core reproduction,
+not a scalable sparse or matrix-free eigensolver. `Execution` checks cooperative
+cancellation and work limits throughout incidence, dense rows and rotations;
+sorting and allocation cannot be interrupted internally.
 
-All constructors below take a degree, `SpectralOptions` by value and an
-`&Execution`, and return `Result<PersistentLaplacian>` unless a vector is shown.
+For certified constructions, a missing q+1 skeleton is an error unless expansion
+exhausted the source. Missing cofaces are not silently read as zeros. Bare supplied
+complexes instead define the entire mathematical source, with genuinely absent
+adjacent degrees treated as zero. Weighted Grams, complex coefficients, general
+chain maps, multiparameter spectra and dynamic insertion/deletion have no entry
+point in this API. Multiscale consumers and spectral feature learning remain
+separate integration work.
 
-| Operation | Input and returned component |
-| --- | --- |
-| `PersistentLaplacian::compute(k, l, degree, options, execution)` | Two stages; `LaplacianComponent::Full` |
-| `compute_up(k, l, degree, options, execution)` | Two stages; `Up`, without the source lower term |
-| `compute_down(k, degree, options, execution)` | Source only; `Down`, with recorded scales `(s,s)` |
-| `fixed_endpoint_laplacians(starts, target, degree, options, execution)` | Ordered source stages and one target; `Vec<PersistentLaplacian>` in input order |
-| `fixed_endpoint_up_laplacians(starts, target, degree, options, execution)` | Same fixed-target route, retaining upper components only |
-
-The result owns `basis()`, `target_basis()`, `degree()`, `scales()`,
-`source_context()`, `source_coverage()` and `construction_dimension()`.
-`matrix()` borrows the owned row-major matrix; `action(x, execution)` returns
-owned coordinates in `basis()` order. Dropping source storage does not invalidate
-the operator. Metadata describes that source/pair, not cross-source equivalence.
-
-`spectrum(execution)` returns `LaplacianSpectrum` with public fields
-`component`, `eigenvalues`, `residual` and `zero_threshold`. It returns all
-eigenvalues in increasing order with multiplicity and without clipping small
-negative roundoff. Eigenvectors and partial index selection are not exposed.
-Retain the originating operator's metadata when storing this result: its component
-tag alone does not authenticate a pair or its coordinates.
-
-For standard real chains, $UD=DU=0$. The nonzero full spectrum is the multiset
-union of the component nonzero spectra; full zero multiplicity is
-$z(U)+z(D)-\dim C_q(K)$. Concatenating both complete spectra doubles the domain
-incorrectly. This interface does not infer exact ranks or recombine thresholded
-spectra automatically.
-
-## Control elimination and understand numerical limits
-
-`SpectralOptions` defaults to `relative_tolerance=1e-12`,
-`residual_tolerance=1e-9`, `max_sweeps=64` and `max_dense_entries=65_536`.
-The last bounds each dense buffer and the cumulative fixed-endpoint output
-entries. A target Gram therefore has at most 256 coordinates by default;
-coexisting buffers are additional memory. Storage is quadratic, and each cyclic
-Jacobi sweep has cubic work. This is a bounded dense reference implementation.
-
-Fixed-endpoint construction reuses the target upper term, eliminates coordinates
-in reverse filtration order and adds each source's own lower term. It preserves
-ties, repeated scales and empty stages. A near-zero pivot may be skipped only
-when retained coupling is exactly zero. Otherwise the route uses a checked direct
-Schur fallback under the same cumulative `Execution` budget, tolerances and
-storage policy. `used_direct_fallback()` records that choice.
-
-Direct solving checks discarded positive-direction correction bounds as well as
-solve and symmetry residuals. A small solve residual alone cannot justify dropping
-a large Schur correction. Unsafe cases return `NumericalFailure`; increasing a
-tolerance is not a correctness repair. Realizability of the general PSD
-counterexamples by the current unweighted simplicial inputs has not been established.
-
-`solver_residual()` describes normalized Schur/range/correction checks, whereas
-`LaplacianSpectrum::residual` measures the selected matrix's eigensystem.
-`reference_scale()` retains the larger assembled/input-Gram scale for PSD and
-near-zero guidance. These are numerical diagnostics, not forward-error or exact
-rank certificates. The persistent Jacobi solver retains its own policy separately
-from the Hodge/Dirac block solver.
-
-Construction and fixed-endpoint work use their documented cumulative budgets;
-later action/spectrum calls start fresh budgets. Cancellation, work exhaustion,
-invalid owners/scales, missing skeletons, storage overflow and numerical failures
-return errors without successful partial output. Buffer limits are not a process
-RAM quota. Weighted models, general chain maps, dynamic endpoint updates and
-large sparse spectral solving remain outside this interface.
-
-## Check the candidate independently
-
-The candidate's comparison tool checks 1,114 finite pairs using exact Fraction
-restricted-domain matrices/ranks and independent NumPy Schur/SVD routes, with
-pinned author-function and supported GUDHI topology checks. Its
-[mathematical specification](https://github.com/Aequiludium/cocycle-rs/blob/867d9acfddde3cd68f9ad24a8a17a36574220acc/docs/reference/mathematics.md#22-real-persistent-laplacians)
-gives the derivation. The [resource study](https://github.com/Aequiludium/cocycle-rs/blob/867d9acfddde3cd68f9ad24a8a17a36574220acc/benches/reports/persistent-laplacian-resources.md)
-retains repeated construction costs and default storage rejections. These checks
-do not establish a scalable persistent spectral kernel or production integration
-with [spectral-feature learning](../research/persistent-spectral-features.md).
+See the [mathematical specification](../reference/mathematics.md#23-real-persistent-laplacians)
+and [independent reproduction tool](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/compare_persistent_laplacians.py).
+The tool uses NumPy Schur and SVD nullspace routes, exact rational restricted-domain
+matrices and real persistent ranks. Its optional GUDHI checks use explicitly
+torsion-free fixtures, since a finite-field diagram is not general real truth.

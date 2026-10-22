@@ -27,11 +27,12 @@ The [mathematical specification](mathematics.md) owns shared definitions;
 [architecture](../development/architecture.md) locates their implementation.
 Design and research sketches do not establish callable APIs.
 
-## Operator interfaces under review
+<a id="operator-interfaces-under-review"></a>
 
-The following entries describe separate implementation candidates, absent from
-this documentation branch and released 0.1.1 rustdoc. Their guides identify
-the checked source revision; build rustdoc in that candidate checkout for exact
+## Real operator interfaces
+
+Hodge, Dirac and persistent Laplacians are available in this checkout and absent
+from released 0.1.1 rustdoc. Build rustdoc in this checkout for exact
 generic bounds, lifetimes, error variants and all accessors. The namespace is
 specific to each operator, with no universal spectral result container.
 
@@ -49,8 +50,8 @@ specific to each operator, with no universal spectral result container.
 
 All execution arguments above are `&Execution<'_>`. Persistent constructors take
 `SpectralOptions` by value; Hodge/Dirac spectral calls borrow their options.
-The Hodge and Dirac candidates re-export the same `IterativeOptions` policy.
-The persistent candidate's `SpectralOptions` has distinct Schur/Jacobi semantics.
+Hodge and Dirac re-export the same `IterativeOptions` policy.
+Persistent `SpectralOptions` has distinct Schur/Jacobi semantics.
 
 Use the [Hodge](../guides/hodge-laplacian.md), [Dirac](../guides/dirac.md) and
 [persistent](../guides/persistent-laplacian.md) guides for coordinate order,

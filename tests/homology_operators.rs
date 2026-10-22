@@ -10,6 +10,324 @@ use std::sync::atomic::AtomicBool;
 fn matrix(rows: &[&[u8]], n: usize) -> F2Matrix {
     F2Matrix::from_rows(&rows.iter().map(|r| r.to_vec()).collect::<Vec<_>>(), n).unwrap()
 }
+
+#[test]
+fn minimum_class_matches_independent_coset_enumeration_and_lexicographic_ties() {
+    let controls = Execution::default();
+    for mask in 0..64_u32 {
+        let rows: Vec<Vec<u8>> = (0..3)
+            .map(|i| (0..2).map(|j| ((mask >> (2 * i + j)) & 1) as u8).collect())
+            .collect();
+        let op = HomologyOperator::feasible(
+            ChainWindow::new(
+                0,
+                [
+                    F2Matrix::zero(0, 3).unwrap(),
+                    F2Matrix::from_rows(&rows, 2).unwrap(),
+                ],
+                [vec![], vec![0, 1, 2], vec![3, 4]],
+                vec![5, 1, 3],
+                "tiny",
+                "cost",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        for bits in 0..8 {
+            let z: Vec<u8> = (0..3).map(|i| ((bits >> i) & 1) as u8).collect();
+            let expected = (0..4)
+                .map(|c| {
+                    let chain: Vec<u8> = (0..3)
+                        .map(|i| z[i] ^ (rows[i][0] * (c & 1)) ^ (rows[i][1] * ((c >> 1) & 1)))
+                        .collect();
+                    let mass = chain
+                        .iter()
+                        .zip([5_u64, 1, 3])
+                        .map(|(&b, w)| u64::from(b) * w)
+                        .sum::<u64>();
+                    (mass, chain)
+                })
+                .min()
+                .unwrap();
+            let minimum = op.minimum_class_mass(&z, &controls).unwrap();
+            assert_eq!(
+                (minimum.mass(), minimum.chain()),
+                (expected.0, expected.1.as_slice())
+            );
+            let residual = op.window().boundaries()[1]
+                .apply(minimum.boundary_witness().unwrap())
+                .unwrap();
+            assert_eq!(
+                residual,
+                z.iter()
+                    .zip(minimum.chain())
+                    .map(|(a, b)| a ^ b)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+    let op = HomologyOperator::feasible(
+        ChainWindow::new(
+            0,
+            [F2Matrix::zero(0, 2).unwrap(), matrix(&[&[1], &[1]], 1)],
+            [vec![], vec![0, 1], vec![2]],
+            vec![10, 1],
+            "edge",
+            "cost",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(op.class_query(&[1, 0]).unwrap().selected_mass(), 10);
+    assert_eq!(op.minimum_class_mass(&[1, 0], &controls).unwrap().mass(), 1);
+    for controls in [
+        Execution::default().max_work(0),
+        Execution::default().cancellation(&AtomicBool::new(true)),
+    ] {
+        assert!(op.minimum_class_mass(&[1, 0], &controls).is_err());
+    }
+    assert!(
+        op.minimum_class_mass(&[2, 0], &Execution::default())
+            .is_err()
+    );
+    assert!(
+        HomologyOperator::feasible(triangle(false))
+            .unwrap()
+            .minimum_class_mass(&[1, 0, 0], &Execution::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn minimum_filling_uses_upper_costs_and_distinguishes_zero_infeasible_and_failure() {
+    let d = matrix(&[&[1, 1, 1], &[1, 1, 1]], 3);
+    let lower = ChainWindow::new(
+        0,
+        [F2Matrix::zero(0, 2).unwrap(), d.clone()],
+        [vec![], vec![0, 1], vec![2, 3, 4]],
+        vec![100, 100],
+        "edge",
+        "lower cost",
+    )
+    .unwrap();
+    let upper = ChainWindow::new(
+        1,
+        [d, F2Matrix::zero(3, 0).unwrap()],
+        [vec![0, 1], vec![2, 3, 4], vec![]],
+        vec![7, 2, 2],
+        "edge",
+        "upper cost",
+    )
+    .unwrap();
+    let op = HomologyOperator::feasible(lower).unwrap();
+    let controls = Execution::default();
+    let minimum = op
+        .minimum_filling(&[1, 1], &upper, &controls)
+        .unwrap()
+        .unwrap();
+    assert_eq!((minimum.chain(), minimum.mass()), (&[0, 1, 0][..], 2));
+    assert_eq!(minimum.boundary(), &[1, 1]);
+    assert_eq!(minimum.window().unit(), "upper cost");
+    assert_eq!(
+        op.minimum_filling(&[0, 0], &upper, &controls)
+            .unwrap()
+            .unwrap()
+            .mass(),
+        0
+    );
+    assert!(
+        op.minimum_filling(&[1, 0], &upper, &controls)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        op.minimum_filling(&[1, 1], &upper, &controls.max_work(0))
+            .is_err()
+    );
+    let foreign = ChainWindow::new(
+        1,
+        upper.boundaries().clone(),
+        upper.bases().clone(),
+        upper.weights().to_vec(),
+        "foreign",
+        "upper cost",
+    )
+    .unwrap();
+    assert!(
+        op.minimum_filling(&[1, 1], &foreign, &Execution::default())
+            .is_err()
+    );
+    let huge = HomologyOperator::feasible(
+        ChainWindow::new(
+            0,
+            [F2Matrix::zero(0, 2).unwrap(), F2Matrix::zero(2, 0).unwrap()],
+            [vec![], vec![0, 1], vec![]],
+            vec![u64::MAX, 1],
+            "huge",
+            "cost",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(matches!(
+        huge.minimum_class_mass(&[1, 1], &Execution::default()),
+        Err(Error::NumericalFailure { .. })
+    ));
+}
+
+#[test]
+fn feature_histories_correct_earlier_generators_and_bind_family_runs() {
+    let window = |filled| {
+        ChainWindow::new(
+            0,
+            [
+                F2Matrix::zero(0, 2).unwrap(),
+                if filled {
+                    matrix(&[&[1], &[1]], 1)
+                } else {
+                    F2Matrix::zero(2, 0).unwrap()
+                },
+            ],
+            [vec![], vec![0, 1], if filled { vec![2] } else { vec![] }],
+            vec![1, 1],
+            "merge",
+            "cost",
+        )
+        .unwrap()
+    };
+    let ops = vec![
+        HomologyOperator::feasible(window(false)).unwrap(),
+        HomologyOperator::feasible(window(true)).unwrap(),
+    ];
+    let family = OperatorFamily::new(vec![0., 1.], ops.clone()).unwrap();
+    let features = family.features(&Execution::default()).unwrap();
+    assert_eq!(features.len(), 2);
+    let dying = features.iter().find(|f| f.death() == Some(1)).unwrap();
+    // The second original basis vector alone does not die: the full corrected
+    // history is e0+e1, whose raw boundary preimage is the new edge.
+    assert_eq!(
+        family
+            .resolve_feature(dying, 0, &Execution::default())
+            .unwrap()
+            .unwrap()
+            .representative(),
+        &[1, 1]
+    );
+    assert!(
+        family
+            .resolve_feature(dying, 1, &Execution::default())
+            .unwrap()
+            .is_none()
+    );
+    let foreign = OperatorFamily::new(vec![0., 1.], ops).unwrap();
+    assert!(
+        foreign
+            .resolve_feature(dying, 0, &Execution::default())
+            .is_err()
+    );
+    assert!(
+        family
+            .clone()
+            .resolve_feature(dying, 0, &Execution::default())
+            .is_ok()
+    );
+    assert!(family.features(&Execution::default().max_work(0)).is_err());
+    let same = OperatorFamily::new(
+        vec![0.],
+        vec![HomologyOperator::feasible(window(false)).unwrap()],
+    )
+    .unwrap();
+    let repeated = same.features(&Execution::default()).unwrap();
+    assert_eq!(
+        repeated.iter().map(|f| f.occurrence()).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+}
+
+#[test]
+fn simplex_features_pair_cycles_and_volumes_preserve_original_coordinates() {
+    use cocycle::complex::{Simplex, SimplicialComplex};
+    let source = SimplicialComplex::new(vec![
+        Simplex::new(vec![10], 0.).unwrap(),
+        Simplex::new(vec![20], 0.).unwrap(),
+        Simplex::new(vec![30], 0.).unwrap(),
+        Simplex::new(vec![10, 20], 1.).unwrap(),
+        Simplex::new(vec![10, 30], 1.).unwrap(),
+        Simplex::new(vec![20, 30], 1.).unwrap(),
+        Simplex::new(vec![10, 20, 30], 2.).unwrap(),
+    ])
+    .unwrap();
+    let controls = Execution::default();
+    let family =
+        OperatorFamily::from_simplices(&source, 1, vec![1; 3], "triangle", "edges", &controls)
+            .unwrap();
+    let features = family.features(&controls).unwrap();
+    assert_eq!(features.len(), 1);
+    let f = &features[0];
+    assert_eq!((f.birth(), f.death()), (5, Some(6)));
+    let (birth, death) = family.feature_pairing(f).unwrap();
+    assert_eq!(source.simplex(birth).unwrap().dimension(), 1);
+    assert_eq!(
+        source.simplex(death.unwrap()).unwrap().vertices(),
+        &[10, 20, 30]
+    );
+    let cycle = family.optimal_1_cycle(f, &controls).unwrap();
+    assert_eq!(cycle.mass(), 3);
+    let location = family.locate_chain(f.birth(), cycle.chain()).unwrap();
+    assert!(
+        location.contains(&vec![10, 20])
+            && location.contains(&vec![10, 30])
+            && location.contains(&vec![20, 30])
+    );
+    let upper = family
+        .filling_window(f, vec![7], "face cost", &controls)
+        .unwrap();
+    let volume = family
+        .optimal_volume(f, &upper, &controls)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (volume.chain(), volume.boundary(), volume.mass()),
+        (&[1][..], &[1, 1, 1][..], 7)
+    );
+    let stable = family
+        .stable_volume(f, &upper, 1, "filtration time", &controls)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stable.chain(), &[1]);
+    assert_eq!(stable.examined(), 1); // Positive-cost death-anchor certificate.
+    assert!(
+        family
+            .stable_volume(f, &upper, 0, "time", &controls)
+            .is_err()
+    );
+    assert!(family.stable_volume(f, &upper, 1, "", &controls).is_err());
+    assert!(
+        family
+            .optimal_volume(f, &upper, &controls.max_work(0))
+            .is_err()
+    );
+    let fractional = SimplicialComplex::new(
+        source
+            .simplices()
+            .iter()
+            .map(|s| Simplex::new(s.vertices().to_vec(), s.value() / 2.).unwrap())
+            .collect(),
+    )
+    .unwrap();
+    let fractional =
+        OperatorFamily::from_simplices(&fractional, 1, vec![1; 3], "triangle", "edge", &controls)
+            .unwrap();
+    let fs = fractional.features(&controls).unwrap();
+    let upper = fractional
+        .filling_window(&fs[0], vec![1], "faces", &controls)
+        .unwrap();
+    assert!(
+        fractional
+            .stable_volume(&fs[0], &upper, 1, "time", &controls)
+            .is_err()
+    );
+}
 fn triangle(filled: bool) -> ChainWindow<usize> {
     let a = matrix(&[&[1, 1, 0], &[1, 0, 1], &[0, 1, 1]], 3);
     let d = if filled {
@@ -30,6 +348,192 @@ fn triangle(filled: bool) -> ChainWindow<usize> {
         "cost",
     )
     .unwrap()
+}
+
+#[test]
+fn seeded_small_filtrations_match_rank_barcodes_and_raw_history_equations() {
+    use cocycle::complex::{Simplex, SimplicialComplex};
+    use std::collections::BTreeMap;
+    for seed in 0..24_u64 {
+        let mut state = seed + 0x1234_5678;
+        let mut next = || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            state >> 32
+        };
+        let vertices = 5 + (seed % 2) as usize;
+        let mut values = BTreeMap::new();
+        for size in 1..=4 {
+            for mask in 1..1_usize << vertices {
+                if mask.count_ones() as usize != size {
+                    continue;
+                }
+                let faces = (0..vertices)
+                    .filter(|i| mask & (1 << i) != 0)
+                    .map(|i| mask ^ (1 << i))
+                    .collect::<Vec<_>>();
+                if size > 1 && (faces.iter().any(|f| !values.contains_key(f)) || next() % 4 == 0) {
+                    continue;
+                }
+                let earliest = if size == 1 {
+                    -2.
+                } else {
+                    faces
+                        .iter()
+                        .map(|f| values[f])
+                        .fold(f64::NEG_INFINITY, f64::max)
+                };
+                values.insert(mask, earliest + (next() % 3) as f64);
+            }
+        }
+        let source = SimplicialComplex::new(
+            values
+                .iter()
+                .map(|(&mask, &value)| {
+                    Simplex::new(
+                        (0..vertices)
+                            .filter(|i| mask & (1 << i) != 0)
+                            .map(|i| 10 + 7 * i)
+                            .collect(),
+                        value,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        )
+        .unwrap();
+        for degree in 0..=2 {
+            let costs = vec![
+                1;
+                source
+                    .simplices()
+                    .iter()
+                    .filter(|s| s.dimension() == degree)
+                    .count()
+            ];
+            let controls = Execution::default().max_work(100_000_000);
+            let family =
+                OperatorFamily::from_simplices(&source, degree, costs, "seeded", "unit", &controls)
+                    .unwrap();
+            let features = family.features(&controls).unwrap();
+            let mut actual = BTreeMap::new();
+            for feature in &features {
+                *actual
+                    .entry((feature.birth(), feature.death()))
+                    .or_insert(0) += 1;
+            }
+            let expected = family
+                .barcode()
+                .unwrap()
+                .into_iter()
+                .map(|bar| ((bar.birth, bar.death), bar.multiplicity))
+                .collect::<BTreeMap<_, _>>();
+            assert_eq!(actual, expected, "seed={seed} degree={degree}");
+            for feature in &features {
+                family.feature_pairing(feature).unwrap();
+                let end = feature.death().unwrap_or(source.len());
+                for stage in 0..source.len() {
+                    let resolved = family.resolve_feature(feature, stage, &controls).unwrap();
+                    assert_eq!(resolved.is_some(), stage >= feature.birth() && stage < end);
+                    let Some(query) = resolved else { continue };
+                    let op = family.stage(stage).unwrap();
+                    assert!(op.is_cycle(query.representative()).unwrap());
+                    if stage + 1 < end || feature.death() == Some(stage + 1) {
+                        let target = family.stage(stage + 1).unwrap();
+                        let mut embedded = vec![0; target.window().weights().len()];
+                        for (&bit, id) in query.representative().iter().zip(&op.window().bases()[1])
+                        {
+                            embedded[target.window().bases()[1]
+                                .iter()
+                                .position(|x| x == id)
+                                .unwrap()] = bit;
+                        }
+                        if stage + 1 < end {
+                            let following = family
+                                .resolve_feature(feature, stage + 1, &controls)
+                                .unwrap()
+                                .unwrap();
+                            assert_eq!(
+                                target.project(&embedded).unwrap(),
+                                following.representative()
+                            );
+                        } else {
+                            let witness = target.boundary_preimage(&embedded).unwrap().unwrap();
+                            assert_eq!(
+                                target.window().boundaries()[1].apply(&witness).unwrap(),
+                                embedded
+                            );
+                        }
+                    }
+                }
+            }
+            // Independent prefix incidence check uses original vertex subsets,
+            // not the new matrix-prefix copier or source boundary accessor.
+            for stage in 0..source.len() {
+                let window = family.stage(stage).unwrap().window();
+                for (matrix, lower, upper) in [
+                    (
+                        &window.boundaries()[0],
+                        &window.bases()[0],
+                        &window.bases()[1],
+                    ),
+                    (
+                        &window.boundaries()[1],
+                        &window.bases()[1],
+                        &window.bases()[2],
+                    ),
+                ] {
+                    for (i, &lower) in lower.iter().enumerate() {
+                        let face = source.simplex(lower).unwrap().vertices();
+                        for (j, &upper) in upper.iter().enumerate() {
+                            let cell = source.simplex(upper).unwrap().vertices();
+                            let incidence = u8::from(
+                                face.len() + 1 == cell.len()
+                                    && face.iter().all(|v| cell.contains(v)),
+                            );
+                            assert_eq!(matrix.column(j).unwrap()[i], incidence);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn minimum_filling_enforces_the_exact_nullity_boundary() {
+    for nullity in [16, 17] {
+        let columns = nullity + 1;
+        let d = F2Matrix::from_rows(&[vec![1; columns]], columns).unwrap();
+        let lower = ChainWindow::new(
+            0,
+            [F2Matrix::zero(0, 1).unwrap(), d.clone()],
+            [vec![], vec![0], (1..=columns).collect()],
+            vec![1],
+            "nullity",
+            "lower",
+        )
+        .unwrap();
+        let upper = ChainWindow::new(
+            1,
+            [d, F2Matrix::zero(columns, 0).unwrap()],
+            [vec![0], (1..=columns).collect(), vec![]],
+            vec![1; columns],
+            "nullity",
+            "upper",
+        )
+        .unwrap();
+        let op = HomologyOperator::feasible(lower).unwrap();
+        let result = op.minimum_filling(&[1], &upper, &Execution::default().max_work(50_000_000));
+        if nullity == 16 {
+            let result = result.unwrap().unwrap();
+            assert_eq!(result.examined(), 65536);
+            assert_eq!(result.mass(), 1);
+            assert_eq!(result.chain()[0], 1);
+            assert!(result.chain()[1..].iter().all(|&b| b == 0));
+        } else {
+            assert!(matches!(result, Err(Error::InvalidParameter { .. })));
+        }
+    }
 }
 
 #[test]

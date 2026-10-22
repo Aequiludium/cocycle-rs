@@ -16,6 +16,8 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
+- **Real Hodge analysis** — sparse action, explicit matrices, bounded dense
+  spectra and matrix-free partial eigenpairs under the standard inner product (Unreleased).
 - **Unreleased stage access** — borrowed sublevel stages and checked inclusions
   between increasing scales of the same frozen source, preserving IDs and signs.
 - **Sparse approximation** — deterministic sampling, modified edges and higher-simplex
@@ -28,10 +30,16 @@ dependencies and no unsafe code.
   diagram/context data can be shared by specialized result types.
 - **Useful summaries** — finite lifetimes, persistence entropy in nats, and Betti
   curves, computed directly from a diagram.
+- **Unreleased Dirac operators** — sparse real action and bounded matrix export
+  on signed chains, selected signed boundary modes, explicit degree truncation
+  and source-local coordinates.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
 - **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
   with bounded Partial U; updates and differentiation remain caller-owned.
+- **Unreleased persistent Laplacians** — bounded real stage-pair Schur operators,
+  action, complete numerical spectra and fixed-endpoint reverse elimination.
+  See the [usage and limits](docs/guides/persistent-laplacian.md).
 
 ![A square's Rips filtration: points, a loop at edge length 1, and filled triangles at sqrt(2).](assets/filtration.svg)
 
@@ -122,8 +130,13 @@ Run `cargo run --locked --example diagram_analysis` to analyze supplied interval
 without constructing a complex.
 Run `cargo run --locked --example complex_construction` to construct a lower-star
 filtration, inspect its simplices and compute persistence using existing APIs.
+Run `cargo run --locked --example dirac` for real Dirac action on a filled triangle;
+see the [Dirac guide](docs/guides/dirac.md).
 The unreleased source API also provides [F2 homology operators](docs/guides/homology-operators.md):
-run `cargo run --locked --example homology_operators` for class queries and finite transport.
+run `cargo run --locked --example homology_operators` for class queries, finite
+transport and bounded exact integer geometry queries on historical features.
+Run `cargo run --locked --example hodge_laplacian` for standard real Hodge
+matrices and spectra; see the [Hodge guide](docs/guides/hodge-laplacian.md).
 
 Read the [published API reference](https://docs.rs/cocycle), or build it locally
 with `cargo doc --no-deps --open`. From a repository
@@ -145,9 +158,12 @@ comparison and analysis. Filtration selects scales when needed; computation
 produces concrete results that comparison and analysis can borrow independently.
 See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
 [roadmap](docs/design/roadmap.md#phase-4-priorities) and
-[interface guide](docs/guides/interface-contracts.md). Laplacian/Dirac solvers,
-persistent spectra, optimal F₂ projections, non-diagram similarity and external
-learning remain future contracts, described in the [route report](docs/research/route-integration.md).
+[interface guide](docs/guides/interface-contracts.md). Standard real Hodge,
+Dirac and bounded persistent Laplacian operators are available in this source
+checkout. General weighted models, certified global partial spectra, scalable
+persistent spectra, optimal F₂ projections, non-diagram similarity and production
+learning integration remain future contracts. The
+[route report](docs/research/route-integration.md) retains the earlier handoff.
 
 Work and memory depend on the input and reduction fill-in. Rips comparisons
 use native GUDHI and upstream Ripser C++; see the maintained

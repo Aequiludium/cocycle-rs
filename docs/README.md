@@ -20,14 +20,16 @@ proposed APIs and remaining acceptance gates.
 <a id="version-and-capability-status"></a>
 
 Usage pages describe this checkout, including **Unreleased** borrowed stages,
-critical sets, feasible F2 operators and source/interval assembly integration. The README dependency
+critical sets, feasible F2 operators, real Dirac action and source/interval assembly
+integration. The README dependency
 selects [0.1.1](../CHANGELOG.md#011); see the [Unreleased notes](../CHANGELOG.md#unreleased)
 and [architecture](development/architecture.md) for source additions.
-Real Hodge, Dirac and persistent Laplacian implementations have separate PR
-candidates, documented in the guides below with pinned source interfaces.
-They are not included in this documentation branch or the released crate.
-Production spectral consumers, optimal F2 projections, non-diagram similarity,
-external-learning integration and automatic feedback remain future contracts.
+Standard real Hodge action and eigenpairs, Dirac action and signed boundary modes,
+and bounded real persistent Laplacians are available in this checkout. None of
+these operators is included in released 0.1.1. Production spectral consumers,
+general SPD/complex Hodge, general Dirac spectra, scalable sparse persistent spectra,
+optimal F2 projections, non-diagram similarity, external-learning integration and
+automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
 
@@ -40,19 +42,26 @@ release. Releases follow the [release procedure](../CONTRIBUTING.md#release-proc
 
 The adopted scope excludes #26/#49's paused preparation and #56's experimental adaptive
 H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
-do not supply its unmeasured direct-graph and H2/H3 performance gates.
+do not waive its retained direct-graph and H2/H3 performance regressions.
 
 ## Use the library
 
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,
-  selected class costs and controlled finite transport from borrowed stages.
+  selected class costs, controlled finite transport, historical simplex features
+  and bounded exact integer class/filling/volume minima.
 
+- [Real persistent Laplacians](guides/persistent-laplacian.md): same-source pairs,
+  Schur operators, complete numerical spectra and fixed-endpoint elimination.
+- [Real Hodge Laplacians](guides/hodge-laplacian.md): sparse action, explicit
+  matrices, dense/partial spectra, numeric evidence and independent reproduction.
 - [Big-steps critical sets](guides/critical-sets.md): sparse F2 endpoint proposals,
   bounded partial U and a lower-star simplification step.
 - [Borrow inputs and compose results](guides/interface-contracts.md): signed stage
   conversion, result ownership and per-operation execution controls.
 - [Supplied filtered complexes](guides/filtered-complexes.md): validated simplicial
   storage, borrowed stages and inclusions, signed scales and boundary reduction.
+  [Real Dirac action and matrices](guides/dirac.md) use the same signed sources
+  with explicit degree truncation, bounded export and selected signed boundary modes.
 - [Rips guide](guides/rips.md): choose an input, compute persistence, interpret
   coverage and endpoints, and derive measurements.
 - [Rips construction guide](guides/rips-construction.md): matrix layouts, custom
@@ -71,12 +80,12 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
   and error contracts. For the current checkout's [API source](../src/lib.rs),
   build locally with `cargo doc --locked --no-deps --open`.
 
-## Review operator candidates
+## Real operator interfaces
 
 These pages follow the same input, example, result and execution conventions as
-the usage guides. Their candidate status is explicit; use the linked checkout
-for runnable examples and local rustdoc. They do not add the implementations to
-this documentation PR.
+the usage guides. Hodge, Dirac and persistent Laplacians are available in this
+checkout. They remain Unreleased; use this checkout for runnable examples and
+rustdoc.
 
 | Operation | Guide and scope |
 | --- | --- |
@@ -135,7 +144,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
 | [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
-| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); algorithms remain future work |
+| [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); standard real Dirac action is in the guide above; global spectral solvers remain future work |
 | [Performance reporting rules](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reporting.md) | Comparability, sampling, memory, source retention and report template |
 | [Changelog](../CHANGELOG.md) | Unreleased implemented changes and versioned release notes |
 

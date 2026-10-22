@@ -448,6 +448,55 @@ pub(super) fn unpack(x: &[u64], n: usize) -> Vec<u8> {
         .map(|j| ((x[j / 64] >> (j % 64)) & 1) as u8)
         .collect()
 }
+// Incremental column span for one adjacent homology map. Each stored row keeps
+// its expression in the original accepted columns, so a dependency can correct
+// the complete dying history without rebuilding and eliminating the span.
+pub(super) struct ColumnBasis {
+    pivots: Vec<Option<(Vec<u64>, Vec<u64>)>>,
+}
+impl ColumnBasis {
+    pub(super) fn new(dimension: usize) -> Result<Self> {
+        Ok(Self {
+            pivots: zeros(dimension)?,
+        })
+    }
+    // None inserts an independent column. Some returns its expression in the
+    // previous accepted columns. `column` is their count, never an event index.
+    pub(super) fn insert<const C: bool>(
+        &mut self,
+        x: &[u8],
+        column: usize,
+        budget: &mut WorkBudget<'_, C>,
+    ) -> Result<Option<Vec<u8>>> {
+        let dimension = self.pivots.len();
+        let mut vector = pack(x, dimension, budget)?;
+        let mut coefficients = zeros::<u64>(dimension.div_ceil(64))?;
+        loop {
+            budget.step_by(vector.len())?;
+            let Some(word) = vector.iter().rposition(|&w| w != 0) else {
+                return Ok(Some(unpack(&coefficients, dimension)));
+            };
+            let pivot = word * 64 + 63 - vector[word].leading_zeros() as usize;
+            if let Some((other, expression)) = &self.pivots[pivot] {
+                budget.step_by(vector.len().saturating_mul(2))?;
+                for (a, b) in vector.iter_mut().zip(other) {
+                    *a ^= b;
+                }
+                for (a, b) in coefficients.iter_mut().zip(expression) {
+                    *a ^= b;
+                }
+            } else {
+                if column >= dimension {
+                    return Err(invalid("incremental column basis exceeded its dimension"));
+                }
+                coefficients[column / 64] ^= 1_u64 << (column % 64);
+                self.pivots[pivot] = Some((vector, coefficients));
+                return Ok(None);
+            }
+        }
+    }
+}
+
 /// A request-local stable RREF; rank/kernel-only work has no row transform.
 pub(super) struct Decomposition {
     reduced: F2Matrix,
@@ -455,6 +504,9 @@ pub(super) struct Decomposition {
     pivots: Vec<usize>,
 }
 impl Decomposition {
+    pub(super) fn rank(&self) -> usize {
+        self.pivots.len()
+    }
     pub(super) fn kernel<const C: bool>(
         &self,
         budget: &mut WorkBudget<'_, C>,
@@ -631,6 +683,65 @@ mod tests {
                     assert_eq!(matrix.apply(&x).unwrap(), rhs);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn incremental_span_returns_original_column_dependencies() {
+        let mut basis = ColumnBasis::new(4).unwrap();
+        let mut accepted: Vec<Vec<u8>> = Vec::new();
+        for bits in [3, 5, 6, 9, 15, 1, 2, 4, 8, 0, 7, 10, 11, 12, 13, 14] {
+            let vector: Vec<u8> = (0..4).map(|i| ((bits >> i) & 1) as u8).collect();
+            let possible = (0..1_usize << accepted.len()).any(|mask| {
+                (0..4).all(|row| {
+                    accepted.iter().enumerate().fold(0, |sum, (i, col)| {
+                        sum ^ (col[row] * ((mask >> i) & 1) as u8)
+                    }) == vector[row]
+                })
+            });
+            let dependency = basis
+                .insert(&vector, accepted.len(), &mut WorkBudget::unlimited())
+                .unwrap();
+            assert_eq!(dependency.is_some(), possible);
+            if let Some(c) = dependency {
+                for row in 0..4 {
+                    assert_eq!(
+                        accepted
+                            .iter()
+                            .zip(&c)
+                            .fold(0, |sum, (col, bit)| sum ^ (col[row] * bit)),
+                        vector[row]
+                    );
+                }
+            } else {
+                accepted.push(vector);
+            }
+        }
+        for n in [63, 64, 65, 129] {
+            let mut basis = ColumnBasis::new(n).unwrap();
+            let mut a = vec![0; n];
+            a[0] = 1;
+            let mut b = vec![0; n];
+            b[n - 1] = 1;
+            assert!(
+                basis
+                    .insert(&a, 0, &mut WorkBudget::unlimited())
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                basis
+                    .insert(&b, 1, &mut WorkBudget::unlimited())
+                    .unwrap()
+                    .is_none()
+            );
+            let c: Vec<_> = a.iter().zip(&b).map(|(a, b)| a ^ b).collect();
+            let dependency = basis
+                .insert(&c, 2, &mut WorkBudget::unlimited())
+                .unwrap()
+                .unwrap();
+            assert_eq!(&dependency[..2], &[1, 1]);
+            assert!(dependency[2..].iter().all(|&b| b == 0));
         }
     }
 }

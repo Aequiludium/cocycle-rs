@@ -5,16 +5,17 @@
 Feasible F2 operators are an **Unreleased** opt-in addition in this checkout.
 See the [version status](../README.md#version-and-capability-status). Use
 `homology_operators` for one weighted chain window or a finite sequence of
-same-source stages. The result selects class representatives; it does not solve
-for the shortest representative or a globally minimum-stretch projection.
+same-source stages. Projection readouts select class representatives. Separate
+opt-in searches below minimize one class, filling or simplex-pair volume; none
+optimizes the projection's global stretch.
 
 The [mathematical specification](../reference/mathematics.md#21-feasible-f2-homology-projections)
 derives the projection and transport identities. The
-[comparison report](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/reports/homology-operators.md)
+[comparison report](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/homology-operators.md)
 records exact oracle agreement, measured scopes and unfavorable results.
 No Python or foreign solver is a Rust runtime dependency. This implementation
 requires Rust 1.91 and follows the pinned
-[homology-operator source](https://github.com/proffitteoy/homology-operator/tree/3daff9bd69033d1ee9c5cba5026bfff94df8d6ac),
+[homology-operator source](https://github.com/proffitteoy/homology-operator/tree/a11bf50b8c8320651e9ac015566778d957af9c17),
 with its MIT attribution in [third-party notices](../../THIRD_PARTY_NOTICES.md).
 
 ## Query an ordered chain window
@@ -163,8 +164,141 @@ Finite barcode preparation composes adjacent homology-coordinate maps and keeps
 only two stage bases during preparation. The rank table and explicit maps still
 have quadratic worst-case costs. Stretch is exponential in dim ker(A), because
 input mass depends on cycle representatives, not only quotient coordinates.
-There is no persistent family cache, streaming barcode, historical barcode-basis
-algorithm or infinite-filtration conclusion. Run
+There is no persistent family cache, streaming barcode or infinite-filtration
+conclusion. Historical generators are an explicit opt-in output below. Run
 `cargo run --locked --example homology_operators` for the stage workflow; use the
-[verification protocol](https://github.com/Aequiludium/cocycle-rs/blob/codex/homology-operator-integration/benches/homology-operators.md)
+[verification protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/homology-operators.md)
 for external comparisons and distinct timing boundaries.
+
+## Exact minima and historical simplex features
+
+Select a query by its feasible set, rather than interpreting every returned
+chain as the same kind of geometric representative:
+
+| Query | Constraint and costs | Successful result |
+| --- | --- | --- |
+| `class_query` | Representative selected by this P, with current-degree costs | `ClassQuery`; its mass need not be minimal |
+| `minimum_class_mass` | All representatives in one input cycle's class, with current-degree costs | `MinimumChain` and a raw-D class witness |
+| `minimum_filling` | Fixed boundary D c=z, with explicitly supplied upper-degree costs | `Some(MinimumChain)`; `None` proves infeasibility |
+| `optimal_1_cycle` | Historical H1 class at birth, with unit edge costs | `MinimumChain` in the birth window |
+| `optimal_volume` | Finite H1/H2 birth/death constraints, with upper-degree costs | `Some(MinimumChain)` in the upper death window; `None` for no finite death |
+| `stable_volume` | Exact epsilon cutoff and death anchor, with upper-degree costs | `Some(MinimumChain)`; certifies optimization only |
+
+The cost window determines what `chain()` and `boundary()` mean. A class
+minimum is a degree-k cycle and its boundary is zero. A filling or volume is a
+degree-k+1 chain and its boundary is the degree-k cycle. In both cases,
+`window().bases()[1]` identifies the chain coordinates and
+`window().bases()[0]` identifies the boundary coordinates. `boundary_witness()`
+is populated only for class minima; it relates the original input to the
+minimizer and is not the minimizer's own boundary.
+
+`minimum_class_mass(z, &execution)` searches the affine set z+im(D) using
+positive integer costs. Its `MinimumChain` owns the cost window, chain, exact
+mass and a next-degree `boundary_witness`: D c = z XOR chain. This differs from
+`class_query(z).selected_mass()` and never changes P. Ties use lexicographic
+chain coordinates. Search is exponential in rank(D); provide a practical budget.
+
+`minimum_filling(z, &upper, &execution)` minimizes upper-chain mass with D c=z.
+Supply a degree-k+1 `ChainWindow` whose A equals D, ordered previous/current
+bases match the lower current/next bases, and source declaration agrees. Its
+weights and cost unit are explicit, independent of lower-degree weights.
+`None` proves infeasibility; a zero or empty filling is a computed minimum.
+Nonzero filling queries require nullity(D)<=16. Filling ties use the smallest
+original-coordinate bitset. Every mass addition is checked for `u64` overflow.
+
+`features(&execution)` reads this family's adjacent homology maps and corrects
+historical generators backwards when a class dies. It independently checks full
+quotient bases, raw cycles, adjacent transport and death boundaries. A `Feature`
+has birth/death stages and an occurrence among repeated endpoint pairs; its
+private binding rejects a reference from another family run. Family clones
+retain references. `resolve_feature` returns a stage-bound `ClassQuery`, or
+`None` before birth/after death. Full histories may be large and are charged to
+the supplied budget. Cross-process feature IDs and snapshot schemas are excluded.
+
+For certified pair queries, use `from_simplices` on one frozen
+`SimplicialComplex`. It inserts one simplex per stage in Cocycle's face-first
+order, retaining repeated scales and original vertex IDs. `feature_pairing`
+returns source-local birth/death IDs; `locate_chain` returns original vertex
+lists for supported raw chains. Existing `from_stages` groups by scale and
+cannot certify individual simplex pairs. Equal source labels do not establish
+such provenance.
+
+This is an **eager small-scale exact reference interface**. Each insertion
+extracts its chain window and receives an independently solved and validated
+operator. All stage
+windows/actions are retained. For N insertions, retained basis/matrix data can
+grow quadratically or worse with N and degree sizes; no input-size-independent
+memory bound follows from a successful query. `Execution` limits counted work,
+not bytes, and cannot prevent every large allocation. Bound source size and
+use a process memory/time cap when measuring untrusted or exploratory inputs.
+Use the existing persistence APIs when only a large diagram is needed.
+
+Feature construction maintains one incremental packed column basis for each
+adjacent map and keeps only the two adjacent temporary homology bases. Backward
+correction still owns complete original-coordinate chain histories. Independent
+verification remains a separate pass over raw A/D, with one reusable boundary
+decomposition per stage. That pass is included in `features()` runtime and its
+cooperative budget; it is not an optional unchecked fast path. Full output size
+can itself be quadratic or larger. Neither API is a streaming persistence engine.
+The [family resource protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/homology-operators.md#owned-family-and-history-resources)
+records growing inputs and distinguishes measured workloads from general
+scalability or a universal acceptable-size guarantee.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::homology_operators::OperatorFamily;
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![1], 0.)?,
+    Simplex::new(vec![2], 0.)?, Simplex::new(vec![0, 1], 1.)?,
+    Simplex::new(vec![0, 2], 1.)?, Simplex::new(vec![1, 2], 1.)?,
+    Simplex::new(vec![0, 1, 2], 2.)?,
+])?;
+let controls = Execution::default().max_work(1_000_000);
+let family = OperatorFamily::from_simplices(
+    &source, 1, vec![1; 3], "triangle", "edge count", &controls,
+)?;
+let features = family.features(&controls)?;
+let feature = &features[0];
+assert_eq!(family.optimal_1_cycle(feature, &controls)?.mass(), 3);
+let upper = family.filling_window(feature, vec![7], "upper cost", &controls)?;
+assert_eq!(family.optimal_volume(feature, &upper, &controls)?.unwrap().mass(), 7);
+assert_eq!(family.stable_volume(feature, &upper, 1, "filtration time", &controls)?.unwrap().mass(), 7);
+# Ok::<(), cocycle::Error>(())
+```
+
+`optimal_1_cycle` minimizes the feature's birth-stage historical H1 class with
+unit edge costs and boundary rank<=16. It is not a shortest cycle containing
+only a specified birth edge. `optimal_volume` minimizes finite H1/H2 upper-chain
+mass with the death coefficient fixed to one, the birth boundary coefficient
+one, no pre-birth upper simplices and zero boundary on intervening degree-k
+simplices. The resulting boundary need not equal the historical generator's
+class; use the raw boundary rather than attributing that extra property.
+
+`stable_volume` uses [Definition 6](../reference/bibliography.md#ob23)'s cutoff
+birth-scale+epsilon. It drops the
+birth coefficient constraint and permits pre-death upper simplices whose scale
+is at least that cutoff, forcing zero boundary on the corresponding lower
+simplices. A feasible death-only anchor attains a positive-cost lower bound;
+otherwise affine search supports constraint nullity<=16. This Rust interface
+accepts positive integer epsilon and integer scales/cutoff within +/-2^53, with
+an explicit filtration unit separate from upper costs. It certifies exact
+optimization only. No convex-fan perturbation or resampling guarantee is made.
+An infinite interval has no finite volume; the volume methods return `None`.
+
+`MinimumChain` can be constructed only by completed searches. Work exhaustion
+or cancellation returns an error without exposing an apparently optimal partial
+candidate. Rational/floating costs, noninteger stable thresholds, Python
+snapshots, Euclidean-length certification and periodic embedding coordinates
+remain outside this Rust port. `minimum_class_mass` still accepts arbitrary
+positive integer coordinate costs; the specialized birth-cycle method uses
+unit costs. The example exercises both existing transport and new queries.
+
+Invalid shape/binary input, noncycles, mismatched upper windows, foreign feature
+runs and unsupported domains return errors. Checked mass overflow returns
+`Error::NumericalFailure`; a work limit or cancellation returns
+`Error::WorkLimitExceeded` or `Error::Cancelled`. These failures return no
+optimal result and do not invalidate the accepted operators or earlier queries.
+`None` from `resolve_feature` instead means the feature is inactive at a valid
+stage. `filling_window` requires a finite death and rejects infinite features.
+Keep these outcomes distinct from a successful zero-mass minimum.

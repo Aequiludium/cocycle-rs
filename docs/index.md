@@ -29,15 +29,15 @@ the Rust toolchain and how to use a source checkout.
 | Reuse stage inputs and owned results | [Interface contracts](guides/interface-contracts.md) |
 | Propose bounded F2 endpoint changes | [Critical sets](guides/critical-sets.md) |
 | Query feasible F2 homology operators | [Homology operators](guides/homology-operators.md) |
-| Review a real single-stage operator | [Hodge Laplacians](guides/hodge-laplacian.md), [Dirac operators](guides/dirac.md) (candidate interfaces) |
-| Review a two-stage real operator | [Persistent Laplacians](guides/persistent-laplacian.md) (candidate interface) |
+| Review a real single-stage operator | [Hodge Laplacians](guides/hodge-laplacian.md), [Dirac operators](guides/dirac.md) (available on main) |
+| Review a two-stage real operator | [Persistent Laplacians](guides/persistent-laplacian.md) (available on main) |
 
 ## Versions and guarantees
 
 The site documents **main**, including additions labeled **Unreleased**.
 `cocycle = "0.1.1"` selects the released crate; it does not include every main
-API. Operator guides labeled **under review** describe their linked candidate
-checkouts, rather than main. See the [version and capability status](README.md#version-and-capability-status)
+API. The real operator guides describe Unreleased main interfaces. See the
+[version and capability status](README.md#version-and-capability-status)
 before using a source-only feature, and use the [API reference](reference/api.md)
 for versioned signatures and contracts.
 
@@ -73,7 +73,7 @@ guides/homology-operators
 
 ```{toctree}
 :hidden:
-:caption: Operator candidates
+:caption: Real operators
 
 guides/hodge-laplacian
 guides/dirac

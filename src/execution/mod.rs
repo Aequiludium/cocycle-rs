@@ -16,8 +16,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// thread limit.
 /// F2 homology-operator construction, batch queries, transport and barcode
 /// `_with` operations charge coordinate and arithmetic visits across the whole
-/// operation. Exhaustive stretch charges each visited cycle. Their counts are
-/// also version-dependent and do not establish a memory quota or deadline.
+/// operation. Exhaustive stretch charges each visited cycle. Minimum-class/filling
+/// searches, feature histories and pair volumes also charge candidate mass
+/// evaluation and independent witness checks. Exact minima are returned only
+/// after completion or a positive-cost lower bound. Counts are version-dependent
+/// and do not establish a memory quota or deadline.
+/// Hodge `new_with` controls window preparation; action, matrix and spectrum
+/// each start a separate budget. Spectrum shares its budget across dense matrix
+/// conversion, solving and error measurement. Passing the same Execution to
+/// preparation and solving does not combine their counters. Hodge `new` uses
+/// default unlimited preparation controls.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.

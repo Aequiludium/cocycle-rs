@@ -23,6 +23,22 @@ algorithm using its existing sparse reducer; it does not import Oineus code
 or add it as a runtime dependency. Runtime comparisons and mathematical
 theorems are distinct evidence.
 
+## CSB23
+
+Lucille Calmon, Michael T. Schaub and Ginestra Bianconi.
+**Dirac Signal Processing of Higher-Order Topological Signals**.
+New Journal of Physics 25, 093013 (2023).
+[arXiv:2301.10137v2](https://arxiv.org/abs/2301.10137v2), section 2 for the
+standard real graded Dirac definition, square and signed spectral pairing.
+The [specification](mathematics.md#24-standard-real-discrete-dirac) fixes the
+ordinary-chain and degree-truncation conventions used here; signal filtering
+and persistent/weighted variants are outside this implementation.
+
+[TopoNetX signed incidence and Dirac methods](https://github.com/pyt-team/TopoNetX/blob/ce3d414b571fff95916c4cbc20b8d2c2c9d428e6/toponetx/classes/simplicial_complex.py)
+at `ce3d414b571fff95916c4cbc20b8d2c2c9d428e6` provide an independent matrix
+reference. The reference's rank-zero incidence is augmented; Cocycle's Dirac
+coupling starts at B1. Its `weight` argument is not evidence of a metric adjoint.
+
 ## ZC05
 
 Afra Zomorodian and Gunnar Carlsson. **Computing Persistent Homology**.
@@ -133,11 +149,22 @@ are separate forms of evidence.
 
 ## HO
 
-[homology-operator](https://github.com/proffitteoy/homology-operator/tree/3daff9bd69033d1ee9c5cba5026bfff94df8d6ac),
-MIT source revision `3daff9bd69033d1ee9c5cba5026bfff94df8d6ac`. The feasible
+[homology-operator](https://github.com/proffitteoy/homology-operator/tree/a11bf50b8c8320651e9ac015566778d957af9c17),
+MIT source revision `a11bf50b8c8320651e9ac015566778d957af9c17`. The feasible
 generalized-inverse construction and deterministic packed native route are the
 implementation reference. The [specification](mathematics.md#21-feasible-f2-homology-projections)
 gives the algebraic proof and finite-stage convention used in Cocycle. Source
-agreement is not a global-optimality proof; Python result schemas and global
-optimization solvers are not ported. This is a source citation, not a claimed
-peer-reviewed algorithm publication or a Rust runtime dependency.
+agreement is not a global-optimality proof. Bounded affine geometry queries and
+historical feature correction follow this reference's contracts; Python result
+schemas and globally minimum-stretch solvers are not ported. This is a source
+citation, not a claimed peer-reviewed algorithm publication or a Rust runtime
+dependency.
+
+## OB23
+
+Stable-volume Definition 6 and the separate conditional perturbation results in
+Theorems 3.1/4.1: [published source](https://doi.org/10.1007/s41468-023-00119-8).
+The pinned [HO](#ho) implementation specifies its F2 constraints and finite replay
+domain. Cocycle's `stable_volume` implements the bounded integer optimization
+contract; it does not certify the geometric hypotheses of those theorems or
+claim a perturbation/resampling guarantee.
