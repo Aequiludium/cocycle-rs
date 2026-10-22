@@ -109,6 +109,8 @@ python3 tools/check_docs.py
 python3 -m unittest discover -s tools -p 'test_*.py'
 cargo build --locked
 rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+rustdoc --edition 2024 -D warnings --test docs/getting-started/quickstart.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+rustdoc --edition 2024 -D warnings --test docs/guides/diagram-distances.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/rips.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/rips-construction.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/rips-representatives.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -229,6 +231,7 @@ When adding or moving a document:
 
 1. Update the index, relative links, heading fragments, and literal paths in
    commands or tooling. Clearly label proposals and dated source observations.
+   Keep `docs/index.md` website navigation aligned with `docs/README.md`.
 2. Run `python3 tools/check_docs.py`. It recursively checks `docs/` and selected
    repository Markdown for inline/reference local targets, headings, and CJK
    text. It does not fetch external URLs or establish English prose quality.
@@ -250,6 +253,37 @@ When adding or moving a document:
    the manifest's actual package name/version. This checks the extracted package
    without resolving missing files from the checkout. Use repository URLs for
    excluded reports, tools and CI files; the checker does not fetch those URLs.
+
+The documentation website uses Sphinx, MyST Markdown, MathJax and Furo, following
+the same site tooling as [Topp](https://proffitteoy.github.io/Topp/). Existing
+Markdown remains the source for both GitHub and the website. From the repository
+root, use Python 3.12 or later and an isolated documentation environment:
+
+```sh
+python3 -m venv target/docs-venv
+# POSIX: source target/docs-venv/bin/activate
+# PowerShell: .\target\docs-venv\Scripts\Activate.ps1
+python -m pip install -r docs/requirements.txt
+python -m sphinx -E -a -W --keep-going -b html docs target/docs/html
+python tools/check_docs.py --html target/docs/html
+python -m http.server 8000 --directory target/docs/html
+```
+
+Open `http://localhost:8000/` to review navigation, tables and mathematical
+rendering. Documentation dependencies stay outside the Rust crate's runtime;
+build output stays under `target/`. The existing quality job checks the strict
+site build, rendered links and Rust doctests for the new quickstart and distance
+guide, so the website also participates in the existing required CI check.
+
+The `Documentation and Pages` workflow builds every PR with warnings as errors
+and uploads an HTML preview artifact. Only main pushes or manual runs on main
+can deploy to the `github-pages` environment. PR builds have read-only repository
+permissions; Pages and OIDC write permissions belong only to the deployment job.
+Before the first deployment, select **GitHub Actions** in
+**Settings > Pages > Build and deployment > Source** and permit main in the
+`github-pages` environment. The published address is
+`https://aequiludium.github.io/cocycle-rs/`. Workflow configuration or a local build
+alone does not establish a successful hosted deployment.
 
 Performance reports use stable topic-based paths; update the existing report on
 reruns and let Git retain its history. Each report binds to the measured commit

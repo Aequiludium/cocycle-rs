@@ -122,7 +122,10 @@ A single-scale graph consumer can similarly borrow `WeightedGraph::edges()`
 and derive vertex-edge incidence. Its interpretation as a one-dimensional
 complex is explicit: a graph triangle is not automatically a filled clique.
 Filtration values, spectral Grams and F2 coordinate costs remain separate.
-This prepares inputs; it implements no Laplacian, Dirac or F2 projection solver.
+This conversion prepares inputs; it implements no Laplacian, Dirac or F2
+projection solver. Separate candidate [Hodge](hodge-laplacian.md),
+[Dirac](dirac.md) and [persistent Laplacian](persistent-laplacian.md) guides
+show how their interfaces consume signed stages and preserve result coordinates.
 
 The stage borrow checks the inclusion into the filled triangle; the matrix
 reader selects the same source-local IDs with the explicit scale predicate.

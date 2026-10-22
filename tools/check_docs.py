@@ -1,10 +1,13 @@
-"""Check repository Markdown for stale local links and CJK source text.
+"""Check maintained Markdown or a built HTML site's local links.
 
 Uses only the standard library. External URLs are not fetched; dated raw artifacts
 and generated output are not documentation sources. Run from any directory.
+Markdown checks also reject CJK project text; --html checks rendered site assets
+and anchors instead.
 """
 
 import argparse
+from html.parser import HTMLParser
 from pathlib import Path
 import re
 import sys
@@ -132,8 +135,71 @@ def main(root=None):
     return 0
 
 
+class HTMLLinks(HTMLParser):
+    """Collect local navigation, assets and anchors from a built page."""
+
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.ids = set()
+        self.links = []
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if attrs.get("id"):
+            self.ids.add(attrs["id"])
+        if tag == "a" and attrs.get("name"):
+            self.ids.add(attrs["name"])
+        for name in ("href", "src"):
+            if attrs.get(name):
+                self.links.append((self.getpos()[0], attrs[name]))
+
+
+def check_html(root):
+    """Check rendered local links without fetching external services."""
+    root = root.resolve()
+    pages = {path: HTMLLinks(path.read_text(encoding="utf-8"))
+             for path in root.rglob("*.html") if path.is_file()}
+    if not pages:
+        return [f"No HTML pages found in {root}"]
+    errors = []
+    for path, page in pages.items():
+        for line, destination in page.links:
+            link = urlsplit(destination)
+            if link.scheme or link.netloc:
+                continue
+            if not link.path:
+                target = path
+            elif link.path.startswith("/"):
+                target = (root / unquote(link.path).lstrip("/")).resolve()
+            else:
+                target = (path.parent / unquote(link.path)).resolve()
+            if target.is_dir():
+                target /= "index.html"
+            location = f"{path.relative_to(root).as_posix()}:{line}"
+            if not target.is_relative_to(root):
+                errors.append(f"{location}: HTML target outside site {destination}")
+            elif not target.is_file():
+                errors.append(f"{location}: missing HTML target {destination}")
+            elif link.fragment and target in pages and unquote(link.fragment) not in pages[target].ids:
+                errors.append(f"{location}: missing HTML anchor {destination}")
+    return errors
+
+
+def main_html(root):
+    errors = check_html(root)
+    if errors:
+        print("\n".join(errors), file=sys.stderr)
+        return 1
+    print("HTML checks passed: local navigation, assets and anchors.")
+    return 0
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT,
                         help="documentation root, including an unpacked Cargo package")
-    raise SystemExit(main(parser.parse_args().root))
+    parser.add_argument("--html", type=Path,
+                        help="check a built HTML site instead of Markdown sources")
+    args = parser.parse_args()
+    raise SystemExit(main_html(args.html) if args.html is not None else main(args.root))
