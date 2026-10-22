@@ -11,6 +11,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 | Report | Scope |
 | --- | --- |
 | [Hodge resources and small-gap convergence](hodge-resources.md) | Repeated native time/memory, default nonconvergence and independent preconditioning diagnosis |
+| [Persistent spectral workflow resources](spectral-feature-resources.md) | Repeated traced reproduction time and parent-process peak memory; no kernel ranking |
 | [Cocycle and homology-operator: feasible F2 projections](homology-operators.md) | Exact reference agreement, scoped Rust before/after and cross-library measurements, finite barcode readout and retained limits |
 | [Cocycle, GUDHI and Ripser: Rips comparison](rips-comparison.md) | Native C++ references, Rips correctness, selected workflow and H0/H1 timings, limitations and reproduction |
 | [Archived diagram-distance preparation candidates](distance-preparation.md) | Performance admission not passed; logical and scoped candidates withdrawn, adverse scalar/prepared results and missing adoption evidence retained |
