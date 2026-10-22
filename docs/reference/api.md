@@ -50,8 +50,8 @@ specific to each operator, with no universal spectral result container.
 
 All execution arguments above are `&Execution<'_>`. Persistent constructors take
 `SpectralOptions` by value; Hodge/Dirac spectral calls borrow their options.
-The Hodge and Dirac candidates re-export the same `IterativeOptions` policy.
-The persistent candidate's `SpectralOptions` has distinct Schur/Jacobi semantics.
+Hodge and Dirac re-export the same `IterativeOptions` policy.
+Persistent `SpectralOptions` has distinct Schur/Jacobi semantics.
 
 Use the [Hodge](../guides/hodge-laplacian.md), [Dirac](../guides/dirac.md) and
 [persistent](../guides/persistent-laplacian.md) guides for coordinate order,

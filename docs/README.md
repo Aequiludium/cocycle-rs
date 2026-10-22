@@ -42,7 +42,7 @@ release. Releases follow the [release procedure](../CONTRIBUTING.md#release-proc
 
 The adopted scope excludes #26/#49's paused preparation and #56's experimental adaptive
 H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timings
-do not supply its unmeasured direct-graph and H2/H3 performance gates.
+do not waive its retained direct-graph and H2/H3 performance regressions.
 
 ## Use the library
 
@@ -83,8 +83,9 @@ do not supply its unmeasured direct-graph and H2/H3 performance gates.
 ## Real operator interfaces
 
 These pages follow the same input, example, result and execution conventions as
-the usage guides. Hodge, Dirac and persistent Laplacians are available in this checkout. They remain
-Unreleased; use this checkout for runnable examples and rustdoc.
+the usage guides. Hodge, Dirac and persistent Laplacians are available in this
+checkout. They remain Unreleased; use this checkout for runnable examples and
+rustdoc.
 
 | Operation | Guide and scope |
 | --- | --- |

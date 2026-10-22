@@ -45,7 +45,7 @@
   allow explicit per-buffer limits; sparse action remains independent. Spectrum
   callers using full option literals must supply the new field or use `..Default::default()`.
 
-These entries describe implemented candidate changes and documentation, not a
+These entries describe Unreleased source changes and documentation, not a
 published version. See the [version status](docs/README.md#version-and-capability-status)
 for the integration provenance and separate future capability contracts.
 
@@ -73,10 +73,10 @@ for the integration provenance and separate future capability contracts.
 - Add a Sphinx/MyST/Furo documentation website with task-based navigation,
   installation, a released-crate quickstart and a diagram-distance guide.
   Check PR builds and publish main documentation through GitHub Pages Actions.
-- Document the separate Hodge, Dirac and persistent Laplacian candidates with
-  worked examples, concrete interfaces, coordinate/result ownership and numerical
-  resource limits. Add the external spectral-feature reproduction and schema;
-  keep these candidate descriptions distinct from main and released APIs.
+- Document the Hodge, Dirac and persistent Laplacian interfaces with worked
+  examples, coordinate/result ownership and numerical resource limits. Add the
+  external spectral-feature reproduction and schema; distinguish Unreleased
+  source capabilities from released APIs.
 - Separate source preparation from shared ordinary interval assembly while
   preserving existing public paths, kernels, result ownership and execution controls.
 - Consolidate stage usage, the six-responsibility architecture and Phase-4

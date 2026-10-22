@@ -36,7 +36,8 @@ the Rust toolchain and how to use a source checkout.
 
 The site documents **main**, including additions labeled **Unreleased**.
 `cocycle = "0.1.1"` selects the released crate; it does not include every main
-API. Hodge is available on main. The real operator guides describe Unreleased main interfaces. See the [version and capability status](README.md#version-and-capability-status)
+API. The real operator guides describe Unreleased main interfaces. See the
+[version and capability status](README.md#version-and-capability-status)
 before using a source-only feature, and use the [API reference](reference/api.md)
 for versioned signatures and contracts.
 

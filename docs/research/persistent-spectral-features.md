@@ -2,13 +2,13 @@
 
 [Documentation](../index.md) / Research
 
-This page describes the reproduction under review in
-[PR #129](https://github.com/Aequiludium/cocycle-rs/pull/129), checked against
-[source 71aa864](https://github.com/Aequiludium/cocycle-rs/blob/71aa864cd3b7afafe541ba5e88c5866c90d175a8/tools/reproduce_persistent_spectral_features.py).
-It is absent from this documentation branch. It is a standalone Python
-reproduction using existing Rust descriptor workers, with no new public Rust
-spectral-feature or classifier interface. Production integration with the
-[persistent Laplacian candidate](../guides/persistent-laplacian.md) remains separate.
+This page describes the standalone reproduction introduced in
+[PR #129](https://github.com/Aequiludium/cocycle-rs/pull/129). It is available in
+this source checkout at
+[`tools/reproduce_persistent_spectral_features.py`](../../tools/reproduce_persistent_spectral_features.py).
+It uses existing Rust descriptor workers, with no new public Rust spectral-feature
+or classifier interface. Production integration with the
+[persistent Laplacian](../guides/persistent-laplacian.md) remains separate.
 
 ## From pair spectra to a feature row
 

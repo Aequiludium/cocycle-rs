@@ -158,9 +158,12 @@ comparison and analysis. Filtration selects scales when needed; computation
 produces concrete results that comparison and analysis can borrow independently.
 See the [architecture](docs/development/architecture.md#six-responsibilities-and-data-routes),
 [roadmap](docs/design/roadmap.md#phase-4-priorities) and
-[interface guide](docs/guides/interface-contracts.md). Laplacian operators and general Dirac spectra,
-persistent spectra, optimal F₂ projections, non-diagram similarity and external
-learning remain future contracts, described in the [route report](docs/research/route-integration.md).
+[interface guide](docs/guides/interface-contracts.md). Standard real Hodge,
+Dirac and bounded persistent Laplacian operators are available in this source
+checkout. General weighted models, certified global partial spectra, scalable
+persistent spectra, optimal F₂ projections, non-diagram similarity and production
+learning integration remain future contracts. The
+[route report](docs/research/route-integration.md) retains the earlier handoff.
 
 Work and memory depend on the input and reduction fill-in. Rips comparisons
 use native GUDHI and upstream Ripser C++; see the maintained
