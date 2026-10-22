@@ -1,6 +1,6 @@
 # Standard real discrete Dirac operators
 
-[Documentation](../README.md) / Guides
+[Documentation](../index.md) / Guides
 
 The unreleased API now belongs to `cocycle::dirac`, independently of persistent
 Laplacians. Input/stage interfaces, operator/result types and `Execution` controls
@@ -76,7 +76,7 @@ Terms crossing a selected endpoint are zero. Ordinary nonaugmented chains have
 `C[-1]=0`; no all-ones vertex sum is added. With the retained integer chain
 condition d^2=0, K is symmetric and K^2 is block diagonal, with degree-j block
 `B[j]^T B[j] + B[j+1] B[j+1]^T` using those same endpoint conventions. See the
-[mathematical specification](../reference/mathematics.md#22-standard-real-discrete-dirac).
+[mathematical specification](../reference/mathematics.md#24-standard-real-discrete-dirac).
 
 Thus the edge-only K above is [0], while the full source's edge Hodge Laplacian
 is [2]. Squaring a truncated K does not recover the source's full endpoint

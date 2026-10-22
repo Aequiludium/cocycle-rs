@@ -30,7 +30,7 @@ Lucille Calmon, Michael T. Schaub and Ginestra Bianconi.
 New Journal of Physics 25, 093013 (2023).
 [arXiv:2301.10137v2](https://arxiv.org/abs/2301.10137v2), section 2 for the
 standard real graded Dirac definition, square and signed spectral pairing.
-The [specification](mathematics.md#22-standard-real-discrete-dirac) fixes the
+The [specification](mathematics.md#24-standard-real-discrete-dirac) fixes the
 ordinary-chain and degree-truncation conventions used here; signal filtering
 and persistent/weighted variants are outside this implementation.
 

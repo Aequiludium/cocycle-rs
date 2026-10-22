@@ -28,10 +28,21 @@ do not require six crates or a common source/result registry.
 Filtration is optional for single-scale consumers; diagrams and distances are
 optional for direct consumers. Signed incidence can already be read without PH,
 and supplied diagrams can already be compared/analyzed without a source owner.
+The `hodge` domain directly snapshots adjacent signed boundaries from a supplied
+complex or stage and provides standard-real action, explicit matrices and bounded
+dense eigenpairs. It does not request persistence or expand implicit Rips data.
 The [interface guide](../guides/interface-contracts.md) exercises current calls;
 the [route report](../research/route-integration.md) records composed handoffs and
 future requirements. Proposed producers and output types remain outside the
 implemented source tree below.
+
+Real Hodge, Dirac and persistent Laplacian implementations are under review in
+separate PRs, outside this source tree. The [operator interface map](../reference/api.md#operator-interfaces-under-review)
+and guides document their concrete input/result owners and source revisions.
+Their proposed public namespaces are `hodge`, `dirac` and
+`persistent_laplacian`; Hodge/Dirac share a private iterative core, while the
+persistent Schur/Jacobi policy remains separate. This documentation does not
+promote those candidate modules into main or the released crate.
 
 ## Production code
 
@@ -39,6 +50,9 @@ implemented source tree below.
 src/
   lib.rs                         public domains and Error/Result exports
   error.rs                       shared structured errors
+  persistent_laplacian/
+    mod.rs                       real stage-pair Schur operators and reverse elimination
+    schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/
@@ -96,6 +110,10 @@ src/
       order.rs                   compact H1 entry comparison adapter
       cliques.rs                 dense/sparse clique enumeration
       expansion.rs               shared explicit clique construction
+  hodge/
+    mod.rs                       real signed chain windows and sparse Hodge action
+    spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
+  eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/
     mod.rs                       public exports and private computation wiring
     assembly.rs                  shared raw intervals and endpoint normalization
@@ -161,6 +179,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | `geometry` | Input validation and distance access | Error utilities |
 | `complex` | Checked graphs, simplicial incidence and filtered-cell contract | Geometry scalar validation, execution, error utilities |
 | `execution` | Immutable controls and private per-operation budget | Error utilities |
+| `persistent_laplacian` | Bounded real persistent Laplacian, action, complete spectrum and fixed-endpoint elimination | Complex signed incidence, filtration stages/provenance, execution, error utilities |
 | `filtration` | Construction, source context, coverage and private coface access | Geometry, complex, execution, error utilities |
 | `persistence` | Algorithms, options, interval and representative assembly | Algebra, geometry, filtration, diagram, execution |
 | `diagram` | Algorithm-independent result ownership and validation | Algebra field identity, filtration provenance, error utilities |
@@ -444,7 +463,7 @@ public abstraction only when a concrete capability needs it and its validation
 contract can be specified. A second filtration need not use a simplex-based
 representation: it can share diagrams while owning its own input and algorithm.
 
-Future Laplacian operators and general Dirac spectra, true persistent spectral pairs
+General SPD/complex Hodge, general Dirac spectra, scalable persistent spectra
 and optimal F2 projections
 need actual producers and their [input](../research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9)
 and [result contracts](../research/result-contracts.md#computation-family-outputs-and-resources).

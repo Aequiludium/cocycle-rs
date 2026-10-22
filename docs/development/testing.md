@@ -42,6 +42,8 @@ and the release documentation gate remain in CONTRIBUTING.
 | `tests/sparse_rips.rs` | Metric hypotheses, sampling provenance, blocker topology, original IDs, approximate coverage and computation parity |
 | `tests/descriptors.rs` | Formula, endpoint, exclusion, overflow, empty-result behavior and translation/rescaling properties |
 | `tests/filtered_complex.rs` | Supplied simplicial/cell inputs, signed scales, unequal vertex births, oriented boundaries, source coverage and invalid contracts |
+| `tests/persistent_laplacian.rs`, `src/persistent_laplacian/schur.rs` tests | Hand-derived Kron/path and Hodge matrices, singular blocks, basis/sign conjugacy, missing skeletons, resource controls and nonconvergence |
+| `tools/compare_persistent_laplacians.py` | Independent NumPy Schur/SVD, exact rational projection and real persistent ranks; optional torsion-free GUDHI checks and bounded route timings |
 | `examples/complex_construction.rs` tests | Lower-star construction, analytic circle persistence, triangle incidence, ties, isolates and invalid topology; run with `--example complex_construction` |
 | `tests/diagram_distances.rs` | Uninstrumented public distances, independent partial matching, essential multiplicity, coverage, field/scale context, supplied versus certified sources and numerical regressions |
 | `src/diagram_distances/bottleneck/tests.rs`, `src/diagram_distances/wasserstein/tests.rs` | Kernel oracles, adaptive routes, forced alternatives and diagnostic counters |
