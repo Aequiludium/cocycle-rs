@@ -531,6 +531,10 @@ sets, complete sample/stage and label joins, failure propagation, and scalar
 replay of returned predictions. Source/base SHA, dirty state, source/binary/input
 hashes, pinned dependencies and process costs accompany each run. Empty stages,
 isolates and nonconsecutive original vertex IDs are exercised explicitly.
+The external consumer receives exported records plus a sample/layout/label
+manifest, without original vertices, edges, births or coordinates. Original-data
+and GUDHI checks remain in the independent oracle; GUDHI is not a learning runtime
+dependency. The fixture exporter rejects total input above 1 MiB or 128 samples.
 
 This selects the original graph route without requiring new spectral features.
 #111 still owns persistent-spectrum feature/export/model integration; no ordinary

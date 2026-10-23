@@ -11,8 +11,10 @@ This bounded application example consumes raw graph/coordinate inputs;
 [#111](https://github.com/Aequiludium/cocycle-rs/issues/111) retains ownership of
 persistent spectral features and their learning connection.
 
-Use Rust 1.91+ and Python 3.10+ in an isolated optional environment. The controller
-and external interpreter require these exact packages:
+Use Rust 1.91+ and Python 3.10+. The learning interpreter requires
+`numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0`.
+Only the independent original-data oracle/controller requires `gudhi==3.12.0`.
+The following combined environment is convenient for the complete acceptance run:
 
 ```sh
 python3 -m pip install numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0 gudhi==3.12.0
@@ -25,9 +27,26 @@ COCYCLE_LEARNING_WORKER="$PWD/target/learning-handoff" python3 -m unittest disco
 On Windows append `.exe` to the worker and use
 `$env:COCYCLE_LEARNING_WORKER = (Resolve-Path target/learning-handoff.exe).Path`
 before the unit-test command. `--python PATH` selects the separate consumer
-interpreter; it must have the same pinned packages. Standard-library test
-discovery skips three real-process tests without the packages/worker. The
-`External learning routes` CI job supplies both and runs the actual command.
+interpreter, which needs only the five learning packages. Standard-library test
+discovery skips optional real-process cases without their packages/worker. The
+`External learning routes` CI job also runs the Rust worker's colocated error
+tests and uses a separate learning-only environment with GUDHI absent.
+
+The external runtime accepts only `records.jsonl` and `manifest.json`. The manifest
+contains sample IDs/order, source snapshots, a shared ascending vertex universe,
+the stage grid, labels and split keys; it contains no original vertices, edges,
+births or coordinate values. The consumer validates the exported record's own
+shape, incidence and identities, then encodes only its values. Original data
+remains in `fixture.json` for `validate_export` and GUDHI to independently check
+the source truth; the model process never opens that file or calls the oracle.
+For a standalone replay in the learning-only environment:
+
+```sh
+python3 tools/check_external_learning.py --consume target/external-learning-001/records.jsonl --manifest target/external-learning-001/manifest.json --result target/external-learning-001/replayed-predictions.json
+```
+
+This replaces the example's previous `--fixture` consumer argument with
+`--manifest`; it is a tooling-protocol change, not a Rust public API change.
 
 The fixed seed is 92. Thirty-two synthetic graphs use six nonconsecutive original
 vertex IDs and two supplied coordinate channels. Twenty-four sample IDs train
@@ -60,7 +79,7 @@ absolute tolerance `1e-12` for this bounded 33/99-column calculation. Independen
 training-only mean/variance checks exclude test-set normalization leakage.
 GUDHI checks the supplied topology and each sublevel set, without computing PH.
 
-The output directory must be new. `fixture.json`, `input.txt`, `records.jsonl`,
+The output directory must be new. `fixture.json`, `manifest.json`, `input.txt`, `records.jsonl`,
 `predictions.json` and `report.json` retain source/base SHA, dirty state, source
 and binary hashes, input/output hashes, package/toolchain versions, commands,
 counts, dimensions and results. Each process retains stdout, stderr, exit code,
@@ -71,6 +90,11 @@ smoke measurement is a cost snapshot, not a speedup or scaling comparison.
 Failures retain a failure report and logs, never a success marker; timeouts kill
 the direct child. Python import/setup failures and interrupted hosts can still
 prevent a complete report. This tool does not manage arbitrary process trees.
+The trusted Rust fixture worker additionally rejects input above 1 MiB or 128
+samples in total (besides 64 vertices, 2016 edges and 16 scales per sample).
+Oversized or invalid input can leave partial stdout, but a nonzero exit always
+rejects the export. The concrete stage carries its own source owner, and export
+returns an error for missing/nonfinite features or missing boundary coordinates.
 
 Scope is bounded to small unweighted undirected graphs with supplied coordinates
 and a shared ordered vertex universe/grid. It does not deliver a general tensor

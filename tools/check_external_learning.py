@@ -22,13 +22,14 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 GRID = [-2., 0., 1.]
 VERTICES = [10, 20, 35, 50, 70, 90]
-PACKAGES = {"numpy": "2.2.6", "scipy": "1.15.3", "scikit-learn": "1.7.2",
-            "threadpoolctl": "3.6.0", "joblib": "1.6.0", "gudhi": "3.12.0"}
+LEARNING_PACKAGES = {"numpy": "2.2.6", "scipy": "1.15.3", "scikit-learn": "1.7.2",
+                     "threadpoolctl": "3.6.0", "joblib": "1.6.0"}
+ORACLE_PACKAGES = {"gudhi": "3.12.0"}
 
 
-def package_versions():
-    versions = {name: importlib.metadata.version(name) for name in PACKAGES}
-    if versions != PACKAGES:
+def package_versions(packages=LEARNING_PACKAGES):
+    versions = {name: importlib.metadata.version(name) for name in packages}
+    if versions != packages:
         raise ValueError("use the documented fixed optional package versions")
     return versions
 
@@ -102,19 +103,33 @@ def record_key(record):
     return record["sample_key"], record["selection"]["kind"], record["selection"]["index"]
 
 
-def validate_records(records, fixture, gudhi=False):
-    """Independent simplex-set/sign/feature expectations, optionally GUDHI sets.
+def sample_manifest(fixture):
+    """Keep only ordered identities, encoding layout, labels and split metadata."""
+    return {"format": "cocycle-graph-learning-manifest-v1",
+            "samples": [{name: s[name] for name in ("sample_key", "snapshot", "sample_order", "universe", "grid")}
+                        for s in fixture["samples"]], "labels": fixture["labels"]}
 
-    GUDHI is only a topology/sublevel oracle here; no PH or spectral solver.
-    Output bases may be permuted, provided incidence and features follow them.
-    """
-    samples = fixture["samples"]
+
+def validate_records(records, manifest):
+    """Validate the self-contained wire contract without reading original data."""
+    if manifest["format"] != "cocycle-graph-learning-manifest-v1":
+        raise ValueError("unsupported sample manifest")
+    samples = manifest["samples"]
     owners = unique(samples, lambda s: s["sample_key"])
-    labels = unique(fixture["labels"], lambda s: s["sample_key"])
+    labels = unique(manifest["labels"], lambda s: s["sample_key"])
     if labels.keys() != owners.keys() or not owners:
         raise ValueError("labels must join every sample exactly once; empty dataset unsupported")
     if [s["sample_order"] for s in samples] != list(range(len(samples))):
         raise ValueError("sample order must be complete and explicit")
+    for s in samples:
+        universe, grid = s["universe"], s["grid"]
+        if (any(type(v) is not int or v < 0 for v in universe)
+                or universe != sorted(set(universe)) or not grid
+                or any(type(x) not in (int, float) or not math.isfinite(x) for x in grid)
+                or any(a >= b for a, b in zip(grid, grid[1:]))):
+            raise ValueError("canonical vertex universe and finite increasing grid required")
+        if universe != samples[0]["universe"] or grid != samples[0]["grid"]:
+            raise ValueError("shared ordered vertex universe and grid required")
     for row in labels.values():
         if type(row["label"]) is not int or row["label"] not in (0, 1) or row["split"] not in ("train", "test"):
             raise ValueError("invalid binary label or split")
@@ -127,6 +142,8 @@ def validate_records(records, fixture, gudhi=False):
         s = owners[r["sample_key"]]
         selection = r["selection"]
         is_stage = selection["kind"] == "stage"
+        if is_stage and type(selection["index"]) is not int:
+            raise ValueError("stage index must be an integer")
         scale = s["grid"][selection["index"]] if is_stage else None
         coverage = "inclusive-supplied-sublevel" if is_stage else "complete-supplied-source"
         if (r["format"] != "cocycle-graph-learning-v1" or r["snapshot"] != s["snapshot"]
@@ -135,13 +152,13 @@ def validate_records(records, fixture, gudhi=False):
                 or r["scale_unit"] != "fixture-time"
                 or r["topology"] != "supplied-graph-no-clique-expansion"):
             raise ValueError("source/selection/units mismatch")
-        wanted_vertices = {(v[0],) for v in s["vertices"] if scale is None or v[1] <= scale}
-        wanted_edges = {tuple(e[:2]) for e in s["edges"] if scale is None or e[2] <= scale}
         bases = r["bases"]
         vertex_keys = [tuple(v) for v in bases["0"]]
         edge_keys = [tuple(e) for e in bases["1"]]
-        if (set(vertex_keys) != wanted_vertices or len(vertex_keys) != len(wanted_vertices)
-                or set(edge_keys) != wanted_edges or len(edge_keys) != len(wanted_edges)
+        if (len(set(vertex_keys)) != len(vertex_keys) or len(set(edge_keys)) != len(edge_keys)
+                or any(len(v) != 1 or type(v[0]) is not int or v[0] not in s["universe"] for v in vertex_keys)
+                or any(len(e) != 2 or any(type(v) is not int for v in e) or e[0] >= e[1]
+                       or any((v,) not in vertex_keys for v in e) for e in edge_keys)
                 or bases.get("2") != [] or set(bases) != {"0", "1", "2"}):
             raise ValueError("basis/topology mismatch")
         boundary = r["boundary"]
@@ -154,12 +171,29 @@ def validate_records(records, fixture, gudhi=False):
                 or {key: t[2] for key, t in terms.items()} != expected_terms):
             raise ValueError("signed boundary/shape mismatch")
         features = r["features"]
-        supplied = {v[0]: v[2:] for v in s["vertices"]}
         if (features["shape"] != [len(vertex_keys), 2] or features["row_keys"] != bases["0"]
                 or features["meaning"] != "supplied-coordinate" or features["units"] != "dimensionless"
-                or features["values"] != [supplied[v[0]] for v in vertex_keys]
-                or any(not math.isfinite(x) for row in features["values"] for x in row)):
+                or len(features["values"]) != len(vertex_keys) or any(len(row) != 2 for row in features["values"])
+                or any(type(x) not in (int, float) or not math.isfinite(x) for row in features["values"] for x in row)):
             raise ValueError("feature row/shape/value mismatch")
+    return by_key
+
+
+def validate_export(records, fixture, gudhi=False):
+    """Independent original-data oracle; never called by the model consumer."""
+    by_key = validate_records(records, sample_manifest(fixture))
+    owners = unique(fixture["samples"], lambda s: s["sample_key"])
+    for r in records:
+        s = owners[r["sample_key"]]
+        scale = r["selection"]["scale"]
+        wanted_vertices = {(v[0],) for v in s["vertices"] if scale is None or v[1] <= scale}
+        wanted_edges = {tuple(e[:2]) for e in s["edges"] if scale is None or e[2] <= scale}
+        if ({tuple(v) for v in r["bases"]["0"]} != wanted_vertices
+                or {tuple(e) for e in r["bases"]["1"]} != wanted_edges):
+            raise ValueError("export differs from original supplied topology/sublevel")
+        supplied = {v[0]: v[2:] for v in s["vertices"]}
+        if r["features"]["values"] != [supplied[v[0]] for v in r["bases"]["0"]]:
+            raise ValueError("exported coordinates differ from original supplied values")
         if gudhi:
             import gudhi as gd
             tree = gd.SimplexTree()
@@ -186,13 +220,10 @@ def encode(record, universe):
             + [float((a, b) in edges) for a, b in itertools.combinations(universe, 2)])
 
 
-def route_inputs(records, fixture, route):
-    by_key = validate_records(records, fixture)
+def route_inputs(records, manifest, route):
+    by_key = validate_records(records, manifest)
     values, identities = [], []
-    if any(s["universe"] != fixture["samples"][0]["universe"]
-           or s["grid"] != fixture["samples"][0]["grid"] for s in fixture["samples"]):
-        raise ValueError("shared ordered vertex universe and grid required")
-    for s in fixture["samples"]:
+    for s in manifest["samples"]:
         selections = [("topology", None)] if route == "topology" else [("stage", i) for i in range(len(s["grid"]))]
         if route not in ("topology", "stage"):
             raise ValueError("unknown route")
@@ -205,7 +236,7 @@ def route_inputs(records, fixture, route):
     return values, identities
 
 
-def consume(input_path, fixture_path, output):
+def consume(input_path, manifest_path, output):
     """Actual separate-process fit/predict; third-party imports stay optional."""
     import numpy as np
     from sklearn.linear_model import LogisticRegression
@@ -213,17 +244,17 @@ def consume(input_path, fixture_path, output):
     from threadpoolctl import threadpool_limits
     begin = time.perf_counter()
     versions = package_versions()
-    fixture = read_json(fixture_path)
+    manifest = read_json(manifest_path)
     records = [json.loads(line) for line in input_path.read_text(encoding="utf-8").splitlines()]
-    labels = unique(fixture["labels"], lambda s: s["sample_key"])
-    result = {"input_sha256": digest(input_path.read_bytes()), "fixture_sha256": digest(fixture_path.read_bytes()),
+    labels = unique(manifest["labels"], lambda s: s["sample_key"])
+    result = {"input_sha256": digest(input_path.read_bytes()), "manifest_sha256": digest(manifest_path.read_bytes()),
               "model": "StandardScaler + LogisticRegression(C=1, solver=lbfgs, max_iter=200)",
               "packages": versions, "python": sys.version,
               "controller_sha256": digest(Path(__file__).read_bytes()),
               "routes": {}, "predictions": []}
     with threadpool_limits(limits=1):
         for route in ("topology", "stage"):
-            values, identities = route_inputs(records, fixture, route)
+            values, identities = route_inputs(records, manifest, route)
             train = [i for i, row in enumerate(identities) if labels[row["sample_key"]]["split"] == "train"]
             test = [i for i, row in enumerate(identities) if labels[row["sample_key"]]["split"] == "test"]
             y = np.array([labels[row["sample_key"]]["label"] for row in identities])
@@ -253,22 +284,22 @@ def consume(input_path, fixture_path, output):
     write_json(output, result)
 
 
-def validate_predictions(result, records, fixture, input_path, fixture_path):
-    if (result["packages"] != PACKAGES or result["controller_sha256"] != digest(Path(__file__).read_bytes())
+def validate_predictions(result, records, manifest, input_path, manifest_path):
+    if (result["packages"] != LEARNING_PACKAGES or result["controller_sha256"] != digest(Path(__file__).read_bytes())
             or result["input_sha256"] != digest(input_path.read_bytes())
-            or result["fixture_sha256"] != digest(fixture_path.read_bytes())
+            or result["manifest_sha256"] != digest(manifest_path.read_bytes())
             or set(result["routes"]) != {"topology", "stage"}):
         raise ValueError("external result input/route mismatch")
     by_key = unique(result["predictions"], lambda r: (r["route"], r["sample_key"]))
-    expected_keys = {(route, s["sample_key"]) for route in ("topology", "stage") for s in fixture["samples"]}
+    expected_keys = {(route, s["sample_key"]) for route in ("topology", "stage") for s in manifest["samples"]}
     if by_key.keys() != expected_keys:
         raise ValueError("external output key mismatch")
     for route in ("topology", "stage"):
-        values, identities = route_inputs(records, fixture, route)
+        values, identities = route_inputs(records, manifest, route)
         model = result["routes"][route]
         if model["shape"] != [len(values), len(values[0])]:
             raise ValueError("external shape mismatch")
-        labels = unique(fixture["labels"], lambda s: s["sample_key"])
+        labels = unique(manifest["labels"], lambda s: s["sample_key"])
         train = [row for row, identity in zip(values, identities) if labels[identity["sample_key"]]["split"] == "train"]
         test_keys = [identity["sample_key"] for identity in identities if labels[identity["sample_key"]]["split"] == "test"]
         if model["train_count"] != len(train) or model["test_count"] != len(test_keys) or not train or not test_keys:
@@ -343,12 +374,15 @@ def run(worker, output, seed, python):
                      ROOT / "tools/benchmark_spectral_resources.py", ROOT / "tools/test_check_external_learning.py"]:
             report["source_sha256"][path.relative_to(ROOT).as_posix()] = digest(path.read_bytes())
         report["phase"] = "dependencies"
-        report["packages"] = package_versions()
+        report["oracle_packages"] = package_versions(ORACLE_PACKAGES)
         report["toolchains"] = {name: subprocess.check_output([name, "--version"], text=True).strip()
                                 for name in ("cargo", "rustc")}
         fixture = fixtures(seed)
         fixture_path = output / "fixture.json"
         write_json(fixture_path, fixture)
+        manifest = sample_manifest(fixture)
+        manifest_path = output / "manifest.json"
+        write_json(manifest_path, manifest)
         protocol = input_text(fixture["samples"])
         (output / "input.txt").write_text(protocol, encoding="utf-8", newline="\n")
         report["phase"] = "export"
@@ -356,14 +390,15 @@ def run(worker, output, seed, python):
         input_path = output / "records.jsonl"
         input_path.write_text(exported, encoding="utf-8", newline="\n")
         records = [json.loads(line) for line in exported.splitlines()]
-        validate_records(records, fixture, gudhi=True)
+        validate_export(records, fixture, gudhi=True)
         report.update(records=len(records), samples=len(fixture["samples"]), export_bytes=len(exported.encode()))
         report["phase"] = "external_fit_predict"
         command = [python, Path(__file__).resolve(), "--consume", input_path,
-                   "--fixture", fixture_path, "--result", output / "predictions.json"]
+                   "--manifest", manifest_path, "--result", output / "predictions.json"]
         _, report["consumer_process"] = run_process(command, output / "consumer")
         result = read_json(output / "predictions.json")
-        validate_predictions(result, records, fixture, input_path, fixture_path)
+        validate_predictions(result, records, manifest, input_path, manifest_path)
+        report["learning_packages"] = result["packages"]
         report.update(status="success", phase="validated", routes={route: {k: result["routes"][route][k]
             for k in ("shape", "train_count", "test_count", "accuracy", "fit_seconds", "predict_seconds")}
             for route in ("topology", "stage")}, oracle="independent signed incidence + GUDHI sublevel sets + scalar forward replay")
@@ -384,13 +419,13 @@ def main():
     parser.add_argument("--seed", type=int, default=92)
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--consume", type=Path)
-    parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--manifest", type=Path)
     parser.add_argument("--result", type=Path)
     args = parser.parse_args()
     if args.consume:
-        if not args.fixture or not args.result:
-            parser.error("--consume requires --fixture and --result")
-        consume(args.consume.resolve(), args.fixture.resolve(), args.result.resolve())
+        if not args.manifest or not args.result:
+            parser.error("--consume requires --manifest and --result")
+        consume(args.consume.resolve(), args.manifest.resolve(), args.result.resolve())
     else:
         if not args.worker or not args.output:
             parser.error("--worker and --output required")

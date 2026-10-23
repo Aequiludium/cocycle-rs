@@ -1,12 +1,17 @@
 //! Optional #92 supplied-graph/stage exporter; no PH or learning runtime.
 //! Whitespace protocol: key snapshot order n m g, g scales, n (id birth x y),
 //! then m (a b birth). Multiple samples may follow. Keys use ASCII word chars.
+//! Trusted fixture tool; rejects input above 1 MiB or 128 samples in total.
 
 use std::collections::HashMap;
 use std::io::{self, Read};
 use std::str::{FromStr, SplitWhitespace};
 
-use cocycle::complex::{FilteredComplex, Simplex, SimplexId, SimplicialComplex};
+use cocycle::complex::{FilteredComplex, Simplex, SimplicialComplex};
+use cocycle::filtration::SimplicialStage;
+
+const MAX_INPUT_BYTES: u64 = 1024 * 1024;
+const MAX_SAMPLES: usize = 128;
 
 fn read<T: FromStr>(words: &mut SplitWhitespace<'_>) -> Result<T, Box<dyn std::error::Error>> {
     words
@@ -27,10 +32,9 @@ fn key(word: &str) -> Result<&str, Box<dyn std::error::Error>> {
 }
 
 fn export(
-    source: &impl FilteredComplex<CellId = SimplexId>,
-    owner: &SimplicialComplex,
+    source: &SimplicialStage<'_>,
     features: &HashMap<usize, [f64; 2]>,
-) -> String {
+) -> Result<String, Box<dyn std::error::Error>> {
     let vertices: Vec<_> = source
         .cells()
         .filter(|&id| source.dimension(id) == 0)
@@ -39,24 +43,50 @@ fn export(
         .cells()
         .filter(|&id| source.dimension(id) == 1)
         .collect();
-    // These handles all belong to owner, including when source is its stage.
-    let vertex_keys: Vec<_> = vertices
+    // A stage carries its own owner; callers cannot supply a different owner.
+    let vertex_keys = vertices
         .iter()
-        .map(|&id| owner.simplex(id).unwrap().vertices())
-        .collect();
-    let edge_keys: Vec<_> = edges
+        .map(|&id| {
+            source
+                .simplex(id)
+                .map(Simplex::vertices)
+                .ok_or("missing stage vertex")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let edge_keys = edges
         .iter()
-        .map(|&id| owner.simplex(id).unwrap().vertices())
-        .collect();
-    let values: Vec<_> = vertex_keys.iter().map(|v| features[&v[0]]).collect();
+        .map(|&id| {
+            source
+                .simplex(id)
+                .map(Simplex::vertices)
+                .ok_or("missing stage edge")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let values = vertex_keys
+        .iter()
+        .map(|v| {
+            let vertex = v.first().ok_or("empty vertex key")?;
+            features
+                .get(vertex)
+                .copied()
+                .ok_or("missing supplied vertex features")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if values.iter().flatten().any(|x| !x.is_finite()) {
+        return Err("nonfinite supplied vertex features".into());
+    }
     let mut terms = Vec::new();
     for (column, &edge) in edges.iter().enumerate() {
-        for (face, sign) in source.boundary(edge) {
-            let row = vertices.iter().position(|&id| id == face).unwrap();
+        for term in source.boundary(edge).ok_or("missing stage boundary")? {
+            let row = vertices
+                .iter()
+                .position(|&id| id == term.face)
+                .ok_or("boundary face absent from vertex basis")?;
+            let sign = term.coefficient;
             terms.push(format!("[{row},{column},{sign}]"));
         }
     }
-    format!(
+    Ok(format!(
         "\"bases\":{{\"0\":{vertex_keys:?},\"1\":{edge_keys:?},\"2\":[]}},\
          \"boundary\":{{\"shape\":[{},{}],\"terms\":[{}]}},\
          \"features\":{{\"shape\":[{},2],\"row_keys\":{vertex_keys:?},\
@@ -65,14 +95,24 @@ fn export(
         edges.len(),
         terms.join(","),
         vertices.len()
-    )
+    ))
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
-    io::stdin().read_to_string(&mut input)?;
+    io::stdin()
+        .take(MAX_INPUT_BYTES + 1)
+        .read_to_string(&mut input)?;
+    if input.len() as u64 > MAX_INPUT_BYTES {
+        return Err("fixture input exceeds 1 MiB".into());
+    }
     let mut words = input.split_whitespace();
+    let mut sample_count = 0;
     while let Some(sample) = words.next() {
+        if sample_count == MAX_SAMPLES {
+            return Err("fixture input exceeds 128 samples".into());
+        }
+        sample_count += 1;
         let sample = key(sample)?;
         let snapshot = key(words.next().ok_or("missing snapshot")?)?;
         let order: usize = read(&mut words)?;
@@ -108,6 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cells.push(Simplex::new(vec![a, b], birth)?);
         }
         let owner = SimplicialComplex::new(cells)?;
+        let full = owner.stage(owner.max_filtration_value().unwrap_or(0.))?;
         let common = format!(
             "\"format\":\"cocycle-graph-learning-v1\",\"sample_key\":\"{sample}\",\
              \"snapshot\":\"{snapshot}\",\"sample_order\":{order},\
@@ -117,16 +158,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "{{{common},\"selection\":{{\"kind\":\"topology\",\"index\":null,\"scale\":null}},\
              \"coverage\":\"complete-supplied-source\",{}}}",
-            export(&owner, &owner, &features)
+            export(&full, &features)?
         );
         for (index, &scale) in grid.iter().enumerate() {
             let stage = owner.stage(scale)?;
             println!(
                 "{{{common},\"selection\":{{\"kind\":\"stage\",\"index\":{index},\"scale\":{scale}}},\
                  \"coverage\":\"inclusive-supplied-sublevel\",{}}}",
-                export(&stage, &owner, &features)
+                export(&stage, &features)?
             );
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_or_nonfinite_features_return_errors() -> Result<(), Box<dyn std::error::Error>> {
+        let owner = SimplicialComplex::new(vec![Simplex::new(vec![10], 0.)?])?;
+        let stage = owner.stage(0.)?;
+        assert!(export(&stage, &HashMap::new()).is_err());
+        assert!(export(&stage, &HashMap::from([(10, [f64::NAN, 0.])])).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn empty_stage_needs_no_vertex_features() -> Result<(), Box<dyn std::error::Error>> {
+        let owner = SimplicialComplex::new(vec![Simplex::new(vec![10], 0.)?])?;
+        let output = export(&owner.stage(-1.)?, &HashMap::new())?;
+        assert!(output.contains("\"shape\":[0,2]"));
+        Ok(())
+    }
 }

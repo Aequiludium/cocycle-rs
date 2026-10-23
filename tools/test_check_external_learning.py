@@ -39,9 +39,10 @@ class HandoffTests(unittest.TestCase):
         self.fixture, self.records = hand_example()
 
     def test_hand_signed_edge_empty_shape_and_application_layout(self):
-        learning.validate_records(self.records, self.fixture)
-        full, _ = learning.route_inputs(list(reversed(self.records)), self.fixture, "topology")
-        stages, _ = learning.route_inputs(self.records, self.fixture, "stage")
+        learning.validate_export(self.records, self.fixture)
+        manifest = learning.sample_manifest(self.fixture)
+        full, _ = learning.route_inputs(list(reversed(self.records)), manifest, "topology")
+        stages, _ = learning.route_inputs(self.records, manifest, "stage")
         self.assertEqual(full, [[1., 1., -3., 0., 5., 1., 1.]])
         self.assertEqual(stages, [[0.] * 7 + full[0]])
 
@@ -59,11 +60,11 @@ class HandoffTests(unittest.TestCase):
             rows = copy.deepcopy(self.records)
             mutate(rows)
             with self.subTest(rows=rows), self.assertRaises(ValueError):
-                learning.validate_records(rows, self.fixture)
+                learning.validate_export(rows, self.fixture)
         for labels in ([], self.fixture["labels"] * 2, [{"sample_key": "foreign", "label": 1, "split": "train"}]):
             self.fixture["labels"] = labels
             with self.assertRaises(ValueError):
-                learning.validate_records(self.records, self.fixture)
+                learning.validate_export(self.records, self.fixture)
 
     def test_source_shape_degree_sign_units_and_nonfinite_fail(self):
         mutations = [lambda r: r.update(snapshot="wrong"), lambda r: r.update(sample_order=2),
@@ -80,7 +81,7 @@ class HandoffTests(unittest.TestCase):
             rows = copy.deepcopy(self.records)
             mutate(rows[0])
             with self.subTest(mutate=mutate), self.assertRaises(ValueError):
-                learning.validate_records(rows, self.fixture)
+                learning.validate_export(rows, self.fixture)
 
     def test_wrong_stage_or_empty_zero_column_shape_fails(self):
         for mutate in (lambda r: r["selection"].update(scale=1.),
@@ -89,7 +90,7 @@ class HandoffTests(unittest.TestCase):
             rows = copy.deepcopy(self.records)
             mutate(rows[1])
             with self.assertRaises(ValueError):
-                learning.validate_records(rows, self.fixture)
+                learning.validate_export(rows, self.fixture)
 
     def test_ambiguous_same_size_universe_is_rejected(self):
         fixture = copy.deepcopy(self.fixture)
@@ -103,7 +104,22 @@ class HandoffTests(unittest.TestCase):
             record.update(sample_key="edge-b", sample_order=1)
             records.append(record)
         with self.assertRaisesRegex(ValueError, "universe"):
-            learning.route_inputs(records, fixture, "topology")
+            learning.route_inputs(records, learning.sample_manifest(fixture), "topology")
+
+    def test_runtime_contract_does_not_need_source_vertices_edges_or_oracle(self):
+        manifest = learning.sample_manifest(self.fixture)
+        self.assertEqual(set(manifest["samples"][0]), {"sample_key", "sample_order", "snapshot", "universe", "grid"})
+        with patch.object(learning, "validate_export", side_effect=AssertionError("original-data oracle called")), \
+                patch.object(learning, "fixtures", side_effect=AssertionError("original fixture accessed")):
+            values, _ = learning.route_inputs(self.records, manifest, "topology")
+        self.assertEqual(values, [[1., 1., -3., 0., 5., 1., 1.]])
+
+    def test_runtime_structure_and_original_data_checks_are_distinct(self):
+        self.records[0]["features"]["values"][0][0] = 123.
+        # A finite supplied value is structurally valid; the oracle checks truth.
+        learning.validate_records(self.records, learning.sample_manifest(self.fixture))
+        with self.assertRaisesRegex(ValueError, "original supplied values"):
+            learning.validate_export(self.records, self.fixture)
 
     def test_fixture_has_disjoint_sample_split_and_real_empty_stages(self):
         fixture = learning.fixtures()
@@ -133,17 +149,53 @@ class HandoffTests(unittest.TestCase):
                 learning.read_json(path)
 
 
-HAS_PACKAGES = all(importlib.util.find_spec(m) is not None for m in ("numpy", "scipy", "sklearn", "gudhi"))
+HAS_LEARNING = all(importlib.util.find_spec(m) is not None for m in ("numpy", "scipy", "sklearn"))
+HAS_GUDHI = importlib.util.find_spec("gudhi") is not None
 WORKER = os.environ.get("COCYCLE_LEARNING_WORKER")
 
 
-@unittest.skipUnless(HAS_PACKAGES and WORKER, "optional packages and COCYCLE_LEARNING_WORKER required")
+@unittest.skipUnless(HAS_LEARNING and WORKER, "learning packages and COCYCLE_LEARNING_WORKER required")
+class ConsumerProcessTests(unittest.TestCase):
+    def test_standalone_consumer_with_no_original_data_or_gudhi_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            fixture = learning.fixtures()
+            manifest = learning.sample_manifest(fixture)
+            learning.write_json(output / "manifest.json", manifest)
+            wire, _ = learning.run_process([WORKER], output / "export", learning.input_text(fixture["samples"]))
+            (output / "records.jsonl").write_text(wire, encoding="utf-8", newline="\n")
+            wrapper = output / "without_gudhi.py"
+            wrapper.write_text('''import builtins, importlib.metadata, runpy, sys
+original_import, original_version = builtins.__import__, importlib.metadata.version
+def no_gudhi_import(name, *args, **kwargs):
+    if name.split('.')[0] == 'gudhi':
+        raise AssertionError('consumer attempted to import GUDHI')
+    return original_import(name, *args, **kwargs)
+def no_gudhi_version(name):
+    if name == 'gudhi':
+        raise AssertionError('consumer attempted to check GUDHI')
+    return original_version(name)
+builtins.__import__, importlib.metadata.version = no_gudhi_import, no_gudhi_version
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name='__main__')
+''', encoding="utf-8", newline="\n")
+            learning.run_process([sys.executable, wrapper, Path(learning.__file__).resolve(),
+                                  "--consume", output / "records.jsonl", "--manifest", output / "manifest.json",
+                                  "--result", output / "predictions.json"], output / "consumer")
+            self.assertFalse((output / "fixture.json").exists())
+            result = learning.read_json(output / "predictions.json")
+            self.assertNotIn("gudhi", result["packages"])
+            learning.validate_predictions(result, [json.loads(line) for line in wire.splitlines()], manifest,
+                                          output / "records.jsonl", output / "manifest.json")
+
+
+@unittest.skipUnless(HAS_LEARNING and HAS_GUDHI and WORKER, "oracle packages and COCYCLE_LEARNING_WORKER required")
 class RealProcessTests(unittest.TestCase):
     def test_both_routes_and_output_integrity(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "run"
             learning.run(Path(WORKER), output, 92, Path(sys.executable))
-            fixture = learning.read_json(output / "fixture.json")
+            manifest = learning.read_json(output / "manifest.json")
             records = [json.loads(line) for line in (output / "records.jsonl").read_text().splitlines()]
             result = learning.read_json(output / "predictions.json")
             self.assertEqual(len(records), 128)
@@ -159,14 +211,15 @@ class RealProcessTests(unittest.TestCase):
                            lambda r: r["routes"]["stage"].update(accuracy=.5),
                            lambda r: r["routes"]["stage"]["mean"].__setitem__(10, .123),
                            lambda r: r["routes"]["stage"].update(shape=[32, 33]),
+                           lambda r: r.update(manifest_sha256="wrong"),
                            lambda r: r.update(input_sha256="wrong")):
                 corrupted = copy.deepcopy(result)
                 mutate(corrupted)
                 with self.subTest(mutate=mutate), self.assertRaises(ValueError):
-                    learning.validate_predictions(corrupted, records, fixture,
-                                                  output / "records.jsonl", output / "fixture.json")
+                    learning.validate_predictions(corrupted, records, manifest,
+                                                  output / "records.jsonl", output / "manifest.json")
             # Train-only normalization: verify independently from fixture rows.
-            values, _ = learning.route_inputs(records, fixture, "topology")
+            values, _ = learning.route_inputs(records, manifest, "topology")
             self.assertAlmostEqual(result["routes"]["topology"]["mean"][6], sum(row[6] for row in values[:24]) / 24, places=14)
             with self.assertRaises(FileExistsError):
                 learning.run(Path(WORKER), output, 92, Path(sys.executable))
@@ -182,6 +235,15 @@ class RealProcessTests(unittest.TestCase):
                 mutate(rows)
                 with self.subTest(name=name), self.assertRaises(RuntimeError):
                     learning.run_process([WORKER], Path(directory) / name, learning.input_text(rows))
+
+    def test_rust_export_rejects_total_input_and_sample_limits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for name, protocol, message in [("bytes", " " * (1024 * 1024 + 1), "1 MiB"),
+                                             ("samples", "empty snapshot 0 0 0 1 0\n" * 129, "128 samples")]:
+                stem = Path(directory) / name
+                with self.subTest(name=name), self.assertRaises(RuntimeError):
+                    learning.run_process([WORKER], stem, protocol)
+                self.assertIn(message, stem.with_suffix(".stderr").read_text())
 
     def test_failed_external_call_cannot_produce_success_report(self):
         with tempfile.TemporaryDirectory() as directory:
