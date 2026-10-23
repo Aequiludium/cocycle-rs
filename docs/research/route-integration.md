@@ -525,7 +525,7 @@ core dependency on an ML runtime is introduced.
 The local roundtrip above remains interface evidence. The bounded graph/stage
 implementation added on 2026-10-23 uses the existing supplied-complex and stage
 readers with a separate scikit-learn fit/predict process; see the
-[replay commands and acceptance contract](../../tools/README.md#direct-external-learning-acceptance-92).
+[replay commands and acceptance contract](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md#direct-external-learning-acceptance-92).
 It verifies both actual exports, independent signed incidence and GUDHI sublevel
 sets, complete sample/stage and label joins, failure propagation, and scalar
 replay of returned predictions. Source/base SHA, dirty state, source/binary/input
