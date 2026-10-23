@@ -16,6 +16,50 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  external-learning:
+    name: External learning routes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COCYCLE_LEARNING_WORKER: ${{ github.workspace }}/target/learning-handoff
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - run: python -m pip install numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0 gudhi==3.12.0
+      - name: Prepare a learning-only consumer environment
+        run: |
+          python -m venv target/learning-runtime
+          target/learning-runtime/bin/python -m pip install numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0
+          target/learning-runtime/bin/python -c "import importlib.util; assert importlib.util.find_spec('gudhi') is None"
+      - run: cargo build --locked --release
+      - run: rustfmt --edition 2024 --check tools/reference/learning_handoff.rs
+      - run: rustc --edition 2024 -D warnings -C opt-level=3 tools/reference/learning_handoff.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/learning-handoff
+      - name: Check exporter error propagation
+        run: |
+          rustc --test --edition 2024 -D warnings tools/reference/learning_handoff.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/learning-handoff-tests
+          target/learning-handoff-tests
+      - run: python -m unittest discover -s tools -p 'test_check_external_learning.py'
+      - run: python tools/check_external_learning.py --worker target/learning-handoff --python target/learning-runtime/bin/python --output target/external-learning
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: external-learning-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: target/external-learning/
+
   operator-reference:
     name: F2 operator reference comparisons
     runs-on: ubuntu-latest

@@ -1,5 +1,109 @@
 # Developer tools
 
+## Direct external learning acceptance (#92)
+
+The optional [external-learning controller](check_external_learning.py) runs two
+real routes: supplied graph to scikit-learn, and three inclusive filtration stages
+to scikit-learn. The [Rust exporter](reference/learning_handoff.rs) borrows existing
+`SimplicialComplex`/`SimplicialStage` APIs and signed boundaries. It neither calls
+PH nor builds a clique complex. No Cargo dependency or production API is added.
+This bounded application example consumes raw graph/coordinate inputs;
+[#111](https://github.com/Aequiludium/cocycle-rs/issues/111) retains ownership of
+persistent spectral features and their learning connection.
+
+Use Rust 1.91+ and Python 3.10+. The learning interpreter requires
+`numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0`.
+Only the independent original-data oracle/controller requires `gudhi==3.12.0`.
+The following combined environment is convenient for the complete acceptance run:
+
+```sh
+python3 -m pip install numpy==2.2.6 scipy==1.15.3 scikit-learn==1.7.2 threadpoolctl==3.6.0 joblib==1.6.0 gudhi==3.12.0
+cargo build --locked --release
+rustc --edition 2024 -D warnings -C opt-level=3 tools/reference/learning_handoff.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/learning-handoff
+python3 tools/check_external_learning.py --worker target/learning-handoff --output target/external-learning-001
+COCYCLE_LEARNING_WORKER="$PWD/target/learning-handoff" python3 -m unittest discover -s tools -p 'test_check_external_learning.py'
+```
+
+On Windows append `.exe` to the worker and use
+`$env:COCYCLE_LEARNING_WORKER = (Resolve-Path target/learning-handoff.exe).Path`
+before the unit-test command. `--python PATH` selects the separate consumer
+interpreter, which needs only the five learning packages. Standard-library test
+discovery skips optional real-process cases without their packages/worker. The
+`External learning routes` CI job also runs the Rust worker's colocated error
+tests and uses a separate learning-only environment with GUDHI absent.
+
+The external runtime accepts only `records.jsonl` and `manifest.json`. The manifest
+contains sample IDs/order, source snapshots, a shared ascending vertex universe,
+the stage grid, labels and split keys; it contains no original vertices, edges,
+births or coordinate values. The consumer validates the exported record's own
+shape, incidence and identities, then encodes only its values. Original data
+remains in `fixture.json` for `validate_export` and GUDHI to independently check
+the source truth; the model process never opens that file or calls the oracle.
+For a standalone replay in the learning-only environment:
+
+```sh
+python3 tools/check_external_learning.py --consume target/external-learning-001/records.jsonl --manifest target/external-learning-001/manifest.json --result target/external-learning-001/replayed-predictions.json
+```
+
+This replaces the example's previous `--fixture` consumer argument with
+`--manifest`; it is a tooling-protocol change, not a Rust public API change.
+
+The fixed seed is 92. Thirty-two synthetic graphs use six nonconsecutive original
+vertex IDs and two supplied coordinate channels. Twenty-four sample IDs train
+and eight are held out; all selections of one sample stay together. Labels mean
+presence of edge `(10,35)`, so prediction is a deliberately simple execution
+check, not a generalization or TDL accuracy result. The coordinate nuisance
+values and other edges do not define the label. Vertex 90 is isolated and born
+at 1; stages `[-2,0,1]` include an empty stage and tied edge insertions.
+
+The UTF-8 JSONL exchange retains sample order, source snapshot, original ordered
+vertex/edge bases, signed integer incidence, explicit shapes (including `[0,2]`
+features and `[0,0]` incidence), feature meaning/units and selection coverage.
+This is an example protocol, not a public serializer. The model uses an explicit
+fixed vertex universe: six presence bits, twelve supplied coordinates, and
+fifteen upper-triangle adjacency entries. Missing vertices have zero coordinate
+slots with a separate presence mask. These give 33 columns for the graph and
+99 for the ordered three stages. Filtration values, labels, IDs, and snapshots
+are not numeric model inputs. Stage encoding does not require spectral or PH
+features, and introduces no new library feature algorithm.
+
+The external Python process fits `StandardScaler` on training samples only and
+`LogisticRegression(C=1, solver=lbfgs, max_iter=200)` with one numerical thread.
+Labels and returned predictions deliberately use different wire orders. Complete
+key joins reject missing, duplicate, or foreign samples/stages; source, feature
+row order, incidence signs, degree availability, shapes, nonfinite values and
+returned input hashes are checked. A complete basis permutation is legal when
+its coordinates and incidence follow it. Predictions and reported accuracy are
+checked again by scalar float64 forward replay and a held-out key join, with
+absolute tolerance `1e-12` for this bounded 33/99-column calculation. Independent
+training-only mean/variance checks exclude test-set normalization leakage.
+GUDHI checks the supplied topology and each sublevel set, without computing PH.
+
+The output directory must be new. `fixture.json`, `manifest.json`, `input.txt`, `records.jsonl`,
+`predictions.json` and `report.json` retain source/base SHA, dirty state, source
+and binary hashes, input/output hashes, package/toolchain versions, commands,
+counts, dimensions and results. Each process retains stdout, stderr, exit code,
+timeout and wall time. Windows additionally records absolute process peak
+working set (runtime, parsing and output included); other platforms report null.
+Fit/predict times are separate from process startup and export. A single serial
+smoke measurement is a cost snapshot, not a speedup or scaling comparison.
+Failures retain a failure report and logs, never a success marker; timeouts kill
+the direct child. Python import/setup failures and interrupted hosts can still
+prevent a complete report. This tool does not manage arbitrary process trees.
+The trusted Rust fixture worker additionally rejects input above 1 MiB or 128
+samples in total (besides 64 vertices, 2016 edges and 16 scales per sample).
+Oversized or invalid input can leave partial stdout, but a nonzero exit always
+rejects the export. The concrete stage carries its own source owner, and export
+returns an error for missing/nonfinite features or missing boundary coordinates.
+
+Scope is bounded to small unweighted undirected graphs with supplied coordinates
+and a shared ordered vertex universe/grid. It does not deliver a general tensor
+binding, TopoModelX integration, persistent-spectrum handoff, full-dataset
+training, automatic feedback, deployment, or a stability/generalization claim.
+CI, review, merge and release remain separate from local route acceptance.
+
+## Spectral validation tools
+
 The maintained resource snapshots for [persistent Laplacians](../benches/reports/persistent-laplacian-resources.md),
 [Dirac](../benches/reports/dirac-resources.md), [Hodge](../benches/reports/hodge-resources.md) and
 [spectral features](../benches/reports/spectral-feature-resources.md) record
