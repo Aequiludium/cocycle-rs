@@ -522,11 +522,23 @@ allocate or copy explicitly. Process setup, serialization, external execution
 and output validation are distinct cost/error boundaries. No Rust mathematical
 core dependency on an ML runtime is introduced.
 
-Stage B remains unimplemented until #111 supplies a selected real exporter and
-external call. Then both routes must actually execute, check complete input/output
-key joins and failure propagation, record fixed tool/runtime/input identities,
-and distinguish export success from external execution and training quality.
-This local roundtrip is interface evidence, not either running route.
+The local roundtrip above remains interface evidence. The bounded graph/stage
+implementation added on 2026-10-23 uses the existing supplied-complex and stage
+readers with a separate scikit-learn fit/predict process; see the
+[replay commands and acceptance contract](../../tools/README.md#direct-external-learning-acceptance-92).
+It verifies both actual exports, independent signed incidence and GUDHI sublevel
+sets, complete sample/stage and label joins, failure propagation, and scalar
+replay of returned predictions. Source/base SHA, dirty state, source/binary/input
+hashes, pinned dependencies and process costs accompany each run. Empty stages,
+isolates and nonconsecutive original vertex IDs are exercised explicitly.
+
+This selects the original graph route without requiring new spectral features.
+#111 still owns persistent-spectrum feature/export/model integration; no ordinary
+graph encoding is presented as a persistent spectral result. Thirty-two synthetic
+graphs and a simple edge-presence label establish execution and data integrity,
+not broad learning quality, TopoModelX support, a production binding, or hosted
+CI/review/merge/release acceptance. The earlier table and JSON sketch describe
+the interface-stage contribution; they did not execute these routes.
 
 ## Optional feedback and invalidation decision: #93
 
@@ -619,7 +631,7 @@ learning feedback loop or production gradient API.
 | #89 | Existing stage/inclusion doctest; persistent-pair definition and exact induced-Gram counterexample | Actual restricted-domain persistent spectrum; independent real persistent rank/nullity. |
 | #90 | Three-degree F2/maps/cost/query contract; exhaustive declared-matrix legality and fill witness | Actual #75 class/query and transport workflows; legal versus optimal evidence. |
 | #91 | Existing diagram comparison/scalar-consumer doctest and direct-object comparability table | #110's selected non-diagram data/result comparison and relevant analysis. |
-| #92 | Ordered topology/stage/feature exchange contract and local JSON roundtrip | #111 real export plus external call on both routes, with complete key joins. |
+| #92 | Ordered exchange contract; optional graph/stage exporter and separate scikit-learn execution with complete key joins | Replay both routes using the pinned optional tool environment; persistent spectral features remain #111. |
 | #93 | Invalidation/ownership contract; actual PH tie fixture and exact slope counterexample; defer automatic feedback | Optional justified model/loss and real experiment, or separately reviewed deferral. |
 | #94 | Fixed combined source disposition/cost audit; owned-stage/F3/witness/consumer regression and full local checks | Approved main integration and exact-head hosted/native acceptance; no release claim. |
 
