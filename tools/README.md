@@ -285,10 +285,13 @@ implements ICML 2023's smallest-eigenvalue truncation, zero padding and flatteni
 on real, unweighted pair spectra. It retains sample/source identities, bases,
 scale pairs, numerical origin, full/partial coverage and a padding mask. Its tiny
 Python Schur oracle, independent nullspace/rational-rank checks and GUDHI cases
-are research tools; production Persistent Laplacian and result APIs remain
-separate work. The [Rust baseline worker](reference/persistent_spectral_baseline.rs)
-calls existing Betti/lifetime descriptors; external scikit-learn training stays
-outside the crate. No dependency is added to Cargo.
+are research tools. The [Rust worker](reference/persistent_spectral_baseline.rs)
+now consumes owned `cocycle::persistent_laplacian::PersistentLaplacian` and
+`LaplacianSpectrum` results, exports the actual two-scale spectra and computes
+the 160-column truncation/padding and validity mask in Rust. Its original mode
+still calls existing Betti/lifetime descriptors. A separate scikit-learn process
+fits and predicts from the exported arrays, without source filtrations or oracle
+access. No dependency is added to Cargo and no general feature API is introduced.
 
 Use Python 3.10+ and an optional environment with the tested versions
 `numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0 scikit-learn==1.7.2 threadpoolctl==3.6.0`.
@@ -297,15 +300,22 @@ as `target/persistent-spectral-reference/perslap.py` (create that directory firs
 The command checks its Git blob before executing only the original matrix-level
 functions with explicit boundary/prefix adapters, plus the unchanged feature
 loop with trace callbacks. It does not run the author's image constructor or
-full MNIST pipeline. Rust 1.91+ is needed for the existing-descriptor worker.
+full MNIST pipeline. Rust 1.91+ is needed for the descriptor/spectral worker.
 The small vertex-cubical fixture checks matrix conventions; the complete cubical
 image-processing pipeline and the paper's MNIST/MoleculeNet experiments have
 not been reproduced here.
 
 ```sh
-python3 -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py'
+cargo build --locked --lib
+rustc --edition 2024 -D warnings tools/reference/persistent_spectral_baseline.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/spectral-worker
+SPECTRAL_WORKER="$PWD/target/spectral-worker" python3 -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py'
 python3 tools/reproduce_persistent_spectral_features.py --author-source target/persistent-spectral-reference/perslap.py --output target/persistent-spectral-run-001
 ```
+
+On Windows append `.exe` to the worker and set `$env:SPECTRAL_WORKER` to its
+absolute path. Without this variable the four real-worker tests skip; CI sets it.
+The reproduction always builds its own library/worker and executes the two
+colocated Rust error/empty-source tests before using it.
 
 The default inclusive grid is `[0, 1/3, 2/3, 1]`, with degrees zero and one and
 eight retained eigenvalues per pair. Columns follow
@@ -315,7 +325,7 @@ only a known exhausted domain is padded. The separate mask distinguishes actual
 zero eigenvalues from padding. This uniform grid is an explicit convention:
 the pinned author's four-point loop uses `[0, 0.25, 0.5, 1]`.
 
-Outputs include 160-column spectral features, padding masks, raw spectra and
+Outputs include 160-column Rust spectral features, padding masks, raw spectra and
 matrices, column definitions, group-held-out predictions, dependency/source
 identities and file hashes. The output directory must be new. Tree controls add
 BFS distance, grounded-solve effective resistance and degree-zero/one ablations.
@@ -329,13 +339,58 @@ callbacks, with its sampling and aggregate failure retained separately.
 Hash-verified `SOURCE_SNAPSHOT.json` also supports offline review-bundle replay
 without a Git checkout. See the [paper](https://proceedings.mlr.press/v202/davies23c.html)
 and [Issue #111](https://github.com/Aequiludium/cocycle-rs/issues/111) for scope.
+The `rust-spectral/` records retain every worker request/output, inclusive pair
+indices, complete K/L bases, K births, full matrices, raw signed eigenvalues,
+residuals and the producer's suggested threshold. Source IDs are application
+identities for the complete supplied complexes, not cross-source certificates.
+The worker accepts four finite strictly increasing scales, ASCII IDs of at most
+128 characters, at most 256 supplied vertices/edges/triangles and 64 KiB input.
+Each dense buffer is capped at 4,096 f64 entries and each construction and solve
+has a separate 20-million-unit work limit. The controller caps each child at
+30 seconds; it retains output only after a complete successful export. Empty
+domains are computed empty spectra; missing/failed/partial blocks are errors.
+It checks basis-aligned matrices against the independent restricted-boundary
+nullspace oracle at absolute tolerance `1e-9`, then compares full spectra,
+feature values and masks. Per-scale ordinary Hodge spectra remain a baseline.
+
+`model-input.npz` contains feature arrays, sample IDs, group IDs, labels and
+explicit train/test row indices. `feature_schema.json` retains sample/source IDs,
+bases, units, pair/column order and origin. `model-output.json` binds predictions
+to test sample IDs and the input SHA-256. Re-run only the external consumer with:
+
+```sh
+python3 tools/reproduce_persistent_spectral_features.py --fit-exported target/persistent-spectral-run-001/model-input.npz target/model-replay.json
+```
+
+The consumer requires finite owned matrices, unique sample IDs, exhaustive
+disjoint row partitions and disjoint groups. Before loading any array it caps
+the checked archive snapshot at 4 MiB, members at 23, each uncompressed member
+at 2 MiB and their uncompressed sum at 16 MiB. Members use stored/DEFLATE ZIP
+compression and must be uniquely named flat NPY v1/v2 arrays with headers of at
+most 4,096 bytes. Header checks
+reject unsupported/object/structured dtypes, excessive shapes and disagreement
+between shape/dtype byte counts and the member's payload size. Numeric items
+use at most eight bytes; Unicode IDs/branch names use at most 128 characters
+per item. The same checked bytes are loaded and hashed, with no path reopening.
+These are input-array budgets, not a bound on NumPy/scikit-learn process memory.
+Samples remain capped at 256, branches at 16 and columns per branch at 512.
+Model failure/timeout or
+an invalid prediction/identity readback fails the controller. Process wall time,
+model CPU and Windows peak working set (including process baseline) are retained;
+peak working set is null on other platforms. Parent CPU excludes children and
+tracemalloc excludes native allocations, so neither is a process-tree quota.
+Rust child times include startup, computation and serialization. There is no
+performance comparison or speedup claim.
+
 Default standard-library tool tests skip the optional numerical checks if their
 packages are absent; the reproduction command requires them and fails visibly.
 
 The fixed seed is `20261012`. Each experiment has 64 matched pairs and splits
 by whole pair groups into 96 training and 32 test rows. The forest uses 100
-estimators, maximum depth four and `n_jobs=1`; IDs, labels and masks are not model
-inputs. The tree labels are defined by early-vertex distance, so shortest path
+estimators, maximum depth four and `n_jobs=1`; sample identities and labels are
+excluded from feature columns. Values-only, values-plus-mask, mask-only and
+domain-size-only branches use the same split. A Python-oracle feature control
+also uses that split. The tree labels are defined by early-vertex distance, so shortest path
 and effective resistance supply the same separating information as the
 degree-zero persistent spectrum. In the disk control, the one-face and
 three-face fillings give degree-one spectra `{3,3,3}` and `{1,3,3}`, while
@@ -351,17 +406,24 @@ Representation limits of this reproduction remain explicit:
   discards the remaining spectrum, including all positive values if the nullity
   reaches the retained length.
 - Fixed feature width does not make different complex sizes equivalent.
-  Domain sizes, coverage and bases are exported, but the model does not consume
-  them. Neither the spectra nor their traces are automatically size-normalized.
+  Domain sizes, coverage and bases are exported; only the separately named
+  domain-size control consumes sizes. Neither spectra nor their traces are
+  automatically size-normalized.
 - The mask separates padding from computed entries after numerical thresholding.
   It does not distinguish exact zero eigenvalues from small values mapped to zero
   by `zero_tolerance`. Raw floating-point spectra and the threshold are retained;
   exact-rank checks certify nullity only for the worked oracle cases.
-- Only value features enter the current forests. Values-only, values-plus-mask,
-  mask-only and domain-size controls on the same grouped splits remain future
-  ablations, especially for varying complex sizes. No robustness guarantee under
+- Values-only, values-plus-mask, mask-only and domain-size controls run on the
+  same grouped splits, including varying complex sizes. No robustness guarantee under
   filtration perturbations has been established; threshold crossings, changes in
   sampled stages, domain dimension and retained coverage require separate checks.
+
+The adoption decision is to keep this bounded file-exchange route as a maintained
+tool/CI consumer of the existing Rust results. It closes the real-feature/model
+integration gap without a new public API or a training runtime in the crate.
+General datasets, cubical Rust spectra, sparse scalability, weighted products,
+general chain maps and a stable PLD/PLI representation remain deferred. CI,
+independent review, merge and release remain separate delivery states.
 
 For subsequent representation work, see Jung, Kang and Park,
 [Stable Vectorization of Persistent Laplacians via Spectral Descriptors](https://arxiv.org/abs/2512.05463v2)
