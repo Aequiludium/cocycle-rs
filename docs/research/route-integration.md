@@ -375,6 +375,11 @@ Main merge, hosted acceptance and release remain separate from local validation.
 
 ## Direct comparison and consumption handoff: #91
 
+The Unreleased [point-set comparison](../guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities)
+now supplies #110's selected Euclidean Hausdorff route and identified sample
+matrix. The dated interface study below retains the broader future questions;
+this selected geometry implementation does not complete #91's other result routes.
+
 Use #81's [existing comparison contract](result-contracts.md#existing-distance-boundaries-and-migration-decision-on-main-a7ee9e9).
 Concrete raw/contextual diagram metrics remain callable; geometry, filtration,
 spectral and projection comparisons need a separately selected mathematical

@@ -147,6 +147,17 @@ defines the compared edge/blocker algorithm. Theorem statements do not certify
 floating-point implementations; native agreement and mathematical guarantees
 are separate forms of evidence.
 
+## HD
+
+[SciPy directed Hausdorff](https://docs.scipy.org/doc/scipy-1.15.3/reference/generated/scipy.spatial.distance.directed_hausdorff.html)
+defines the directed Euclidean operation and symmetric maximum; its
+[fixed numerical kernel](https://github.com/scipy/scipy/blob/v1.15.3/scipy/spatial/_hausdorff.pyx)
+uses squared distances and shuffled early termination. Cocycle instead uses
+exhaustive scans with stable norms. [GUDHI 3.12 nearest neighbors](https://gudhi.inria.fr/python/3.12.0/point_cloud.html#gudhi.point_cloud.knn.KNearestNeighbors)
+documents the `ckdtree` backend and its approximation parameter; the independent
+checker explicitly selects k=1, eps=0 and one worker. It does not use approximate
+HNSW. See the [set-distance specification](mathematics.md#25-euclidean-hausdorff-distance).
+
 ## HO
 
 [homology-operator](https://github.com/proffitteoy/homology-operator/tree/a11bf50b8c8320651e9ac015566778d957af9c17),

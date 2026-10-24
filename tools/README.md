@@ -19,6 +19,33 @@ snapshots do not establish native cross-library rankings or general speedups.
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Point-set Hausdorff reference checks
+
+Build actual Rust fixtures, then verify the exported coordinates and results:
+
+```sh
+cargo run --locked --release --example hausdorff -- --fixtures > target/hausdorff.jsonl
+python tools/check_hausdorff.py target/hausdorff.jsonl --references
+```
+
+The checker requires all 90 pair records (five hand cases, 80 seeded ordinary
+cases, five numerical stress cases) and the identified sample matrix. Exact
+rational squared distances and 120-digit Decimal roots supply independent
+expectations. The ordinary cases also require SciPy directed Hausdorff and
+GUDHI k=1, eps=0 cKDTree checks. The latter reuses SciPy; it is not an independent
+library core. Reference stress exclusions retain overflow/underflow limits and
+are checked only against the high-precision expectation. There is no absolute
+tolerance that could hide tiny nonzero distances. The checker reports versions,
+fixture/source hashes and exclusions. CI pins NumPy 2.2.6, SciPy 1.15.3 and
+GUDHI 3.12.0. Without `--references`, all standard-library checks still run.
+Missing requested dependencies or any mismatch fail the command.
+
+`cargo run --locked --release --example hausdorff -- --measure` emits exploratory
+pair/matrix timings and retained numeric/ID byte counts. It excludes input
+generation and view validation, includes matrix ID copying/allocation, and does
+not claim comparative speedups. Record source fingerprints and dirty state;
+whole-process memory additionally includes input, runtime and executable costs.
+
 The existing Hodge checker also accepts `--path-convergence`: it records
 independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
 controls on the 1024-node path against its complete analytic spectrum, using the

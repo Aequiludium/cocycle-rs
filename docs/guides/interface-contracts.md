@@ -254,3 +254,62 @@ already completed outputs from previous calls remain valid. A future combined
 operation must define and test its own shared budget rather than exposing
 private reducer state or claiming that repeated calls provide that facility.
 Work counts are not timing, bytes or a cross-algorithm performance score.
+
+## Compare point sets and retain sample identities
+
+The **Unreleased** `geometry::hausdorff_distance` compares nonempty point sets
+directly in common Euclidean coordinates, without constructing topology or
+computing persistence. The caller establishes matching physical units, frame
+and normalization; equal dimensions alone do not establish those facts.
+
+```rust
+use cocycle::geometry::{PointCloudView, DissimilarityView,
+    hausdorff_distance, hausdorff_distance_matrix};
+let a = PointCloudView::new(&[0., 2.], 2, 1)?;
+let b = PointCloudView::new(&[1., 3.], 2, 1)?;
+let c = PointCloudView::new(&[4., 6.], 2, 1)?;
+assert_eq!(hausdorff_distance(a, b)?, 1.);
+let matrix = hausdorff_distance_matrix(&[("a", a), ("b", b), ("c", c)])?;
+assert_eq!(matrix.sample_ids(), ["a", "b", "c"]); // Both axes, same order.
+assert_eq!(matrix.values(), [1., 4., 3.]); // (1,0), (2,0), (2,1).
+let nearest = (1..matrix.len()).min_by(|&i, &j|
+    matrix.get(0, i).unwrap().total_cmp(&matrix.get(0, j).unwrap())).unwrap();
+assert_eq!(matrix.sample_ids()[nearest], "b");
+let borrowed = DissimilarityView::new(matrix.values(), matrix.len())?;
+assert_eq!(borrowed.values().as_ptr(), matrix.values().as_ptr());
+# Ok::<(), cocycle::Error>(())
+```
+
+The value is the worst nearest-neighbor Euclidean discrepancy, in coordinate
+units. Point order and duplicate rows do not affect the underlying set. Distinct
+sample IDs may therefore have zero distance. No correspondence, registration,
+weights or automatic normalization is inferred. Hausdorff is sensitive to
+outliers. It is a metric on finite sets, only a pseudometric on records with
+duplicate rows, and does not certify positive definiteness of a derived kernel.
+See the [mathematical definition](../reference/mathematics.md#25-euclidean-hausdorff-distance).
+
+The matrix owns its exact, nonempty, unique UTF-8 IDs in input order and copies
+no coordinates. It stores one finite value per unordered pair with an implicit
+positive-zero diagonal. Invalid indices return `None`; zero samples and one
+valid sample have distinct empty numeric buffers. Every sample is validated,
+even when no pair will be evaluated. Empty point sets or unequal dimensions are
+errors. Numeric failures, failed allocation, shape overflow, work exhaustion and
+cancellation return no partial matrix. Missing observations must be handled
+by the application before calling this interface, rather than encoded as zeros.
+
+The `_with` variants use `Execution`; a matrix shares one fresh budget across
+sample validation, ID comparisons/copies and all coordinate scans and writes.
+Individual calls start separate budgets. Pre-cancellation precedes validation;
+zero work rejects even a zero-sample matrix. Cancellation is checked during
+coordinate and ID loops and around allocations, whose interiors are not
+interruptible. Existing `PointCloudView` validation precedes the operation.
+There is no memory quota or hard deadline.
+
+Two directed scans use O(m*n*d) time and O(1) scalar scratch; no point-pair
+matrix is materialized. For s samples the retained numeric storage is
+s*(s-1)/2 f64 values, plus owned IDs and their vector. ID uniqueness uses
+O(s*s) string comparisons. Explicit `DissimilarityView` conversion above scans
+the output for validation but does not copy its values. The
+[example](../../examples/hausdorff.rs) also supports `--fixtures` for independent
+checks and `--measure` for exploratory resource snapshots; preparation is outside
+its timers. There is no internal parallelism, cache or approximate-neighbor path.

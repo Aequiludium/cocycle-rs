@@ -14,6 +14,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// batch. Counts depend on the selected algorithm and are not comparable across
 /// metrics or versions. These controls impose neither a memory quota nor a
 /// thread limit.
+/// Hausdorff calls count operand/ID checks, point and coordinate visits, ID
+/// copying and result writes. A sample matrix shares one budget across all pairs;
+/// its numeric and identity allocations are fallible but have no memory quota.
 /// F2 homology-operator construction, batch queries, transport and barcode
 /// `_with` operations charge coordinate and arithmetic visits across the whole
 /// operation. Exhaustive stretch charges each visited cycle. Minimum-class/filling

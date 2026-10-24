@@ -20,6 +20,7 @@ Source-only capabilities are identified in the
 | Diagrams, endpoints, coverage and result ownership | [Interface contracts](../guides/interface-contracts.md) |
 | Diagram summaries and Betti curves | [Diagram analysis](../development/diagram-analysis.md) |
 | Bottleneck, W1 and W2 matching | [Diagram distances](../guides/diagram-distances.md) |
+| Euclidean Hausdorff comparison and identified sample matrices | [Point-set comparison](../guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities) |
 | F2 critical sets and partial U | [Critical sets](../guides/critical-sets.md) |
 | Feasible F2 projections and finite transport | [Homology operators](../guides/homology-operators.md) |
 

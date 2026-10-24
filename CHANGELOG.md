@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add direct symmetric Euclidean Hausdorff comparison for nonempty point sets
+  and owned sample-distance matrices preserving ordered IDs, with shared work
+  budgets, cancellation, stable norms and no persistence prerequisite.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and
