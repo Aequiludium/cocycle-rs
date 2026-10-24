@@ -138,6 +138,12 @@ jobs:
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --release --example complex_construction
       - run: cargo run --locked --example diagram_distances
+      - run: cargo run --locked --example hausdorff
+      - run: cargo test --locked --example hausdorff
+      - run: cargo test --locked --release --example hausdorff
+      - run: cargo run --locked --example comparison_routes
+      - run: cargo test --locked --example comparison_routes
+      - run: cargo test --locked --release --example comparison_routes
       - run: cargo run --locked --example critical_sets
       - run: cargo run --locked --example homology_operators
       - run: cargo test --locked --example critical_sets
@@ -156,6 +162,8 @@ jobs:
       - run: cargo check --locked --all-targets --all-features
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --example critical_sets
+      - run: cargo test --locked --example hausdorff
+      - run: cargo test --locked --example comparison_routes
 
   package:
     name: Package and packaged example
@@ -179,11 +187,13 @@ jobs:
           package = metadata["packages"][0]
           print("{}/package/{}-{}/Cargo.toml".format(metadata["target_directory"], package["name"], package["version"]))')"
           python3 tools/check_docs.py --root "$(dirname "$package_manifest")"
-          for example in square diagram_analysis diagram_distances complex_construction critical_sets homology_operators; do
+          for example in square diagram_analysis diagram_distances hausdorff comparison_routes complex_construction critical_sets homology_operators; do
             cargo run --locked --manifest-path "$package_manifest" --example "$example"
           done
           cargo test --locked --manifest-path "$package_manifest" --example complex_construction
           cargo test --locked --manifest-path "$package_manifest" --example critical_sets
+          cargo test --locked --manifest-path "$package_manifest" --example hausdorff
+          cargo test --locked --manifest-path "$package_manifest" --example comparison_routes
           cargo run --locked --manifest-path "$package_manifest" --example hodge_laplacian > target/hodge-package.jsonl
 
   reference:
@@ -281,6 +291,34 @@ jobs:
             target/optimization-sources/oineus/legal.txt
             target/optimization-sources/oineus/extern/taskflow/LICENSE
 
+  hausdorff:
+    name: Euclidean Hausdorff reference comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.12.0
+      - run: mkdir -p target/hausdorff-reference
+      - run: cargo run --locked --release --example hausdorff -- --fixtures > target/hausdorff-reference/fixtures.jsonl
+      - run: python tools/check_hausdorff.py target/hausdorff-reference/fixtures.jsonl --references > target/hausdorff-reference/summary.json
+      - name: Record source identity
+        run: |
+          git rev-parse HEAD > target/hausdorff-reference/source-sha.txt
+          sha256sum src/geometry/distance.rs src/geometry/mod.rs src/execution/mod.rs examples/hausdorff.rs tools/check_hausdorff.py target/release/examples/hausdorff > target/hausdorff-reference/source-hashes.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: hausdorff-reference-${{ github.sha }}-${{ github.run_attempt }}
+          path: target/hausdorff-reference/
+          if-no-files-found: ignore
+          retention-days: 14
+
   distances:
     name: Native diagram-distance references
     runs-on: ubuntu-latest
@@ -306,6 +344,13 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libcgal-dev libboost-dev
       - run: python -m pip install gudhi==3.11.0 numpy==2.4.6 POT==0.9.6.post1
       - run: python tools/compare_distances.py --quick --output target/distance-reference
+      - run: cargo run --locked --release --example comparison_routes > target/distance-reference/comparison-routes.jsonl
+      - run: python tools/check_comparison_routes.py target/distance-reference/comparison-routes.jsonl --references --topp target/distance-reference/build/topp --topp-build target/distance-reference/build/build.json > target/distance-reference/comparison-routes-summary.json
+      - name: Record composed route provenance and resource scope
+        run: |
+          git rev-parse HEAD > target/distance-reference/comparison-routes-source-sha.txt
+          sha256sum examples/comparison_routes.rs tools/check_comparison_routes.py tools/distance_common.py target/release/examples/comparison_routes > target/distance-reference/comparison-routes-hashes.txt
+          target/release/examples/comparison_routes --measure > target/distance-reference/comparison-routes-measure.json
       - run: python tools/benchmark_distances.py --quick --samples 1 --groups baseline arena --families uniform sparse --sizes 8 32 --output target/distance-smoke
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -317,6 +362,11 @@ jobs:
             target/distance-reference/environment.json
             target/distance-reference/results.json
             target/distance-reference/summary.json
+            target/distance-reference/comparison-routes.jsonl
+            target/distance-reference/comparison-routes-summary.json
+            target/distance-reference/comparison-routes-source-sha.txt
+            target/distance-reference/comparison-routes-hashes.txt
+            target/distance-reference/comparison-routes-measure.json
             target/distance-reference/fixtures/
             target/distance-reference/build/build.json
             target/distance-reference/build/build.log

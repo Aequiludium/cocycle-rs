@@ -254,3 +254,117 @@ already completed outputs from previous calls remain valid. A future combined
 operation must define and test its own shared budget rather than exposing
 private reducer state or claiming that repeated calls provide that facility.
 Work counts are not timing, bytes or a cross-algorithm performance score.
+
+## Compare point sets and retain sample identities
+
+The **Unreleased** `geometry::hausdorff_distance` compares nonempty point sets
+directly in common Euclidean coordinates, without constructing topology or
+computing persistence. The caller establishes matching physical units, frame
+and normalization; equal dimensions alone do not establish those facts.
+
+```rust
+use cocycle::geometry::{PointCloudView, DissimilarityView,
+    hausdorff_distance, hausdorff_distance_matrix};
+let a = PointCloudView::new(&[0., 2.], 2, 1)?;
+let b = PointCloudView::new(&[1., 3.], 2, 1)?;
+let c = PointCloudView::new(&[4., 6.], 2, 1)?;
+assert_eq!(hausdorff_distance(a, b)?, 1.);
+let matrix = hausdorff_distance_matrix(&[("a", a), ("b", b), ("c", c)])?;
+assert_eq!(matrix.sample_ids(), ["a", "b", "c"]); // Both axes, same order.
+assert_eq!(matrix.values(), [1., 4., 3.]); // (1,0), (2,0), (2,1).
+let nearest = (1..matrix.len()).min_by(|&i, &j|
+    matrix.get(0, i).unwrap().total_cmp(&matrix.get(0, j).unwrap())).unwrap();
+assert_eq!(matrix.sample_ids()[nearest], "b");
+let borrowed = DissimilarityView::new(matrix.values(), matrix.len())?;
+assert_eq!(borrowed.values().as_ptr(), matrix.values().as_ptr());
+# Ok::<(), cocycle::Error>(())
+```
+
+The value is the worst nearest-neighbor Euclidean discrepancy, in coordinate
+units. Point order and duplicate rows do not affect the underlying set. Distinct
+sample IDs may therefore have zero distance. No correspondence, registration,
+weights or automatic normalization is inferred. Hausdorff is sensitive to
+outliers. It is a metric on finite sets, only a pseudometric on records with
+duplicate rows, and does not certify positive definiteness of a derived kernel.
+See the [mathematical definition](../reference/mathematics.md#25-euclidean-hausdorff-distance).
+
+The matrix owns its exact, nonempty, unique UTF-8 IDs in input order and copies
+no coordinates. It stores one finite value per unordered pair with an implicit
+positive-zero diagonal. Invalid indices return `None`; zero samples and one
+valid sample have distinct empty numeric buffers. Every sample is validated,
+even when no pair will be evaluated. Empty point sets or unequal dimensions are
+errors. Numeric failures, failed allocation, shape overflow, work exhaustion and
+cancellation return no partial matrix. Missing observations must be handled
+by the application before calling this interface, rather than encoded as zeros.
+
+The `_with` variants use `Execution`; a matrix shares one fresh budget across
+sample validation, ID comparisons/copies and all coordinate scans and writes.
+Individual calls start separate budgets. Pre-cancellation precedes validation;
+zero work rejects even a zero-sample matrix. Cancellation is checked during
+coordinate and ID loops and around allocations, whose interiors are not
+interruptible. Existing `PointCloudView` validation precedes the operation.
+There is no memory quota or hard deadline.
+
+Two directed scans use O(m*n*d) time and O(1) scalar scratch; no point-pair
+matrix is materialized. For s samples the retained numeric storage is
+s*(s-1)/2 f64 values, plus owned IDs and their vector. ID uniqueness uses
+O(s*s) string comparisons. Explicit `DissimilarityView` conversion above scans
+the output for validation but does not copy its values. The
+[example](../../examples/hausdorff.rs) also supports `--fixtures` for independent
+checks and `--measure` for exploratory resource snapshots; preparation is outside
+its timers. There is no internal parallelism, cache or approximate-neighbor path.
+
+## Compose direct comparison routes
+
+Run `cargo run --locked --example comparison_routes` for three real compositions:
+
+| Input and operation | Consumer and independently checked output |
+| --- | --- |
+| Three declared point sets in one Cartesian frame, Hausdorff sample matrix | Axes `a,b,c`, lower triangle `(1,3,2)` metres; nearest to `a` is `b`. Explicit `DissimilarityView` conversion borrows the numeric buffer. |
+| Two actual Rips PH results from points `(0,2)` and `(0,3)`, context-checked H0 matching | Finite bars `[0,2)` and `[0,3)` plus one essential bar each; bottleneck-L-infinity, W1-L-infinity and W2-Euclidean each give 1 metre. A one-metre scalar threshold succeeds. |
+| Two complete filtrations on the same triangle keys, application-owned L-infinity comparison | Sup difference 2 seconds, H1 bars `[3,6)` and `[3,7)`, and all three raw matching metrics 1 second. The bottleneck value satisfies the declared fixed-domain bound. |
+
+The example's small `Sample` declaration retains ID, source snapshot, units,
+alignment and normalization for both operands. Unknown or unequal declarations
+fail before comparison. Different snapshots are permitted; source equality is
+not a prerequisite for meaningful comparison. These strings remain caller
+assertions, not authenticated provenance. No metadata registry is added to the
+crate. The example preserves these fields alongside every exported scalar.
+
+The Rips route borrows stored results for the context-checked calls, then moves
+their diagrams with `into_diagram()`. Moving discards context explicitly; raw
+calls afterwards agree because the application retains the declarations. PH is
+not rerun for comparison or threshold analysis. Results remain usable after a
+failed comparison. Unequal fields, missing degrees, incomplete coverage, cancelled
+execution and work exhaustion are checked with actual computed results.
+
+The filtration recipe compares `max_sigma |f(sigma)-g(sigma)|` only on identical
+supplied simplex-key domains with known common units and label namespace. It
+looks up keys through each existing owner, because filtration reordering changes
+local IDs. Equal shapes or equal local ID numbers do not establish alignment.
+The unique empty-domain pair has distance zero; mismatched domains and numeric
+overflow fail. This is bounded application code, not a new general filtration
+metric API or a comparison of arbitrary incidence arrays. General relabeling,
+interleaving estimation and independent source registration remain unsupported.
+The [fixed-domain stability argument](../reference/mathematics.md#8-stability-assumptions)
+explains the checked bottleneck bound.
+
+Supplied PH results have an unspecified parameter convention and are rejected
+by the context-aware adapter, even when both say unspecified. This example
+deliberately uses the existing raw matching API after establishing common field,
+seconds and domain, rather than forging an edge-length context. No spectral or
+projection comparison follows from equal array sizes or these examples.
+
+Preparation, PH, comparison, explicit conversion and nearest-sample analysis
+have separate timer fields in the output. `--measure` repeats the complete three
+routes without serialization; it includes construction, PH and output handling.
+The matrix owns only its IDs and values; neither geometry comparison nor the
+filtered sup recipe clones the source. Diagram matching retains its existing
+private allocations, while moving a diagram needs no PH recomputation. Each
+library terminal starts its own execution budget; these compositions offer no
+cumulative transaction, deadline or total-memory quota. The seven-cell
+application filtration loop has no additional execution-control API.
+
+Raw outputs and resource snapshots belong under `target/`. The independent
+checker is a source-checkout developer tool, excluded from the Cargo package;
+packaged examples and their tests remain runnable without Python dependencies.

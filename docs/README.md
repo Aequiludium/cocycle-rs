@@ -28,7 +28,7 @@ Standard real Hodge action and eigenpairs, Dirac action and signed boundary mode
 and bounded real persistent Laplacians are available in this checkout. None of
 these operators is included in released 0.1.1. Production spectral consumers,
 general SPD/complex Hodge, general Dirac spectra, scalable sparse persistent spectra,
-optimal F2 projections, non-diagram similarity, external-learning integration and
+optimal F2 projections, further non-diagram comparisons, external-learning integration and
 automatic feedback remain future contracts.
 The [roadmap](design/roadmap.md#phase-4-priorities) sets priorities; input/result
 reports retain the proposals.
@@ -45,6 +45,9 @@ H1 dispatch. Their adoption gates remain separate. Corrected #56 matrix-H1 timin
 do not waive its retained direct-graph and H2/H3 performance regressions.
 
 ## Use the library
+
+- [Direct point-set comparison](guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities):
+  Unreleased Euclidean Hausdorff distances and sample matrices with ordered IDs.
 
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,
   selected class costs, controlled finite transport, historical simplex features

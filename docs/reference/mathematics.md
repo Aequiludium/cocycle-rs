@@ -269,6 +269,18 @@ bounds each edge change by $2\eta$, giving the corresponding $2\eta$ bound.
 Numerical tests additionally allow explicit rounding tolerance. This does not
 imply continuity of thresholded interval counts.
 
+**Complete fixed-cell assignments.** Let f and g be face-monotone finite-valued
+filtrations on exactly the same finite simplicial complex, with aligned simplex
+keys and common units. The application recipe in `comparison_routes` computes
+`epsilon = max_sigma |f(sigma)-g(sigma)|`, taking zero on the unique empty-domain
+pair. This is the L-infinity metric on the aligned assignments. Each sublevel
+complex for f includes into g at scale shifted by epsilon, and conversely.
+Their same-field persistence modules are epsilon-interleaved; the same
+[CSO13 Theorem 2.3](bibliography.md#cso13) yields d_B <= epsilon for their complete
+diagrams. This is not an estimated interleaving distance or a metric on arbitrary
+unidentified complexes. Unknown units, different simplex domains and censored
+diagrams do not acquire this guarantee by comparing array shapes.
+
 ## 9. Implicit Rips persistent cohomology
 
 This section specifies the production H1 path and exact F2 H2+ handoff. The explicit boundary oracle
@@ -1228,3 +1240,50 @@ It verifies the reconstructed signed residuals with the actual truncated K.
 Thresholded positive modes do not certify rank, the kernel or extremal coverage.
 Normal-map tolerances have sigma² units; division by |sigma| translates the
 absolute error scale to signed Dirac residual units and reflects conditioning.
+
+## 25. Euclidean Hausdorff distance
+
+For finite nonempty subsets A and B of the same Euclidean R^d, d > 0,
+
+```text
+h(A,B) = max_{a in A} min_{b in B} ||a-b||_2
+d_H(A,B) = max(h(A,B), h(B,A)).
+```
+
+This distance is finite, nonnegative and symmetric. It vanishes exactly when
+the underlying sets agree. For any a in A, choose a nearest b in B and then
+a nearest c in C. The ambient triangle inequality gives
+dist(a,C) <= h(A,B) + h(B,C); taking maxima, and reversing the roles of A and C,
+proves d_H(A,C) <= d_H(A,B) + d_H(B,C). This is a metric on finite sets and a
+pseudometric on ordered point-cloud records: permutations and repeated rows
+can represent the same set. A common isometry preserves it and multiplying all
+coordinates by c scales it by |c|. Independently moving one cloud generally
+changes the distance; the implementation does not minimize over registrations.
+
+The API requires validated `PointCloudView` inputs with equal dimensions and
+rejects empty sets. Common frame, units and normalization are caller premises.
+The result has coordinate units, is sensitive to outliers and does not encode
+sampling density or mass. No positive-definite-kernel claim follows from this
+metric. Chamfer averages, empirical-measure transport, Gromov-Hausdorff distance,
+and comparisons of filtrations, eigenvectors or operators are separate questions.
+
+The implementation uses two exhaustive directed scans and repeated `hypot`
+instead of squared norms, with no algorithmic approximation. Binary64 rounding
+still applies; metric properties above describe the real-valued definition.
+A pairwise difference or norm greater than f64::MAX can be an internal infinity
+upper bound; it is not an error when a finite nearer neighbor exists. Only an
+unrepresentable final distance returns `NumericalFailure`. No successful value
+is NaN or infinity. In particular, 1e200 and 1e-200 one-coordinate distances
+must survive without the overflow/underflow of naive squaring.
+
+Sample matrices preserve one owned ordered ID list for both axes, keep distinct
+samples at zero distance, and store the lower triangle with implicit zero
+diagonal. Their whole-call execution and failure contract is in the
+[usage guide](../guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities).
+Independent rational squared distances and 120-digit decimal roots check Rust
+output, including extremes; SciPy directed Hausdorff and GUDHI exact nearest
+neighbors cover ordinary-range fixtures. GUDHI's selected wrapper delegates to
+SciPy cKDTree, so these are two algorithms in the same external library family.
+Topp's persistence-diagram matchers and Ripser's PH engine do not implement this
+point-set comparison and are excluded as Hausdorff oracles. Reference numerical
+range exclusions are explicit, not passing comparisons.

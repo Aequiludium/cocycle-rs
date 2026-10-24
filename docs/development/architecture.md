@@ -70,7 +70,7 @@ src/
     dissimilarity.rs             existing condensed input contract
     matrix.rs                    borrowed lower/upper/square matrix layouts
     metric.rs                    explicit metric policy and exhaustive triangle checks
-    distance.rs                  checked scalar distance/cutoff operations
+    distance.rs                  Hausdorff comparison/sample matrices and checked scalars
     euclidean.rs                 shared pair evaluation and dense conversion
   complex/
     filtered.rs                  public four-method FilteredComplex contract
@@ -176,7 +176,7 @@ files. Public paths are re-exported from domains, not every private directory.
 | Module | Responsibility | Dependencies within the crate |
 | --- | --- | --- |
 | `algebra` | Validated prime fields and private sparse arithmetic/reduction | Error utilities |
-| `geometry` | Input validation and distance access | Error utilities |
+| `geometry` | Input validation, distance access and Hausdorff sample comparison | Execution, error utilities |
 | `complex` | Checked graphs, simplicial incidence and filtered-cell contract | Geometry scalar validation, execution, error utilities |
 | `execution` | Immutable controls and private per-operation budget | Error utilities |
 | `persistent_laplacian` | Bounded real persistent Laplacian, action, complete spectrum and fixed-endpoint elimination | Complex signed incidence, filtration stages/provenance, execution, error utilities |

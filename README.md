@@ -35,6 +35,10 @@ dependencies and no unsafe code.
   and source-local coordinates.
 - **Diagram distances** — exact bottleneck (L-infinity), W1 (L-infinity) and
   W2 (Euclidean) matching of complete diagrams, preserving essential multiplicity.
+- **Unreleased point-set distances** — symmetric Euclidean Hausdorff comparison
+  and identified sample matrices, without computing persistence. Run
+  `cargo run --locked --example hausdorff`; see the
+  [usage contract](docs/guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities).
 - **Unreleased critical sets** — opt-in sparse F₂ Big Steps endpoint proposals
   with bounded Partial U; updates and differentiation remain caller-owned.
 - **Unreleased persistent Laplacians** — bounded real stage-pair Schur operators,
