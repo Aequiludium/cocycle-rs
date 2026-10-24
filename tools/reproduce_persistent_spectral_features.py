@@ -9,6 +9,7 @@ import argparse
 import ast
 from fractions import Fraction
 import hashlib
+import io
 import json
 import math
 import platform
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import time
 import tracemalloc
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +29,7 @@ AUTHOR_BLOB = "ef49f6caeac3c7710de84795f3ffb225d14dbc29"
 RCOND = 1e-12
 ZERO_TOLERANCE = 1e-10
 COMPARISON_TOLERANCE = 1e-9
+MODEL_METADATA = {"sample_ids", "labels", "groups", "train", "test", "branches", "seed"}
 
 
 def numpy():
@@ -687,15 +690,72 @@ def rust_spectral_features(samples, grid, worker, output):
         "limits": "64 KiB input, 256 simplices, dimensions 0..2, 4096 entries/buffer, 20M work per construction and per solve; 30s/child"}
 
 
+def checked_model_archive(input_path):
+    """Bound ZIP expansion and NPY allocations before NumPy loads any array."""
+    np = numpy()
+    # Reuse the checked bytes for loading and hashing, rather than reopen a path
+    # whose contents could change after inspection.
+    with input_path.open("rb") as source:
+        payload = source.read(4 * 1024 * 1024 + 1)
+    if len(payload) > 4 * 1024 * 1024:
+        raise ValueError("model archive exceeds 4 MiB")
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        members = archive.infolist()
+        names = [member.filename for member in members]
+        if (not 8 <= len(members) <= 23 or len(set(names)) != len(names)
+                or not {name + ".npy" for name in MODEL_METADATA} <= set(names)):
+            raise ValueError("invalid model archive members")
+        # Check every member, including unused ones, before opening any of them.
+        if (any(member.file_size > 2 * 1024 * 1024 for member in members)
+                or sum(member.file_size for member in members) > 16 * 1024 * 1024):
+            raise ValueError("model archive exceeds uncompressed byte limits")
+        for member in members:
+            if member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise ValueError("model archive requires stored or DEFLATE members")
+            name = member.filename.removesuffix(".npy")
+            if (not member.filename.endswith(".npy") or not 1 <= len(name) <= 128
+                    or any(not (c.isascii() and (c.isalnum() or c in "_-")) for c in name)):
+                raise ValueError("model archive requires flat named NPY members")
+            with archive.open(member) as source:
+                version = np.lib.format.read_magic(source)
+                if version not in ((1, 0), (2, 0)):
+                    raise ValueError("model arrays require NPY version 1 or 2")
+                width = 2 if version == (1, 0) else 4
+                length = source.read(width)
+                header_size = int.from_bytes(length, "little")
+                if len(length) != width or not 0 < header_size <= 4096:
+                    raise ValueError("model NPY header exceeds 4096 bytes or is truncated")
+                header = source.read(header_size)
+                if len(header) != header_size:
+                    raise ValueError("truncated model NPY header")
+                reader = (np.lib.format.read_array_header_1_0 if width == 2
+                          else np.lib.format.read_array_header_2_0)
+                shape, _, dtype = reader(io.BytesIO(length + header), max_header_size=4096)
+            if (len(shape) > 2 or any(type(size) is not int or not 0 <= size <= 512 for size in shape)
+                    or dtype.hasobject or dtype.fields is not None or dtype.subdtype is not None):
+                raise ValueError("unsupported model NPY shape or dtype")
+            if name in ("sample_ids", "branches"):
+                limit = 16 if name == "branches" else 256
+                valid = len(shape) == 1 and shape[0] <= limit and dtype.kind == "U" and 0 < dtype.itemsize <= 512
+            elif name in MODEL_METADATA:
+                valid = (shape == () if name == "seed" else len(shape) == 1 and shape[0] <= 256)
+                valid = valid and dtype.kind in "iu" and 0 < dtype.itemsize <= 8
+            else:
+                valid = (len(shape) == 2 and 0 < shape[0] <= 256 and 0 < shape[1] <= 512
+                         and dtype.kind in "fbiu" and 0 < dtype.itemsize <= 8)
+            if not valid or 8 + width + header_size + math.prod(shape) * dtype.itemsize != member.file_size:
+                raise ValueError("invalid model NPY dimensions, dtype or payload size")
+    return payload
+
+
 def fit_exported_features(input_path, output_path):
     """Separate model process; only exported arrays and sample/split IDs enter."""
     np = numpy()
+    payload = checked_model_archive(input_path)
     from sklearn.ensemble import RandomForestClassifier
     started = time.perf_counter()
     cpu = time.process_time()
-    if input_path.stat().st_size > 4 * 1024 * 1024:
-        raise ValueError("model archive exceeds 4 MiB")
-    with np.load(input_path, allow_pickle=False) as data:
+    with np.load(io.BytesIO(payload), allow_pickle=False) as data:
         ids, labels = data["sample_ids"], data["labels"]
         train, test = data["train"], data["test"]
         n = len(ids)
@@ -713,7 +773,8 @@ def fit_exported_features(input_path, output_path):
             raise ValueError("group leakage in exported split")
         branches = data["branches"].tolist()
         if (data["branches"].ndim != 1 or not 1 <= len(branches) <= 16
-                or len(set(branches)) != len(branches)):
+                or len(set(branches)) != len(branches)
+                or set(branches) & MODEL_METADATA or set(data.files) != set(branches) | MODEL_METADATA):
             raise ValueError("invalid feature branches")
         scores = {}
         for name in branches:
@@ -730,7 +791,7 @@ def fit_exported_features(input_path, output_path):
                             "fit_predict_seconds": time.perf_counter() - begin,
                             "feature_bytes": features.nbytes}
         write_json(output_path, {"scores": scores, "model": params,
-                   "test_sample_ids": ids[test].tolist(), "input_sha256": file_hash(input_path),
+                   "test_sample_ids": ids[test].tolist(), "input_sha256": hashlib.sha256(payload).hexdigest(),
                    "wall_seconds": time.perf_counter() - started, "cpu_seconds": time.process_time() - cpu,
                    "gudhi_imported": "gudhi" in sys.modules})
 

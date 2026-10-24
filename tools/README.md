@@ -363,8 +363,18 @@ python3 tools/reproduce_persistent_spectral_features.py --fit-exported target/pe
 ```
 
 The consumer requires finite owned matrices, unique sample IDs, exhaustive
-disjoint row partitions and disjoint groups. It caps archives at 4 MiB, samples
-at 256, branches at 16 and columns per branch at 512. Model failure/timeout or
+disjoint row partitions and disjoint groups. Before loading any array it caps
+the checked archive snapshot at 4 MiB, members at 23, each uncompressed member
+at 2 MiB and their uncompressed sum at 16 MiB. Members use stored/DEFLATE ZIP
+compression and must be uniquely named flat NPY v1/v2 arrays with headers of at
+most 4,096 bytes. Header checks
+reject unsupported/object/structured dtypes, excessive shapes and disagreement
+between shape/dtype byte counts and the member's payload size. Numeric items
+use at most eight bytes; Unicode IDs/branch names use at most 128 characters
+per item. The same checked bytes are loaded and hashed, with no path reopening.
+These are input-array budgets, not a bound on NumPy/scikit-learn process memory.
+Samples remain capped at 256, branches at 16 and columns per branch at 512.
+Model failure/timeout or
 an invalid prediction/identity readback fails the controller. Process wall time,
 model CPU and Windows peak working set (including process baseline) are retained;
 peak working set is null on other platforms. Parent CPU excludes children and

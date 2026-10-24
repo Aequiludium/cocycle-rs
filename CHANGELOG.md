@@ -6,6 +6,8 @@
   two-scale spectra and 160-column feature/mask exports. Run external forests
   on those exports with independent matrix checks and matched PH, ordinary
   spectrum, mask and domain-size controls; keep learning outside the crate.
+  Bound compressed and expanded NPZ inputs and validate NPY headers, shapes
+  and dtypes before loading arrays in the external model consumer.
 
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document

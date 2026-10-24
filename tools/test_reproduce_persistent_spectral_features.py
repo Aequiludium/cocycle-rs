@@ -2,6 +2,7 @@
 
 import copy
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,8 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
+import warnings
+import zipfile
 
 import reproduce_persistent_spectral_features as spectral
 
@@ -413,13 +416,118 @@ class RustExportTests(unittest.TestCase):
 
 @unittest.skipUnless(HAS_NUMPY and HAS_SKLEARN, "optional external model environment required")
 class ExportedModelTests(unittest.TestCase):
-    def archive(self, path, **changes):
+    def archive(self, path, compressed=False, **changes):
         np = spectral.numpy()
         fields = dict(sample_ids=np.array(["a", "b", "c", "d"]), labels=np.array([0, 1, 0, 1]),
                       groups=np.array([0, 1, 2, 3]), train=np.array([0, 1]), test=np.array([2, 3]),
                       branches=np.array(["persistent_spectral"]), seed=np.array(111),
                       persistent_spectral=np.array([[0.], [2.], [0.], [2.]]))
-        np.savez(path, **{**fields, **changes})
+        save = np.savez_compressed if compressed else np.savez
+        save(path, **{**fields, **changes})
+
+    def reject_before_array_load(self, source, output, message):
+        with patch.object(spectral.numpy(), "load", side_effect=AssertionError("array loading must not start")) as load:
+            with self.assertRaisesRegex(ValueError, message):
+                spectral.fit_exported_features(source, output)
+            load.assert_not_called()
+        self.assertFalse(output.exists())
+
+    def test_compressed_oversize_members_including_unused_arrays_are_rejected(self):
+        np = spectral.numpy()
+        large = np.zeros((1024, 1024), dtype=np.float64)  # 8 MiB, compresses to kilobytes
+        for name in ("persistent_spectral", "unused"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+                self.archive(source, compressed=True, **{name: large})
+                self.assertLess(source.stat().st_size, 4 * 1024 * 1024)
+                self.reject_before_array_load(source, output, "uncompressed byte limits")
+
+    def test_aggregate_uncompressed_limit_precedes_array_loading(self):
+        np = spectral.numpy()
+        matrix = np.zeros((256, 512), dtype=np.float64)
+        names = ["persistent_spectral"] + [f"feature_{i}" for i in range(15)]
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source, compressed=True, branches=np.array(names), **dict.fromkeys(names, matrix))
+            with zipfile.ZipFile(source) as archive:
+                self.assertTrue(all(m.file_size < 2 * 1024 * 1024 for m in archive.infolist()))
+                self.assertGreater(sum(m.file_size for m in archive.infolist()), 16 * 1024 * 1024)
+            self.reject_before_array_load(source, output, "uncompressed byte limits")
+
+    def test_forged_npy_shape_dtype_and_truncated_payload_are_rejected(self):
+        cases = [("persistent_spectral", (2 ** 40, 2), "<f8"),
+                 ("persistent_spectral", (-1, 2), "<f8"),
+                 ("persistent_spectral", (4, 1), "|O"),
+                 ("persistent_spectral", (4, 1), [("field", "<f8")]),
+                 ("sample_ids", (4,), "<U1048576"),
+                 ("persistent_spectral", (4, 1), "<f8")]
+        for name, shape, dtype in cases:
+            with self.subTest(shape=shape, dtype=dtype), tempfile.TemporaryDirectory() as directory:
+                source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+                self.archive(source)
+                with zipfile.ZipFile(source) as archive:
+                    members = {m.filename: archive.read(m) for m in archive.infolist()}
+                header = io.BytesIO()
+                spectral.numpy().lib.format.write_array_header_1_0(
+                    header, {"descr": dtype, "fortran_order": False, "shape": shape})
+                members[name + ".npy"] = header.getvalue()  # tiny file, no claimed payload
+                with zipfile.ZipFile(source, "w", zipfile.ZIP_DEFLATED) as archive:
+                    for key, value in members.items():
+                        archive.writestr(key, value)
+                self.reject_before_array_load(source, output, "shape or dtype|payload size")
+
+    def test_npy_header_length_is_bounded_before_reading_header(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source)
+            with zipfile.ZipFile(source) as archive:
+                members = {m.filename: archive.read(m) for m in archive.infolist()}
+            members["persistent_spectral.npy"] = b"\x93NUMPY\x02\x00" + (2 ** 30).to_bytes(4, "little")
+            with zipfile.ZipFile(source, "w", zipfile.ZIP_DEFLATED) as archive:
+                for key, value in members.items():
+                    archive.writestr(key, value)
+            self.reject_before_array_load(source, output, "header exceeds 4096")
+
+    def test_duplicate_and_excess_members_are_rejected_before_array_loading(self):
+        for extra in (["labels.npy"], [f"extra_{i}.npy" for i in range(16)]):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as directory:
+                source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+                self.archive(source)
+                with warnings.catch_warnings(), zipfile.ZipFile(source, "a") as archive:
+                    warnings.simplefilter("ignore", UserWarning)  # intentional duplicate fixture
+                    for name in extra:
+                        archive.writestr(name, b"")
+                self.reject_before_array_load(source, output, "archive members")
+
+    def test_unsupported_zip_compression_is_rejected_before_opening_members(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source)
+            with zipfile.ZipFile(source) as archive:
+                members = {m.filename: archive.read(m) for m in archive.infolist()}
+            with zipfile.ZipFile(source, "w", zipfile.ZIP_BZIP2) as archive:
+                for key, value in members.items():
+                    archive.writestr(key, value)
+            with patch.object(zipfile.ZipFile, "open", side_effect=AssertionError("must not decompress")):
+                self.reject_before_array_load(source, output, "stored or DEFLATE")
+
+    def test_valid_compressed_v2_fortran_archive_still_fits(self):
+        np = spectral.numpy()
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source, compressed=True)
+            with zipfile.ZipFile(source) as archive:
+                members = {m.filename: archive.read(m) for m in archive.infolist()}
+            values = io.BytesIO()
+            np.lib.format.write_array(values, np.asfortranarray([[0., 0.], [2., 2.], [0., 0.], [2., 2.]]), version=(2, 0))
+            members["persistent_spectral.npy"] = values.getvalue()
+            with zipfile.ZipFile(source, "w", zipfile.ZIP_DEFLATED) as archive:
+                for key, value in members.items():
+                    archive.writestr(key, value)
+            spectral.fit_exported_features(source, output)
+            result = json.loads(output.read_text())
+            self.assertEqual(result["scores"]["persistent_spectral"]["predictions"], [0, 1])
+            self.assertEqual(result["input_sha256"], spectral.file_hash(source))
 
     def test_model_consumes_only_export_and_returns_actual_predictions(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -430,6 +538,22 @@ class ExportedModelTests(unittest.TestCase):
             result = json.loads(output.read_text())
             self.assertEqual(result["input_sha256"], spectral.file_hash(source))
             self.assertEqual(result["test_sample_ids"], ["c", "d"])
+            self.assertEqual(result["scores"]["persistent_spectral"]["predictions"], [0, 1])
+
+    def test_loading_and_hashing_use_the_checked_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source)
+            payload = spectral.checked_model_archive(source)
+            digest = spectral.file_hash(source)
+            def replace_path(path):
+                path.write_bytes(b"changed after validation")
+                return payload
+            with patch.object(spectral, "checked_model_archive", side_effect=replace_path):
+                spectral.fit_exported_features(source, output)
+            result = json.loads(output.read_text())
+            self.assertEqual(result["input_sha256"], digest)
+            self.assertNotEqual(result["input_sha256"], spectral.file_hash(source))
             self.assertEqual(result["scores"]["persistent_spectral"]["predictions"], [0, 1])
 
     def test_bad_split_identity_shape_and_nonfinite_export_are_rejected(self):
