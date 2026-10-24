@@ -313,3 +313,58 @@ the output for validation but does not copy its values. The
 [example](../../examples/hausdorff.rs) also supports `--fixtures` for independent
 checks and `--measure` for exploratory resource snapshots; preparation is outside
 its timers. There is no internal parallelism, cache or approximate-neighbor path.
+
+## Compose direct comparison routes
+
+Run `cargo run --locked --example comparison_routes` for three real compositions:
+
+| Input and operation | Consumer and independently checked output |
+| --- | --- |
+| Three declared point sets in one Cartesian frame, Hausdorff sample matrix | Axes `a,b,c`, lower triangle `(1,3,2)` metres; nearest to `a` is `b`. Explicit `DissimilarityView` conversion borrows the numeric buffer. |
+| Two actual Rips PH results from points `(0,2)` and `(0,3)`, context-checked H0 matching | Finite bars `[0,2)` and `[0,3)` plus one essential bar each; bottleneck-L-infinity, W1-L-infinity and W2-Euclidean each give 1 metre. A one-metre scalar threshold succeeds. |
+| Two complete filtrations on the same triangle keys, application-owned L-infinity comparison | Sup difference 2 seconds, H1 bars `[3,6)` and `[3,7)`, and all three raw matching metrics 1 second. The bottleneck value satisfies the declared fixed-domain bound. |
+
+The example's small `Sample` declaration retains ID, source snapshot, units,
+alignment and normalization for both operands. Unknown or unequal declarations
+fail before comparison. Different snapshots are permitted; source equality is
+not a prerequisite for meaningful comparison. These strings remain caller
+assertions, not authenticated provenance. No metadata registry is added to the
+crate. The example preserves these fields alongside every exported scalar.
+
+The Rips route borrows stored results for the context-checked calls, then moves
+their diagrams with `into_diagram()`. Moving discards context explicitly; raw
+calls afterwards agree because the application retains the declarations. PH is
+not rerun for comparison or threshold analysis. Results remain usable after a
+failed comparison. Unequal fields, missing degrees, incomplete coverage, cancelled
+execution and work exhaustion are checked with actual computed results.
+
+The filtration recipe compares `max_sigma |f(sigma)-g(sigma)|` only on identical
+supplied simplex-key domains with known common units and label namespace. It
+looks up keys through each existing owner, because filtration reordering changes
+local IDs. Equal shapes or equal local ID numbers do not establish alignment.
+The unique empty-domain pair has distance zero; mismatched domains and numeric
+overflow fail. This is bounded application code, not a new general filtration
+metric API or a comparison of arbitrary incidence arrays. General relabeling,
+interleaving estimation and independent source registration remain unsupported.
+The [fixed-domain stability argument](../reference/mathematics.md#8-stability-assumptions)
+explains the checked bottleneck bound.
+
+Supplied PH results have an unspecified parameter convention and are rejected
+by the context-aware adapter, even when both say unspecified. This example
+deliberately uses the existing raw matching API after establishing common field,
+seconds and domain, rather than forging an edge-length context. No spectral or
+projection comparison follows from equal array sizes or these examples.
+
+Preparation, PH, comparison, explicit conversion and nearest-sample analysis
+have separate timer fields in the output. `--measure` repeats the complete three
+routes without serialization; it includes construction, PH and output handling.
+The matrix owns only its IDs and values; neither geometry comparison nor the
+filtered sup recipe clones the source. Diagram matching retains its existing
+private allocations, while moving a diagram needs no PH recomputation. Each
+library terminal starts its own execution budget; these compositions offer no
+cumulative transaction, deadline or total-memory quota. The seven-cell
+application filtration loop has no additional execution-control API.
+
+Raw outputs and resource snapshots belong under `target/`. The independent
+checker is a source-checkout developer tool, excluded from the Cargo package;
+packaged examples and their tests remain runnable without Python dependencies.

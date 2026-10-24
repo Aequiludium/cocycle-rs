@@ -269,6 +269,18 @@ bounds each edge change by $2\eta$, giving the corresponding $2\eta$ bound.
 Numerical tests additionally allow explicit rounding tolerance. This does not
 imply continuity of thresholded interval counts.
 
+**Complete fixed-cell assignments.** Let f and g be face-monotone finite-valued
+filtrations on exactly the same finite simplicial complex, with aligned simplex
+keys and common units. The application recipe in `comparison_routes` computes
+`epsilon = max_sigma |f(sigma)-g(sigma)|`, taking zero on the unique empty-domain
+pair. This is the L-infinity metric on the aligned assignments. Each sublevel
+complex for f includes into g at scale shifted by epsilon, and conversely.
+Their same-field persistence modules are epsilon-interleaved; the same
+[CSO13 Theorem 2.3](bibliography.md#cso13) yields d_B <= epsilon for their complete
+diagrams. This is not an estimated interleaving distance or a metric on arbitrary
+unidentified complexes. Unknown units, different simplex domains and censored
+diagrams do not acquire this guarantee by comparing array shapes.
+
 ## 9. Implicit Rips persistent cohomology
 
 This section specifies the production H1 path and exact F2 H2+ handoff. The explicit boundary oracle

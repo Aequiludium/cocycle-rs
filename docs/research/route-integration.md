@@ -376,20 +376,22 @@ Main merge, hosted acceptance and release remain separate from local validation.
 ## Direct comparison and consumption handoff: #91
 
 The Unreleased [point-set comparison](../guides/interface-contracts.md#compare-point-sets-and-retain-sample-identities)
-now supplies #110's selected Euclidean Hausdorff route and identified sample
-matrix. The dated interface study below retains the broader future questions;
-this selected geometry implementation does not complete #91's other result routes.
+supplies #110's selected Euclidean Hausdorff route and identified sample matrix.
+The [comparison routes](../guides/interface-contracts.md#compose-direct-comparison-routes)
+now exercise direct geometry, actual PH results and a bounded aligned-filtration
+recipe. They reuse the existing producers/matchers rather than adding a facade.
 
 Use #81's [existing comparison contract](result-contracts.md#existing-distance-boundaries-and-migration-decision-on-main-a7ee9e9).
-Concrete raw/contextual diagram metrics remain callable; geometry, filtration,
-spectral and projection comparisons need a separately selected mathematical
-definition and #110's actual implementation. This stage adds no generic distance
-entry, pairwise-matrix scheduler, invented numeric value or second matcher.
+Concrete raw/contextual diagram metrics and the selected Hausdorff comparison
+are callable. The fixed-domain filtration example is application-owned;
+arbitrary spectral and projection comparisons still need a separate definition.
+This route layer adds no generic distance entry, pairwise-matrix scheduler,
+invented numeric value or second matcher.
 
 | Comparable object | Information at the boundary | Current availability / future decision |
 | --- | --- | --- |
-| Geometry | Point/set/matrix interpretation, sample IDs/order, ambient metric, coordinate dimension, units, normalization and missing/empty policy | Borrowed inputs exist. No non-diagram set comparison is adopted; #110 must choose metric versus directed similarity and its actual premises. |
-| Filtered topology | Source snapshot, stage/scale or whole filtration, ordered keys/maps, field, coverage, units and topology interpretation | Stage reads exist. Comparing equal-shaped incidence arrays is undefined until a basis-invariant or explicitly aligned definition is selected. |
+| Geometry | Point/set/matrix interpretation, sample IDs/order, ambient metric, coordinate dimension, units, normalization and missing/empty policy | Nonempty Euclidean Hausdorff sets and identified matrices; the example validates declared metadata and consumes the nearest-sample scalar. |
+| Filtered topology | Source snapshot, stage/scale or whole filtration, ordered keys/maps, field, coverage, units and topology interpretation | Complete same-key assignments use the example's finite sup recipe and independent PH bound; arbitrary unlabeled/relabelled complexes remain unsupported. |
 | Ordinary diagrams | Requested computed degree, multiplicity, complete coverage, endpoint semantics; field and declared scale for contextual calls | Existing bottleneck-L-infinity, W1-L-infinity and W2-Euclidean calls. Raw calls leave context/physical-unit checks to the caller. |
 | Spectrum / projection | Actual producer identity and result availability, degree/basis/Gram/domain, eigenproblem or legal P/cost/certificate; meaningful coordinate identification if needed | Contract information only. Do not compare arrays solely by size or require an arbitrary choice of eigenvector signs/repeated-eigenspace bases. |
 | Scalar-to-analysis | Operand/sample association, operation/metric/order, units, finite/infinity success versus error | Existing application code can consume successful scalars directly. Scalars retain none of those associations by themselves. |
@@ -437,11 +439,16 @@ PH. Exporting a requested representation can allocate and discard provenance;
 that loss must be named. Existing result/descriptor implementations and pending
 #26/#49 preparation stay in their original owners.
 
-Stage B remains open for actual data-to-comparison, result-to-comparison and
-comparison-to-analysis examples after #110's selected implementation. It must
-test the selected mathematical properties, every operand's identity/units,
-undefined/unsupported cases, independent expected values and comparable costs.
-The executable diagram route validates current behavior only.
+Stage B now has a bounded executable route in `examples/comparison_routes.rs`:
+data-to-Hausdorff-to-nearest-sample, computed-Rips-result-to-matching-to-threshold,
+and fixed-key-filtration-sup-to-computed-PH-bound. The six example tests reject
+unknown/mismatched declarations, wrong domains, context/coverage/degree errors,
+numeric overflow and controlled failures while preserving owned results.
+Independent rational/tiny matching expectations, four GUDHI PH recomputations
+and six native Topp checks replay exported actual inputs/results. Preparation,
+PH, conversion, comparison and analysis costs have explicit scopes. These are
+finite integration examples, not a universal comparison API, generic kernel
+proof, cross-library speedup, merge or release claim.
 
 ## External learning data handoff: #92
 

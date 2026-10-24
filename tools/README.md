@@ -46,6 +46,29 @@ generation and view validation, includes matrix ID copying/allocation, and does
 not claim comparative speedups. Record source fingerprints and dirty state;
 whole-process memory additionally includes input, runtime and executable costs.
 
+## Comparison-route replay
+
+```sh
+cargo run --locked --release --example comparison_routes > target/comparison-routes.jsonl
+python tools/check_comparison_routes.py target/comparison-routes.jsonl --references
+```
+
+Three required records preserve operand IDs, source snapshots, units and declared
+alignment. Independent rational Hausdorff and tiny matching enumeration check the
+sample matrix, six matching values, conversions and scalar consumers. GUDHI
+recomputes all four actual PH diagrams from the exported points/cells; essential
+endpoints and multiplicity are retained. The fixed-key filtration sup value is
+checked independently of source-local ID order. Missing routes, changed identities,
+wrong units/domains, altered conversions and scalar outputs fail the checker.
+
+The native diagram-distance CI job additionally passes `--topp PATH --topp-build
+PATH` to replay the six matching values with its freshly built pinned Topp
+worker in baseline mode. The checker requires the recorded binary SHA256 and
+revision before invocation and retains each worker output. This reuses the
+existing native build; it does not introduce another matcher or runtime dependency.
+Ripser cannot consume the supplied triangle filtration, so GUDHI and the existing
+separate Rips regression job retain their respective supported scopes.
+
 The existing Hodge checker also accepts `--path-convergence`: it records
 independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
 controls on the 1024-node path against its complete analytic spectrum, using the

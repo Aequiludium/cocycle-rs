@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add executable direct-comparison routes: identified point sets, actual Rips
+  results and aligned finite simplex filtrations, with explicit unit/source
+  declarations, independent PH/matching replay and scalar-consumer checks.
 - Add direct symmetric Euclidean Hausdorff comparison for nonempty point sets
   and owned sample-distance matrices preserving ordered IDs, with shared work
   budgets, cancellation, stable norms and no persistence prerequisite.
