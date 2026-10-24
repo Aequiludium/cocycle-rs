@@ -1,7 +1,8 @@
 """Independent ICML 2023 persistent spectral feature reproduction (#111).
 
 This optional Python oracle is outside the Rust runtime and package. It uses
-real, unweighted, nonaugmented chains; no production spectral API is implied.
+real, unweighted, nonaugmented chains. The bounded file-exchange route consumes
+the existing Rust persistent_laplacian results; learning stays outside the crate.
 """
 
 import argparse
@@ -463,7 +464,7 @@ def synthetic_samples(seed=20261012, groups=64):
             filtration = {(v,): (0. if v in early else 1.) for v in range(n)}
             filtration.update({tuple(sorted(edge)): 1. for edge in edges})
             samples.append({"sample_id": f"tree-{group:03d}-{label}", "group": group,
-                            "source_id": f"synthetic-tree-{group:03d}-early-{early}",
+                            "source_id": f"synthetic-tree-{group:03d}-early-{'-'.join(map(str, early))}",
                             "label": label, "filtration": filtration})
     return samples
 
@@ -581,6 +582,12 @@ def rust_baselines(samples, grid, output):
     compiled = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     (output / "rust-worker-build.log").write_text(compiled.stdout + compiled.stderr, encoding="utf-8")
     compiled.check_returncode()
+    test_worker = worker.with_name(worker.stem + "-tests" + worker.suffix)
+    tested = subprocess.run(command[:-2] + ["--test", "-o", str(test_worker)],
+                            cwd=ROOT, capture_output=True, text=True, check=True)
+    tests = subprocess.run([str(test_worker)], capture_output=True, text=True, check=True)
+    (output / "rust-worker-tests.log").write_text(tested.stdout + tested.stderr + tests.stdout + tests.stderr,
+                                                encoding="utf-8")
     rows = []
     for sample in samples:
         diagram = gudhi_diagram(sample["filtration"])
@@ -589,15 +596,147 @@ def rust_baselines(samples, grid, output):
         result = subprocess.run([str(worker)], input=request, capture_output=True, text=True, check=True)
         rows.append(json.loads(result.stdout))
     return numpy().array(rows), {"worker_source": "tools/reference/persistent_spectral_baseline.rs",
+                                 "binary_path": str(worker),
                                  "library_sha256": file_hash(Path(library)),
                                  "binary_sha256": file_hash(worker),
                                  "interval_source": "GUDHI F2 on torsion-free worked examples",
                                  "columns_per_degree": "four Betti values, count, total, max, entropy, essential, max_valid, entropy_valid"}
 
 
-def learning_run(grid, output, seed, samples=None):
+def rust_request(sample, grid):
+    """The numerical worker receives no labels, split or oracle values."""
+    # Input IDs are separately checked in Rust before JSON serialization.
+    for key in ("sample_id", "source_id"):
+        value = sample[key]
+        if (not isinstance(value, str) or not 1 <= len(value) <= 128
+                or any(not (c.isascii() and (c.isalnum() or c in "-_.")) for c in value)):
+            raise ValueError("invalid worker identity")
+    lines = [sample["sample_id"], sample["source_id"], " ".join(map(str, checked_grid(grid))),
+             str(len(sample["filtration"]))]
+    lines.extend(f"{birth} {len(cell)} " + " ".join(map(str, cell))
+                 for cell, birth in sample["filtration"].items())
+    return "\n".join(lines) + "\n"
+
+
+def verify_rust_sample(record, sample, grid):
+    """Check full source/pair identities and independent matrices, not just spectra."""
+    np = numpy()
+    if record["sample_id"] != sample["sample_id"] or record["source_id"] != sample["source_id"]:
+        raise ValueError("Rust sample/source identity mismatch")
+    if record["numeric_origin"]["producer"] != "cocycle.persistent_laplacian":
+        raise ValueError("expected actual Rust persistent Laplacian results")
+    embedding = vectorize_spectra([record], grid)
+    np.testing.assert_array_equal(record["validity_mask"], embedding["validity_mask"][0])
+    np.testing.assert_array_equal(record["features"], embedding["values"][0])
+    maximum = 0.
+    for r in record["spectra"]:
+        q, i, j = r["degree"], r["i"], r["j"]
+        K = stage(sample["filtration"], grid[i])
+        L = stage(sample["filtration"], grid[j])
+        basis = [tuple(cell) for cell in r["basis"]]
+        if (set(basis) != set(K[q]) or len(r["target_basis"]) != len(L[q])
+                or set(map(tuple, r["target_basis"])) != set(L[q])
+                or r["basis_births"] != [sample["filtration"][cell] for cell in basis]):
+            raise ValueError("Rust source or target basis differs from supplied stages")
+        order = [K[q].index(cell) for cell in basis]
+        expected = nullspace_laplacian(K, L, q)[np.ix_(order, order)]
+        actual = np.asarray(r["matrix"]).reshape((len(basis), len(basis)))
+        np.testing.assert_allclose(actual, expected, atol=COMPARISON_TOLERANCE, rtol=0)
+        np.testing.assert_allclose(r["values"], np.linalg.eigvalsh(expected),
+                                   atol=COMPARISON_TOLERANCE, rtol=0)
+        maximum = max(maximum, float(np.max(np.abs(actual - expected), initial=0)))
+    return maximum
+
+
+def rust_spectral_features(samples, grid, worker, output):
+    from compare_persistent_laplacians import peak_memory
+    records, resources = [], []
+    maximum = 0.
+    raw = output / "rust-spectral"
+    raw.mkdir()
+    for index, sample in enumerate(samples):
+        request = rust_request(sample, grid)
+        started = time.perf_counter()
+        child = subprocess.Popen([str(worker), "--spectral"], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            stdout, stderr = child.communicate(request, timeout=30)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            stdout, stderr = child.communicate()
+            (raw / f"{index:03d}-timeout.txt").write_text(stdout + stderr, encoding="utf-8")
+            raise RuntimeError("Rust spectral worker timeout")
+        process_seconds = time.perf_counter() - started
+        (raw / f"{index:03d}-input.txt").write_text(request, encoding="utf-8")
+        (raw / f"{index:03d}-stdout.json").write_text(stdout, encoding="utf-8")
+        (raw / f"{index:03d}-stderr.txt").write_text(stderr, encoding="utf-8")
+        if child.returncode:
+            raise RuntimeError(f"Rust export failed: {stderr}")
+        resources.append({"process_seconds": process_seconds,
+                          "peak_working_set_bytes": peak_memory(child)})
+        record = json.loads(stdout)
+        maximum = max(maximum, verify_rust_sample(record, sample, grid))
+        records.append(record)
+    embedding = vectorize_spectra(records, grid)
+    embedding["values"] = numpy().array([record["features"] for record in records])
+    embedding["validity_mask"] = numpy().array([record["validity_mask"] for record in records], dtype=bool)
+    return embedding, {
+        "producer": "cocycle.persistent_laplacian", "samples": len(records),
+        "pairs": len(records) * 20, "maximum_matrix_error": maximum, "processes": resources,
+        "resource_boundary": "one child per sample; includes startup/export; Windows peak working set includes baseline; null elsewhere",
+        "limits": "64 KiB input, 256 simplices, dimensions 0..2, 4096 entries/buffer, 20M work per construction and per solve; 30s/child"}
+
+
+def fit_exported_features(input_path, output_path):
+    """Separate model process; only exported arrays and sample/split IDs enter."""
     np = numpy()
     from sklearn.ensemble import RandomForestClassifier
+    started = time.perf_counter()
+    cpu = time.process_time()
+    if input_path.stat().st_size > 4 * 1024 * 1024:
+        raise ValueError("model archive exceeds 4 MiB")
+    with np.load(input_path, allow_pickle=False) as data:
+        ids, labels = data["sample_ids"], data["labels"]
+        train, test = data["train"], data["test"]
+        n = len(ids)
+        if (n == 0 or n > 256 or ids.ndim != 1 or ids.dtype.kind != "U"
+                or not all(ids.tolist()) or len(set(ids.tolist())) != n
+                or labels.shape != (n,) or labels.dtype.kind not in "iu"
+                or set(labels.tolist()) != {0, 1}
+                or train.ndim != 1 or test.ndim != 1 or not len(train) or not len(test)
+                or train.dtype.kind not in "iu" or test.dtype.kind not in "iu"
+                or sorted(np.concatenate([train, test]).tolist()) != list(range(n))):
+            raise ValueError("invalid exported sample/split manifest")
+        if data["groups"].shape != (n,):
+            raise ValueError("invalid group identity shape")
+        if set(data["groups"][train].tolist()) & set(data["groups"][test].tolist()):
+            raise ValueError("group leakage in exported split")
+        branches = data["branches"].tolist()
+        if (data["branches"].ndim != 1 or not 1 <= len(branches) <= 16
+                or len(set(branches)) != len(branches)):
+            raise ValueError("invalid feature branches")
+        scores = {}
+        for name in branches:
+            features = data[name]
+            if (features.ndim != 2 or features.shape[0] != n or not 0 < features.shape[1] <= 512
+                    or features.dtype.kind not in "fbiu" or not np.isfinite(features).all()):
+                raise ValueError("invalid exported feature matrix")
+            params = {"n_estimators": 100, "max_depth": 4, "random_state": int(data["seed"]), "n_jobs": 1}
+            begin = time.perf_counter()
+            model = RandomForestClassifier(**params).fit(features[train], labels[train])
+            predictions = model.predict(features[test])
+            scores[name] = {"accuracy": float(np.mean(predictions == labels[test])),
+                            "shape": list(features.shape), "predictions": predictions.tolist(),
+                            "fit_predict_seconds": time.perf_counter() - begin,
+                            "feature_bytes": features.nbytes}
+        write_json(output_path, {"scores": scores, "model": params,
+                   "test_sample_ids": ids[test].tolist(), "input_sha256": file_hash(input_path),
+                   "wall_seconds": time.perf_counter() - started, "cpu_seconds": time.process_time() - cpu,
+                   "gudhi_imported": "gudhi" in sys.modules})
+
+
+def learning_run(grid, output, seed, samples=None):
+    np = numpy()
     from sklearn.metrics import accuracy_score
     from sklearn.model_selection import train_test_split
     tree_case = samples is None
@@ -613,12 +752,17 @@ def learning_run(grid, output, seed, samples=None):
     # The graph baseline keeps degree zero only, with the same pair columns.
     ordinary_zero = [{**s, "spectra": [r for r in s["spectra"] if r["degree"] == 0]} for s in ordinary]
     graph = vectorize_spectra(ordinary_zero, grid, degrees=(0,), operator="ordinary_hodge")
-    q0 = embedding["values"][:, [c["degree"] == 0 for c in embedding["columns"]]]
-    q1 = embedding["values"][:, [c["degree"] == 1 for c in embedding["columns"]]]
     geometry = np.array([graph_pair_geometry(s["filtration"]) for s in samples]) if tree_case else None
     started = time.perf_counter()
     ph, rust = rust_baselines(samples, grid, output)
     baseline_time = time.perf_counter() - started
+    native, native_evidence = rust_spectral_features(samples, grid, Path(rust["binary_path"]), output)
+    native_evidence["maximum_feature_error"] = float(np.max(np.abs(native["values"] - embedding["values"])))
+    np.testing.assert_allclose(native["values"], embedding["values"], atol=COMPARISON_TOLERANCE, rtol=0)
+    np.testing.assert_array_equal(native["validity_mask"], embedding["validity_mask"])
+    # Model input is the Rust export. The independent Python oracle is a control.
+    q0 = native["values"][:, [c["degree"] == 0 for c in native["columns"]]]
+    q1 = native["values"][:, [c["degree"] == 1 for c in native["columns"]]]
     for index in range(0, len(samples), 2):
         np.testing.assert_allclose(hodge["values"][index], hodge["values"][index + 1],
                                    atol=COMPARISON_TOLERANCE, rtol=0)
@@ -639,34 +783,63 @@ def learning_run(grid, output, seed, samples=None):
     test = [i for i, s in enumerate(samples) if s["group"] in test_groups]
     labels = np.array([s["label"] for s in samples])
     params = {"n_estimators": 100, "max_depth": 4, "random_state": seed, "n_jobs": 1}
-    scores = {}
     branches = [("betti_lifetime", ph), ("ordinary_graph", graph["values"]),
                 ("ordinary_hodge", hodge["values"]), ("persistent_q0", q0),
-                ("persistent_q1", q1), ("persistent_spectral", embedding["values"])]
+                ("persistent_q1", q1), ("persistent_spectral", native["values"]),
+                ("persistent_with_mask", np.concatenate([native["values"], native["validity_mask"]], axis=1)),
+                ("mask_only", native["validity_mask"]), ("domain_size_only", np.array(native["domain_sizes"])),
+                ("oracle_persistent", embedding["values"])]
     if tree_case:
         branches.extend((("shortest_path", geometry[:, :1]), ("effective_resistance", geometry[:, 1:])))
+    model_input = output / "model-input.npz"
+    np.savez(model_input, **dict(branches), labels=labels, sample_ids=np.array(native["sample_ids"]),
+             groups=np.array([s["group"] for s in samples]), train=np.array(train), test=np.array(test),
+             branches=np.array([name for name, _ in branches]), seed=np.array(seed))
+    started = time.perf_counter()
+    from compare_persistent_laplacians import peak_memory
+    child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--fit-exported",
+                              str(model_input), str(output / "model-output.json")],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = child.communicate(timeout=120)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        child.communicate()
+        raise RuntimeError("external model timeout")
+    model_process_seconds = time.perf_counter() - started
+    (output / "model-process.log").write_text(stdout + stderr, encoding="utf-8")
+    if child.returncode:
+        raise RuntimeError(f"external model failed: {stderr}")
+    learned = json.loads((output / "model-output.json").read_text(encoding="utf-8"))
+    if (learned["input_sha256"] != file_hash(model_input)
+            or learned["test_sample_ids"] != [samples[i]["sample_id"] for i in test]
+            or set(learned["scores"]) != {name for name, _ in branches}):
+        raise ValueError("external model output identity mismatch")
+    scores = learned["scores"]
     for name, features in branches:
-        started = time.perf_counter()
-        model = RandomForestClassifier(**params).fit(features[train], labels[train])
-        predictions = model.predict(features[test])
-        scores[name] = {"accuracy": float(accuracy_score(labels[test], predictions)),
-                        "shape": list(features.shape), "predictions": predictions.tolist(),
-                        "fit_predict_seconds": time.perf_counter() - started,
-                        "feature_bytes": features.nbytes}
-    arrays = {"persistent": embedding["values"], "validity_mask": embedding["validity_mask"],
+        score = scores[name]
+        prediction = np.asarray(score["predictions"])
+        if (prediction.shape != labels[test].shape or not np.isin(prediction, [0, 1]).all()
+                or score["shape"] != list(features.shape)
+                or score["accuracy"] != float(accuracy_score(labels[test], prediction))):
+            raise ValueError("invalid model prediction readback")
+    arrays = {"persistent": native["values"], "validity_mask": native["validity_mask"],
               "ordinary_hodge": hodge["values"], "ordinary_graph": graph["values"],
               "betti_lifetime": ph, "persistent_q0": q0, "persistent_q1": q1, "labels": labels}
     if tree_case:
         arrays.update(shortest_path=geometry[:, :1], effective_resistance=geometry[:, 1:])
     np.savez(output / "features.npz", **arrays)
     write_json(output / "spectra.json", persistent)
-    schema = {key: value for key, value in embedding.items() if key not in ("values", "validity_mask")}
+    schema = {key: value for key, value in native.items() if key not in ("values", "validity_mask")}
     write_json(output / "feature_schema.json", schema)
     write_json(output / "fixtures.json", [{**s, "filtration": [[list(cell), birth] for cell, birth in s["filtration"].items()]}
                                          for s in samples])
     return {"scores": scores, "model": params, "train_rows": train, "test_rows": test,
             "test_labels": labels[test].tolist(), "train_groups": train_groups, "test_groups": test_groups,
             "rust_baseline": rust, "persistent_seconds": persistent_time, "ordinary_seconds": ordinary_time,
+            "rust_spectral": native_evidence, "model_process_seconds": model_process_seconds,
+            "model_cpu_seconds": learned["cpu_seconds"],
+            "model_peak_working_set_bytes": peak_memory(child),
             "baseline_seconds_including_build_and_processes": baseline_time,
             "mask_bytes": embedding["validity_mask"].nbytes,
             "copy_policy": "owned zero-filled matrices and mask; each input spectrum copied before sorting",
@@ -703,6 +876,9 @@ def source_provenance():
 
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--fit-exported":
+        fit_exported_features(Path(sys.argv[2]), Path(sys.argv[3]))
+        return 0
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--author-source", type=Path, required=True, help="unmodified pinned src/perslap.py")
     parser.add_argument("--output", type=Path, required=True, help="new output directory; never overwritten")
@@ -718,8 +894,10 @@ def main():
                    "versions": {name: importlib.metadata.version(name) for name in
                                 ("numpy", "scipy", "gudhi", "scikit-learn", "threadpoolctl")},
                    "base_sha": revision, "git_status": dirty,
-                   "sources": {str(path.relative_to(ROOT)): file_hash(path) for path in
-                               (Path(__file__), ROOT / "tools/reference/persistent_spectral_baseline.rs")},
+                   "sources": {path.relative_to(ROOT).as_posix(): file_hash(path) for path in
+                               (Path(__file__), ROOT / "tools/reference/persistent_spectral_baseline.rs",
+                                ROOT / "tools/compare_persistent_laplacians.py", ROOT / "Cargo.toml",
+                                ROOT / "Cargo.lock", *sorted((ROOT / "src").rglob("*.rs")))},
                    "author_revision": AUTHOR_REVISION, "author_blob": AUTHOR_BLOB,
                    "author_sha256": file_hash(args.author_source), "command": sys.argv,
                    "toolchains": {name: subprocess.check_output([name, "--version"], text=True).strip()

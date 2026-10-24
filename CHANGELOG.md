@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Extend the optional persistent spectral reproduction with actual Rust
+  two-scale spectra and 160-column feature/mask exports. Run external forests
+  on those exports with independent matrix checks and matched PH, ordinary
+  spectrum, mask and domain-size controls; keep learning outside the crate.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

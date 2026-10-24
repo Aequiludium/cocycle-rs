@@ -2,8 +2,11 @@
 
 import copy
 import importlib.util
+import json
+import os
 from pathlib import Path
 import random
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,6 +16,7 @@ import reproduce_persistent_spectral_features as spectral
 
 HAS_NUMPY = importlib.util.find_spec("numpy") is not None
 HAS_SCIPY = importlib.util.find_spec("scipy") is not None
+HAS_SKLEARN = importlib.util.find_spec("sklearn") is not None
 
 
 class SourceSnapshotTests(unittest.TestCase):
@@ -352,6 +356,94 @@ class MathematicalTests(unittest.TestCase):
             ordinary = [spectral.make_sample(s["sample_id"], s["source_id"], s["filtration"], grid, ordinary=True) for s in (a, b)]
             values = spectral.vectorize_spectra(ordinary, grid, operator="ordinary_hodge")["values"]
             np.testing.assert_allclose(values[0], values[1], atol=1e-9)
+
+
+@unittest.skipUnless(HAS_NUMPY and HAS_SCIPY and os.environ.get("SPECTRAL_WORKER"),
+                     "set SPECTRAL_WORKER to the actual Rust exporter")
+class RustExportTests(unittest.TestCase):
+    grid = (0., 1 / 3, 2 / 3, 1.)
+
+    def export(self, cells):
+        fixture = {"sample_id": "sample", "source_id": "supplied", "filtration": cells}
+        run = subprocess.run([os.environ["SPECTRAL_WORKER"], "--spectral"],
+                             input=spectral.rust_request(fixture, self.grid),
+                             capture_output=True, text=True, check=True, timeout=30)
+        record = json.loads(run.stdout)
+        spectral.verify_rust_sample(record, fixture, self.grid)
+        return fixture, record
+
+    def test_hand_path_and_basis_permutation(self):
+        np = spectral.numpy()
+        cells = {(0,): 0., (2,): 0., (1,): 1., (0, 1): 1., (1, 2): 1.}
+        fixture, record = self.export(cells)
+        pair = next(r for r in record["spectra"] if (r["degree"], r["i"], r["j"]) == (0, 0, 3))
+        np.testing.assert_allclose(pair["values"], [0, 1], atol=1e-12)
+        np.testing.assert_allclose(pair["matrix"], [.5, -.5, -.5, .5], atol=1e-12)
+        _, reordered = self.export(dict(reversed(list(cells.items()))))
+        np.testing.assert_array_equal(record["features"], reordered["features"])
+        for field, bad in (("source_id", "different"), ("features", [0.] * 160)):
+            damaged = copy.deepcopy(record)
+            damaged[field] = bad
+            with self.assertRaises((ValueError, AssertionError)):
+                spectral.verify_rust_sample(damaged, fixture, self.grid)
+
+    def test_empty_zero_and_repeated_spectra_keep_masks(self):
+        _, empty = self.export({})
+        self.assertEqual(sum(empty["validity_mask"]), 0)
+        _, isolates = self.export({(0,): 0., (1,): 0.})
+        self.assertEqual(sum(isolates["validity_mask"]), 20)
+        self.assertEqual(set(isolates["features"]), {0.})
+        _, triangle = self.export({(0,): 0., (1,): 0., (2,): 0., (0, 1): 0.,
+                                   (0, 2): 0., (1, 2): 0., (0, 1, 2): 1.})
+        q1 = next(r for r in triangle["spectra"] if (r["degree"], r["i"], r["j"]) == (1, 0, 3))
+        spectral.numpy().testing.assert_allclose(q1["values"], [3, 3, 3], atol=1e-12)
+
+    def test_worker_limits_fail_without_successful_partial_output(self):
+        for request in ("x" * 65_537, "s source 0 1 2 3 257",
+                        "s source 0 1 2 3 65\n" + "\n".join(f"0 1 {v}" for v in range(65))):
+            run = subprocess.run([os.environ["SPECTRAL_WORKER"], "--spectral"], input=request,
+                                 capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertEqual(run.stdout, "")
+
+    def test_seeded_existing_fixtures_use_real_rust_spectra(self):
+        for fixture in spectral.synthetic_samples(groups=3) + spectral.higher_order_samples(groups=3):
+            self.export(fixture["filtration"])
+
+
+@unittest.skipUnless(HAS_NUMPY and HAS_SKLEARN, "optional external model environment required")
+class ExportedModelTests(unittest.TestCase):
+    def archive(self, path, **changes):
+        np = spectral.numpy()
+        fields = dict(sample_ids=np.array(["a", "b", "c", "d"]), labels=np.array([0, 1, 0, 1]),
+                      groups=np.array([0, 1, 2, 3]), train=np.array([0, 1]), test=np.array([2, 3]),
+                      branches=np.array(["persistent_spectral"]), seed=np.array(111),
+                      persistent_spectral=np.array([[0.], [2.], [0.], [2.]]))
+        np.savez(path, **{**fields, **changes})
+
+    def test_model_consumes_only_export_and_returns_actual_predictions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+            self.archive(source)
+            with patch.object(spectral, "make_sample", side_effect=AssertionError("no oracle input")):
+                spectral.fit_exported_features(source, output)
+            result = json.loads(output.read_text())
+            self.assertEqual(result["input_sha256"], spectral.file_hash(source))
+            self.assertEqual(result["test_sample_ids"], ["c", "d"])
+            self.assertEqual(result["scores"]["persistent_spectral"]["predictions"], [0, 1])
+
+    def test_bad_split_identity_shape_and_nonfinite_export_are_rejected(self):
+        np = spectral.numpy()
+        for changes in (dict(sample_ids=np.array(["a"] * 4)), dict(test=np.array([1, 3])),
+                        dict(groups=np.array([0, 1, 0, 1])),
+                        dict(persistent_spectral=np.zeros((3, 1))),
+                        dict(persistent_spectral=np.full((4, 1), float("nan")))):
+            with tempfile.TemporaryDirectory() as directory:
+                source, output = Path(directory) / "input.npz", Path(directory) / "output.json"
+                self.archive(source, **changes)
+                with self.assertRaises(ValueError):
+                    spectral.fit_exported_features(source, output)
+                self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

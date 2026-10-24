@@ -66,7 +66,10 @@ jobs:
           PY
       - name: Run independent comparisons
         run: |
-          python -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py' 2>&1 | tee target/persistent-spectral-reference/tests.log
+          cargo build --locked --lib
+          rustfmt --edition 2024 --check tools/reference/persistent_spectral_baseline.rs
+          rustc --edition 2024 -D warnings tools/reference/persistent_spectral_baseline.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/persistent-spectral-reference/spectral-worker
+          SPECTRAL_WORKER="$PWD/target/persistent-spectral-reference/spectral-worker" python -m unittest discover -s tools -p 'test_reproduce_persistent_spectral_features.py' 2>&1 | tee target/persistent-spectral-reference/tests.log
           python tools/reproduce_persistent_spectral_features.py --author-source target/persistent-spectral-sources/perslap/src/perslap.py --output target/persistent-spectral-reference/reproduction 2>&1 | tee target/persistent-spectral-reference/check.log
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
