@@ -74,6 +74,93 @@ real topology, whole-package compatibility or performance rankings.
 
 ## Real persistent Laplacian reproduction
 
+The bounded [relevant-pair reproduction](reproduce_relevant_pairs.py) transcribes
+Kirchner--Vittorietti arXiv:2611.09610v1 Algorithms 1-2 over Q. It freezes the PDF
+SHA-256, input bytes, R/V columns, event buckets, selected pairs, predecessor
+embeddings and every exact upper/full matrix. Its independent row-RREF restricted
+kernel oracle comes from `compare_persistent_laplacians.py`, not the new column
+reducer. GUDHI 3.12.0 corroborates topology over F11; this is not a real-spectrum
+oracle. NumPy 2.2.6 supplies numerical cross-checks. These remain external tools.
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --paper-style --rust-worker target/release/examples/persistent_laplacian \
+  --output target/relevant-pair-reproduction
+```
+
+Obtain the exact PDF from [arXiv v1](https://arxiv.org/pdf/2611.09610v1); its
+required SHA-256 is `81731c460bbeb12a210fd5745fa862919d4f9992e30e23c07e08419c483009cc`.
+Output directories must be fresh. The tool fails on a different PDF or missing
+dependencies. No author implementation has been verified; this is a mathematical
+transcription. Controls include joint-bucket events, delayed vertices, ties,
+zero columns, RP2 and tetrahedral shells. Every tiny-grid pair, including internal
+empty stages, is checked. The optional paper-style inputs use 12 planar alpha
+points and 8 spatial Rips points at radius 0.3, project-selected seeds 0/1/2 and
+degrees 0-3. These are scaled instances, not author data or Figure 9 timings.
+The Rust worker checks every real-grid pair's full matrix, spectrum, ordered
+labels, scales, degree and evaluated representative against frozen rational
+results. Its `--relevant` mode accepts the existing whitespace fixture protocol,
+treating the start list as the entire grid and evaluating all legal pairs.
+
+Round 2 can replay an existing Round-1 directory directly, without regenerating
+expected R/V or matrices from the current Python algorithm:
+
+```sh
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --replay-frozen target/relevant-pair-reproduction \
+  --output target/relevant-pair-rust-replay
+```
+
+The controller builds and freezes the library test executable, then explicitly
+runs its ignored `replay_frozen_cases` test. Test-only capture hooks in the actual
+public constructor export exact rational R/V, events and selected pairs. They
+are absent from ordinary library builds. Frozen C intermediates, predecessors,
+embeddings, full matrices/spectra and owned coordinate metadata are compared;
+empty grids retain their empty output. Cancellation, work/storage exhaustion,
+invalid indices and degree overflow must return errors without partial output.
+Private arithmetic tests separately exercise checked i128 overflow.
+
+Add `--shared-baseline PATH` for package A's published R0 directory containing
+`manifest.json`, `inputs.json`, `index.json` and the indexed `pair-*.json` files.
+The tool verifies their original SHA-256 manifest and exact `exact_delta`
+matrices, then compares the same Rust batch outputs in matched coordinates.
+A's restricted-boundary Y/R are not the final-boundary C transforms, so only
+C's frozen transforms are compared directly; R=B V and upper-triangular V are
+checked independently for all exported traces. No A code or runtime API is
+imported. All read artifact hashes, the test binary, source fingerprints and
+raw input/output/logs are retained, and inputs are checked for concurrent edits.
+
+New Round-1 runs include raw-byte input hashes and an artifact manifest. Legacy
+Windows runs hashed UTF-8 LF logical input text before CRLF file writing; replay
+verifies precisely that legacy hash while also freezing the original raw bytes.
+Expected outputs from legacy runs without manifests receive current read-time
+hashes, not a claim of a historical signed manifest. Replay is correctness
+evidence only and is kept separate from reproduction/resource timing modes.
+
+Serial single-run Python timings compare exhaustive Schur, selective Schur and
+new-chain upper construction with identical returned matrices/spectra. They
+exclude input construction, oracle validation and export, and remain exploratory
+phase diagnostics. They do not establish an adopted optimization, formal timing
+acceptance, total process memory or complete-spectrum scalability.
+
+On Windows, add `--benchmark-baseline PATH --baseline-revision FULL_SHA` to
+compare a frozen unoptimized Rust worker with `--rust-worker`. Commit the
+implementation/harness first and run without concurrent builds/tests. The
+controller retains one warmup and ten fresh-process paired samples per cell,
+seeded alternating order, full-output equality, construction time, process wall
+time and absolute peak working set. All-pair alpha/Rips, shell/filling controls
+and an alpha single-pair case retain adverse/no-benefit outcomes. It is a bounded
+resource snapshot; process memory includes input/runtime/output and is not an
+allocation peak. The raw manifest records both commits, binary/source/input
+hashes and the uncontrolled host-load limitation.
+Add `--benchmark-direct` with the same current worker/revision as both inputs
+to compare exhaustive native Rust Schur against the unoptimized new-chain batch.
+That comparison checks full matrices/spectra numerically and matches ordered
+coordinates/scales exactly; representative indices and solve counts differ by
+design. It measures whether saved solves repay preparation for these inputs,
+without selecting an automatic default.
+
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
 release [example worker](../examples/persistent_laplacian.rs) with independently
 assembled signed boundaries, NumPy Schur and SVD nullspace computations, exact
