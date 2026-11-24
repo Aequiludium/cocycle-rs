@@ -136,6 +136,151 @@ controls on the 1024-node path against its complete analytic spectrum, using the
 same SplitMix64 starting span. Warnings and incomplete lookahead convergence
 remain explicit; these controls are numerical diagnosis, not native timing.
 
+## Ordinary-Hodge sparsification reproduction
+
+The optional [sampling/KID controller](reproduce_sparsification.py) and
+[bounded Rust worker](reference/sparsification.rs) implement the reproducible
+subroutines in [Issue #149](https://github.com/Aequiludium/cocycle-rs/issues/149).
+They leave the library's exact, unweighted operators unchanged. Sampling retains
+the complete lower skeleton and original coordinates; filtration values do not
+become weights. These tools are correctness experiments, outside the crate.
+
+The sources are Osting, Palande and Wang,
+[arXiv:1708.08436v3, Section 3/Theorem 3.1](https://arxiv.org/abs/1708.08436v3),
+and Savostianov, Schaub, Guglielmi and Tudisco,
+[arXiv:2502.07558v2](https://arxiv.org/abs/2502.07558v2), PDF Algorithm 3.1
+(physical page 8), Section 4.3 (pages 11-13) and Algorithm 4.1 (page 14).
+PDF versions and SHA-256 are enforced before a run. No author implementation
+was verified in these paper links; this is an independent mathematical rewrite.
+
+For an integer boundary B, an independent rational row-space projector supplies
+the exact rank/kernel and column leverage scores. A numerical pseudoinverse of
+G = B B^T supplies a separate comparison. Positive-rank probabilities are
+p_j = tau_j/rank. Sampling with replacement retains the seed, every draw,
+repeated counts and Gram weights count_j/(k p_j); factor columns use the square
+roots of these weights. Zero rank returns zero without probability normalization.
+Uniform sampling is a separate control. Every trial retains the complete
+generalized spectrum on the positive space of G and explicit kernel checks,
+including rank loss and failed PSD sandwiches. Epsilon targets 0.25/0.5 and delta
+target 0.05 are experiment metadata: no theorem-backed sample count or failure
+probability is asserted, individually or jointly across inputs.
+
+The four-face tetrahedron shell has B^T B = 4I - ss^T, s = [1,-1,1,-1], rank 3,
+scores 3/4 and probabilities 1/4. For H = B^T B/4, all 16 Rademacher probes
+recover odd moments 2 diag(T_m(H)) = 3/2 at degrees 1,3,5,7. A one-face draw
+loses rank and is retained as a failure. The printed Algorithm 4.1 is replayed
+separately: its upper-Gram/probe dimensions disagree on this rectangular input;
+even after substituting the dual Gram, its indexing, conditional recurrence
+update and factor differ from Section 4.3. These are observed discrepancies,
+not author-confirmed errata. The corrected branch updates every degree and
+collects only odd moments, checking scalar polynomials before sampling.
+
+Full paper KID probability reconstruction remains unresolved. Its
+`histogramIntegral` does not specify the executable bin/integration policy.
+The separate **project diagnostic** fixes 64 positive bins of width 1/64,
+undamped Chebyshev expansion, analytic bin integration and normalization by
+the raw score sum. Its bin averages are not asserted to reproduce the paper's
+convolution kernel. Raw scores, sums relative to exact rank, negative bins and
+negative probabilities are retained. Invalid sampling probabilities are rejected
+without clipping. This branch's probability errors and empirical sandwiches
+cannot establish the paper's probability theorem or full KID reproduction.
+
+The frozen project family contains eight points in two seeded Gaussian clusters,
+four inclusive Rips thresholds and q=0/1. It is not author data. The full sweep
+uses maximum polynomial degrees 8/16/32 (4/8/16 odd moments), probes 32/128/512
+and seeds 0 through 19; `--quick` uses seed 0 only. The same nested probes and
+draw seeds are retained across settings. GUDHI checks input simplices, while
+GUDHI and Ripser field-2 Betti0/1 corroborate exact rational ranks on these inputs;
+neither library is a real-spectrum oracle. Rust parity covers numerical scores,
+fixed-draw Gram assembly and corrected moments at all nine degree/probe settings
+with seed 0 on every fixture, plus shell, empty and zero controls. It does not
+claim native RNG parity, a Rust histogram implementation or a persistent extension.
+The worker reuses the existing checked Hodge eigensolver through a formal
+two-degree chain window; its numerical rank threshold is 1e-10 max(1,lambda_max).
+
+One tested environment uses Python 3.12.13, NumPy 2.4.6, SciPy 1.17.1,
+GUDHI 3.12.0 and Ripser 0.6.12. Create an isolated environment, save its complete
+dependency lock, and download both pinned PDFs to `target/sparsification-sources/`
+using their arXiv PDF URLs. Then run from the repository root:
+
+```sh
+python3 -m venv target/sparsification-venv
+target/sparsification-venv/bin/python -m pip install numpy==2.4.6 scipy==1.17.1 gudhi==3.12.0 ripser==0.6.12
+target/sparsification-venv/bin/python -m pip freeze > target/sparsification-lock.txt
+cargo build --locked --release
+rustfmt --edition 2024 --check tools/reference/sparsification.rs
+rustc --edition 2024 -O tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-worker
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --sources target/sparsification-sources --worker target/sparsification-worker --output target/sparsification-run-001
+target/sparsification-venv/bin/python -m unittest discover -s tools -p test_reproduce_sparsification.py
+```
+
+On Windows use `Scripts/python.exe`, append `.exe` to the worker and set the
+three thread environment variables in PowerShell before starting Python.
+The PDFs must hash to `373640de5a96c8fce16784aecc072ef240cdacb96476fffde7ef3263426fa8f8`
+(2502.07558v2) and `1470ef2d8785dc9872f525479253b00e6d7d84b6b5b08ef8804b981e0983305e`
+(1708.08436v3). An existing output directory is rejected. Sources, inputs, probes,
+moments, all trials, Rust requests/results/rejections and environment identities
+are retained under the new output. Phase durations and Python-allocation peaks
+are diagnostics; they are not formal benchmarks, process RSS or speedup evidence.
+Core integration, persistent Schur sampling and optimization remain deferred
+until the full probability/error contract and matched cost evidence are resolved.
+
+### Round 2: complete the scoped Rust rewrite
+
+The same worker now also accepts
+`native n p degree probes draws seed leverage|uniform`, followed by the
+row-major integer B and p-by-probes Rademacher Z. Rust computes the scores,
+probabilities and draws itself. Leverage probabilities divide the numerical
+scores by their measured sum; the raw sum and numerical rank are returned so
+the normalization and trace defect remain visible. Uniform sampling is a
+separate control. Zero rank returns zero probabilities and no draws.
+
+Native randomness uses SplitMix64 with explicit wrapping 64-bit arithmetic,
+its high 53 bits divided by 2^53, and the ordered half-open inverse CDF. The last
+positive bin absorbs floating-point endpoint roundoff. This is a declared finite
+random-number implementation, with independent golden-word and CDF controls;
+it does not claim the same draws as NumPy PCG64 or a probability certificate.
+Every result retains the route, seed, actual draws, scores, probabilities,
+weights and matrix. The original supplied-probability/draw protocol remains
+available for exact Round-1 replay. Negative input probabilities are rejected.
+
+After generating the complete Round-1 output above, use its saved input arrays,
+probes, moments, weights and draws for the Round-2 command:
+
+```sh
+rustc --edition 2024 -D warnings --test tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-tests
+target/sparsification-tests
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --replay-round1 target/sparsification-run-001 --worker target/sparsification-worker --output target/sparsification-round2-001
+```
+
+The frozen eight-fixture input SHA-256 is enforced. The full command checks all
+1,440 stored moment configurations against both frozen values and independent
+dense scalar-polynomial evaluation on the same probes. It replays all 7,036
+sampling trials, including the externally supplied project-diagnostic
+probabilities, checking the whole generalized spectrum, rank-loss and sandwich
+pass/fail states. It separately verifies Rust-generated leverage/uniform draws
+for 1,280 seed/count/route cases with an independent Python integer-RNG/CDF
+control and rational leverage expectations. The frozen invalid probability
+estimate is replayed as a rejection. Shell/empty/zero analytic controls and
+protocol rejections remain separate from these counts. `--quick` restricts the
+frozen and native sweeps to seed 0.
+
+`--batch` frames independent worker requests, one per line, with the original
+2 MB per-request cap and dimension/probe/degree/draw caps. Each request still
+reconstructs and solves the same simple dense reference; no factor cache or
+algorithm optimization is added. A bad request terminates with a nonzero status;
+earlier complete request outputs remain visible. The controller rejects partial
+batches and retains exact requests, stdout/stderr, comparisons, fingerprints,
+native trials and all failure diagnostics in a new output directory.
+
+This completes only the reproduced mathematical scope. Full paper KID
+histogram/probability reconstruction, persistent transfer, public weighted APIs
+and Round-3 optimization remain separate admission gates. Native draw outcomes
+are empirical evidence, not a replacement for a justified sample-count theorem.
+CI compiles and runs the standalone analytic/protocol tests; the optional full
+numerical replay additionally needs the declared Python reference environment
+and an existing complete Round-1 output.
+
 ## Spectral reference CI
 
 The [Gram and harmonic-restriction reproduction](../docs/research/split-spectral-reproduction.md)

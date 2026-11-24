@@ -119,6 +119,11 @@ jobs:
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
+      - name: Test the bounded sparsification Rust worker
+        run: |
+          rustfmt --edition 2024 --check tools/reference/sparsification.rs
+          rustc --edition 2024 -D warnings --test tools/reference/sparsification.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/sparsification-tests
+          target/sparsification-tests
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/getting-started/quickstart.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/diagram-distances.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
