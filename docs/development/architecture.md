@@ -53,6 +53,7 @@ src/
   persistent_laplacian/
     mod.rs                       real stage-pair Schur operators and reverse elimination
     schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
+    split.rs                     bounded dual Grams, harmonic restriction and paper-basic LOBPCG
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/
