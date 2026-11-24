@@ -1,6 +1,10 @@
 """Independent polynomial, ordering and active/locked shape controls."""
 
 import importlib.util
+import json
+from pathlib import Path
+import tempfile
+from types import SimpleNamespace
 import unittest
 
 import reproduce_subspaces as subject
@@ -78,6 +82,19 @@ class SubspaceTests(unittest.TestCase):
         mapped, _ = subject.transfer_block(block, old, new, 1, 20, np.diag([1., 0.]))
         self.assertLess(abs(mapped[1, 0]), 1e-12)
         self.assertEqual(subject.transfer_block(block, old, new, 0, 20)[0].shape, (2, 0))
+
+    def test_frozen_replay_rejects_modified_inputs_before_solver_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            frozen = root / "results.json"
+            frozen.write_text(json.dumps({"sequences": [{"matrices": [[[1.]]],
+                "fields": [[[1.]]], "input_sha256": "changed"}]}))
+            output = root / "output"
+            output.mkdir()
+            args = SimpleNamespace(output=output, worker=None, papers=None,
+                                   rust_sequences=False, frozen=frozen, gudhi=False)
+            with self.assertRaisesRegex(ValueError, "frozen sequence input hash differs"):
+                subject.reproduce(args)
 
 
 if __name__ == "__main__":

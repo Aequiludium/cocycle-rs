@@ -5,7 +5,7 @@
 This is the bounded first implementation for
 [Issue 148](https://github.com/Aequiludium/cocycle-rs/issues/148). The optional
 repository tools reproduce a **corrected, fixed-degree, real-symmetric**
-SCSF/ChFSI control and replay its filter inputs in Rust. The private
+SCSF/ChFSI control and replay its verified sequence in standalone Rust. The private
 [LOBPCG owner](../../src/eigensolver.rs) accepts a supplied starting block;
 existing public callers still use its unchanged cold-start wrapper. There is
 no public FFT, ChFSI, persistent warm-start API or change to spectral coverage.
@@ -76,8 +76,9 @@ these known controls. The fixed-degree iteration does **not** implement the
 companion paper's Lanczos bound estimator or residual-based degree optimizer.
 Nor does it resolve general complex Hermitian problems, interior or
 indefinite smallest-magnitude targeting, MPI/Elemental, or a full paper dataset.
-The selected Rust rewrite covers the verified filter and the separate existing
-LOBPCG initialization, not the complete FFT/QR/ChFSI pipeline.
+The standalone Rust rewrite covers the verified filter, Fourier ordering,
+fixed-degree QR/Ritz/locking iteration and bounded basis transfer, alongside the
+separate existing LOBPCG initialization. It remains outside the product API.
 
 Acceptance uses eigenvalue error at most `1e-10`, normalized original residual
 `||AV-VLambda||F/max(1,||A||F)` at most `1e-9`, projector error at most `1e-8`,
@@ -132,6 +133,7 @@ From the repository checkout:
 cargo build --locked --release
 rustc --edition 2024 -D warnings -O tools/reference/subspace_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/subspace_cocycle
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/reproduce_subspaces.py --worker target/subspace_cocycle --papers target/subspace-papers --gudhi --output target/subspace-run-001
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/reproduce_subspaces.py --worker target/subspace_cocycle --rust-sequences --frozen target/subspace-run-001/results.json --gudhi --output target/subspace-rewrite-001
 python3 -m unittest discover -s tools -p test_reproduce_subspaces.py
 ```
 
@@ -147,6 +149,47 @@ controls, Rust replay and GUDHI checks with NumPy 2.2.6 and GUDHI 3.12.0. It
 uploads the raw `subspace-reference-<sha>-<attempt>` artifact even on failure,
 with 14-day retention. CI uses the documented mathematical source pins without
 downloading the PDFs; `--papers` additionally enforces their exact hashes locally.
+
+## Rust rewrite admission
+
+Round two reuses the first-round result file through `--frozen`, recording its
+SHA-256 and validating each saved matrix/field hash. It replays every original
+active/locked QR/Ritz input and compares active projectors, lifted quotients,
+ordered Ritz values, orthogonality and independently recomputed original
+residuals. It also solves all three iterative routes entirely in Rust, transferring
+only the previous solved block and restoring original sample order. QR signs,
+rotations within a repeated cluster, locking counts and operation counts need
+not be bit-identical; requested counts and the same residual acceptance still
+apply. No new random matrices replace the frozen controls.
+
+The unoptimized Rust descriptor uses a direct DFT with the same sign,
+normalization and truncation as FFT2. This establishes mathematical descriptor
+equivalence, not FFT complexity or performance parity. The worker uses
+Householder QR, a one-sided Jacobi singular-value rank check without squaring
+the `1e-13` threshold, and the existing dense symmetric Ritz solver. Its
+experimental ChFSI limits are `n <= 64`, block width at most 16, degree at most
+64, at most 200 iterations and at most 64 sequence samples. Fourier field size
+is at most 32. These are bounded research controls, not a scalable solver API.
+
+The basis replay reads the saved first-round worker stdout for preceding solved
+vectors. It maps original integer simplex identities and orientation, applies
+the new dense range projector, reorthogonalizes and fills rank. Fresh candidate
+vectors from the first prototype's `PCG64(73)` convention are explicit worker
+inputs; no Rust port of NumPy's RNG is claimed. Integer labels stay integer text,
+including the control above `2^53`. Incompatible source/degree/metric, invalid
+orientation, storage exhaustion and insufficient projected rank fail explicitly.
+The dense projector remains an independent oracle input, not a scalable positive
+solver or cross-track integration. All raw fixtures and worker stdout/stderr
+are retained beside the rewrite results.
+
+CI runs the prototype first, freezes its result bundle, and then admits the Rust
+rewrite against that bundle. Local historical replay additionally uses the
+unchanged first-round artifact whose result SHA-256 is
+`c39fdafd51cda7a535f9fd6c1524eb2242855764c871852389214d96060bcbda`.
+Rank, nonconvergence, nonfinite input and zero-filter failure controls are checked
+against the Python prototype as well as Rust. Standalone Rust tests cover the
+rank threshold, Householder orthogonality, analytic repeated spectra, original
+residual accounting, large integer identities and projected rank loss.
 
 ## Retained numerical run
 

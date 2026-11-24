@@ -36,13 +36,18 @@ jobs:
       - name: Build selected Rust rewrite
         run: |
           mkdir -p target/subspace-reference
+          rustc --version | tee target/subspace-reference/rustc.txt
+          cargo --version | tee target/subspace-reference/cargo.txt
           cargo build --locked --release 2>&1 | tee target/subspace-reference/build.log
           rustfmt --edition 2024 --check tools/reference/subspace_cocycle.rs
           rustc --edition 2024 -D warnings -O tools/reference/subspace_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/subspace_cocycle
+          rustc --edition 2024 -D warnings --test tools/reference/subspace_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/subspace_tests
+          target/subspace_tests 2>&1 | tee target/subspace-reference/rust-unit.log
       - name: Check polynomial, ordering, subspaces and basis transfer
         run: |
           python -m unittest discover -s tools -p test_reproduce_subspaces.py 2>&1 | tee target/subspace-reference/unit.log
           python tools/reproduce_subspaces.py --worker target/subspace_cocycle --gudhi --output target/subspace-reference/reproduction 2>&1 | tee target/subspace-reference/reproduction.log
+          python tools/reproduce_subspaces.py --worker target/subspace_cocycle --rust-sequences --frozen target/subspace-reference/reproduction/results.json --gudhi --output target/subspace-reference/rewrite 2>&1 | tee target/subspace-reference/rewrite.log
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

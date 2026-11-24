@@ -1,7 +1,7 @@
 # Developer tools
 
 The optional [sequence-subspace reproduction](../docs/research/sequence-subspaces.md)
-checks corrected fixed-degree SCSF/ChFSI controls, frozen Rust filter parity,
+checks corrected fixed-degree SCSF/ChFSI controls, frozen Rust Fourier/QR/Ritz/sequence parity,
 private supplied-block LOBPCG and tiny changing-basis experiments. It preserves
 printed-recursion discrepancies and adverse cases; it is not a public spectral
 API, full author-data reproduction or performance adoption result.

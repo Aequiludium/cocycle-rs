@@ -304,7 +304,7 @@ def source_identity(root):
                        for p in paths if (root / p).exists()}}
 
 
-def rust_call(worker, path, header, matrix, initial=None):
+def rust_call(worker, path, header, matrix, initial=None, expected_error=None):
     np = numpy()
     values = np.asarray(matrix).ravel().tolist()
     if initial is not None:
@@ -313,6 +313,10 @@ def rust_call(worker, path, header, matrix, initial=None):
     process = subprocess.run([str(worker), str(path)], capture_output=True, text=True)
     path.with_suffix(".stdout").write_text(process.stdout)
     path.with_suffix(".stderr").write_text(process.stderr)
+    if expected_error is not None:
+        if not process.returncode or expected_error not in process.stderr:
+            raise ValueError(f"Rust failure semantics differ: {path}")
+        return {"returncode": process.returncode, "error": expected_error}
     if process.returncode:
         raise RuntimeError(f"Rust worker failed ({process.returncode}): {path}")
     return json.loads(process.stdout)
@@ -373,6 +377,238 @@ def rust_parity(worker, output, sequences):
                              "actions": result["actions"], "iterations": result["iterations"],
                              "residuals": result["residuals"]})
     return {"filter_replays": calls, "max_filter_relative_error": maximum, "lobpcg": rows}
+
+
+def rust_sequence_parity(worker, output, sequences):
+    """Rewrite admission: immutable inputs and invariant intermediate comparisons.
+
+    QR/Ritz signs and bases within repeated clusters need not be byte-identical.
+    Compare active projectors, lifted quotients, ordered values, orthogonality
+    and independently recomputed residuals. Action/locking counts are diagnostics.
+    """
+    np = numpy()
+    output.mkdir()
+    step_count = 0
+    max_projector, max_lifted, max_values = 0., 0., 0.
+    rows = []
+    for family in sequences:
+        fields = np.array(family["fields"])
+        samples, p, _ = fields.shape
+        sorted_result = rust_call(worker, output / f"order-{family['family']}.txt",
+                                  f"order {samples} {p} 2", fields)
+        descriptors = np.array(family["descriptors_real"]) + 1j * np.array(family["descriptors_imag"])
+        actual = (np.array(sorted_result["descriptors_real"])
+                  + 1j * np.array(sorted_result["descriptors_imag"])).reshape(descriptors.shape)
+        np.testing.assert_allclose(actual, descriptors, atol=1e-10, rtol=0)
+        if sorted_result["order"] != family["order"]:
+            raise ValueError("Rust ordering permutation differs")
+        matrices = np.array(family["matrices"])
+        first = family["routes"]["cold_chfsi"]["output"][0]["trace"][0]
+        initial = np.array(first["filter_input"])
+        n, block = initial.shape
+        for route, code in (("cold_chfsi", 0), ("warm_original", 1), ("fft_scsf", 2)):
+            result = rust_call(worker, output / f"sequence-{family['family']}-{code}.txt",
+                               f"sequence {n} {block} 3 8 200 1e-11 2 12.1 0.3 {samples} {p} 2 {code}",
+                               np.r_[fields.ravel(), matrices.ravel(), initial.ravel()])
+            if result["order"] != (family["order"] if code == 2 else list(range(samples))):
+                raise ValueError("Rust sequence order")
+            if len(result["output"]) != samples:
+                raise ValueError("Rust restored sample count")
+            for index, solved in enumerate(result["output"]):
+                expected = family["routes"][route]["output"][index]
+                vectors = np.array(solved["vectors"]).reshape(n, 3)
+                reference = np.array(expected["vectors"])
+                values = np.array(solved["values"])
+                np.testing.assert_allclose(values, expected["values"], atol=1e-10, rtol=0)
+                projector = float(np.linalg.norm(vectors @ vectors.T - reference @ reference.T))
+                residual = float(np.linalg.norm(matrices[index] @ vectors - vectors * values)
+                                 / max(1., np.linalg.norm(matrices[index], "fro")))
+                if (projector > 1e-8 or residual > 1e-9
+                        or np.linalg.norm(vectors.T @ vectors - np.eye(3)) > 1e-10):
+                    raise ValueError("Rust end-to-end subspace mismatch")
+                retained = np.array(solved["retained"]).reshape(n, block)
+                if np.linalg.norm(retained.T @ retained - np.eye(block)) > 1e-10:
+                    raise ValueError("Rust retained lookahead orthogonality")
+                rows.append({"family": family["family"], "route": route, "index": index,
+                             "projector_error": projector, "normalized_residual": residual,
+                             "rust_actions": solved["actions"], "python_actions": expected["actions"],
+                             "rust_iterations": len(solved["trace"]),
+                             "python_iterations": len(expected["trace"])})
+        for data in family["routes"].values():
+            for index, sample in enumerate(data["output"]):
+                a = matrices[index]
+                for step in sample["trace"]:
+                    active, locked = np.array(step["filter_input"]), np.array(step["locked"])
+                    l, width = step["locked_shape"][1], step["active_shape"][1]
+                    lower, upper = step["filter_interval"]
+                    result = rust_call(worker, output / f"step-{step_count}.txt",
+                                       f"step {n} {l + width} {l} {step['degree']} 200 1e-11 {lower} {upper} {step['anchor']}",
+                                       np.r_[a.ravel(), active.ravel(), locked.ravel()])
+                    for key in ("locked_shape", "active_shape", "qr_shape", "ritz_shape"):
+                        if result[key] != step[key]:
+                            raise ValueError("Rust frozen active/locked dimensions")
+                    q, reference_q = np.array(result["q"]).reshape(n, width), np.array(step["q"])
+                    quotient = np.array(result["quotient"]).reshape(width, width)
+                    projector = float(np.linalg.norm(q @ q.T - reference_q @ reference_q.T))
+                    lifted = float(np.linalg.norm(q @ quotient @ q.T
+                                   - reference_q @ np.array(step["quotient"]) @ reference_q.T)
+                                   / max(1., np.linalg.norm(a, "fro")))
+                    eigenvalue_error = float(np.max(np.abs(np.array(result["values"]) - step["values"])))
+                    ritz = np.array(result["ritz"]).reshape(n, width)
+                    fresh = np.linalg.norm(a @ ritz - ritz * result["values"], axis=0)
+                    np.testing.assert_allclose(fresh, result["fresh_residuals"], atol=1e-12, rtol=1e-9)
+                    if (projector > 1e-9 or lifted > 1e-10 or eigenvalue_error > 1e-10
+                            or np.linalg.norm(ritz.T @ ritz - np.eye(width)) > 1e-10):
+                        raise ValueError("Rust frozen QR/Ritz parity")
+                    max_projector = max(max_projector, projector)
+                    max_lifted = max(max_lifted, lifted)
+                    max_values = max(max_values, eigenvalue_error)
+                    step_count += 1
+    return {"qr_ritz_replays": step_count, "max_active_projector_error": max_projector,
+            "max_lifted_quotient_error": max_lifted, "max_ritz_value_error": max_values,
+            "solves": rows}
+
+
+def rust_sequence_failures(worker, output, sequences):
+    """Replay first-round rank/convergence controls plus explicit input exclusions."""
+    np = numpy()
+    output.mkdir()
+    a = np.array(sequences[0]["matrices"][0])
+    initial = np.array(sequences[0]["routes"]["cold_chfsi"]["output"][0]["trace"][0]["filter_input"])
+    n, b = initial.shape
+    rows = []
+    for tag, matrix, start, iterations, degree, expected in (
+            ("initial-rank", a, np.ones_like(initial), 200, 8, "initial rank"),
+            ("nonconvergence", a, initial, 1, 8, "ChFSI convergence"),
+            ("nonfinite", a, np.full_like(initial, np.nan), 200, 8, "ChFSI input"),
+            ("zero-filter", 7.05 * np.eye(n), initial, 200, 1, "filtered rank")):
+        try:
+            chfsi(matrix, start, 3, 2., 12.1, 0.3, degree=degree, max_iterations=iterations)
+        except ValueError as error:
+            if expected not in str(error):
+                raise
+        else:
+            raise ValueError("Python failure control unexpectedly succeeded")
+        result = rust_call(worker, output / (tag + ".txt"),
+                           f"chfsi {n} {b} 3 {degree} {iterations} 1e-11 2 12.1 0.3",
+                           matrix, start, expected_error=expected)
+        rows.append({"case": tag, **result})
+    for tag, fields in (("ties-and-large-distance", np.array([np.full((4, 4), v)
+                                                             for v in [0., 10000., 10000., 30000.]])),
+                        ("empty-order", np.empty((0, 4, 4)))):
+        result = rust_call(worker, output / (tag + ".txt"), f"order {len(fields)} 4 2", fields)
+        if result["order"] != fft_order(fields)[0]:
+            raise ValueError("Rust ordering edge control")
+        rows.append({"case": tag, "order": result["order"]})
+    return rows
+
+
+def rust_transfer_call(worker, path, block, old, new, width, max_entries, projector=None,
+                       expected_error=None):
+    """Keep simplex identities as integer text, never round them through f64."""
+    np = numpy()
+    header = (f"transfer {old['source'].encode().hex() or '-'} {new['source'].encode().hex() or '-'} "
+              f"{old['degree']} {new['degree']} {old['metric']} {new['metric']} "
+              f"{len(old['basis'])} {len(new['basis'])} {block.shape[1]} {width} {max_entries} "
+              f"{int(projector is not None)}")
+    for context in (old, new):
+        for simplex, sign in context["basis"]:
+            header += " " + " ".join(map(str, (sign, *simplex)))
+    # Freeze the first prototype's PCG64-generated candidates as worker inputs;
+    # the Rust mathematical rewrite does not claim NumPy RNG implementation parity.
+    fresh = np.random.default_rng(73).normal(size=(width, len(new["basis"])))
+    payload = np.r_[block.ravel(), fresh.ravel(),
+                    np.asarray(projector).ravel() if projector is not None else []]
+    return rust_call(worker, path, header, payload, expected_error=expected_error)
+
+
+def rust_basis_parity(worker, output, frozen_path):
+    """Replay original pair matrices and the saved preceding Rust solved vectors."""
+    np = numpy()
+    output.mkdir()
+    frozen = json.loads(frozen_path.read_text())
+    previous, old, group = None, None, None
+    rows, raw_hashes = [], {}
+    for pair in frozen["changing_basis"]["pairs"]:
+        current_group = (pair["source"], pair["degree"], pair["fixed"])
+        if current_group != group:
+            previous, old, group = None, None, current_group
+        context = {"source": pair["source"], "degree": pair["degree"], "metric": "euclidean",
+                   "basis": [(tuple(s), 1) for s in pair["basis"]]}
+        n = len(context["basis"])
+        a = np.array(pair["matrix"]).reshape(n, n)
+        width = min(3, n)
+        tag = f"{pair['source']}-{pair['degree']}-{pair['fixed']}-{pair['start']}-{pair['target']}"
+        if previous is not None:
+            values, vectors = np.linalg.eigh(a)
+            positive = vectors[:, values > 1e-10]
+            for projected in (False, True):
+                wanted = min(width, positive.shape[1]) if projected else width
+                projector = positive @ positive.T if projected else None
+                expected, rank = transfer_block(previous, old, context, wanted, 4096, projector)
+                result = rust_transfer_call(worker, output / f"{tag}-{projected}.txt",
+                                            previous, old, context, wanted, 4096, projector)
+                mapped = np.array(result["mapped"]).reshape(n, wanted)
+                error = float(np.linalg.norm(mapped @ mapped.T - expected @ expected.T))
+                if result["rank"] != rank or error > 1e-10:
+                    raise ValueError("Rust frozen basis-transfer parity")
+                row = {"source": pair["source"], "degree": pair["degree"],
+                       "fixed": pair["fixed"], "start": pair["start"], "target": pair["target"],
+                       "projected": projected, "width": wanted, "rank": rank,
+                       "projector_error": error, "retained_bytes": n * wanted * 8}
+                if not projected:
+                    solved = rust_call(worker, output / f"{tag}-solve.txt",
+                                       f"lobpcg {n} {width} {width} 1", a, mapped)
+                    v = np.array(solved["vectors"]).reshape(n, width)
+                    np.testing.assert_allclose(solved["values"], pair["spectrum"][:width], atol=1e-10, rtol=0)
+                    row["new_operator_residual"] = float(np.linalg.norm(a @ v - v * solved["values"]))
+                    if row["new_operator_residual"] > 1e-9:
+                        raise ValueError("Rust transferred new-operator residual")
+                rows.append(row)
+        raw = frozen_path.parent / "changing-basis" / (tag + "-1.stdout")
+        raw_hashes[raw.name] = hashlib.sha256(raw.read_bytes()).hexdigest()
+        saved = json.loads(raw.read_text())
+        previous = np.array(saved["vectors"]).reshape(n, len(saved["values"]))
+        old = context
+    old = {"source": "triangle", "degree": 1, "metric": "euclidean",
+           "basis": [((0, 1), 1), ((0, 2), 1), ((1, 2), 1)]}
+    new = {**old, "basis": [((1, 2), -1), ((0, 1), 1)]}
+    block = np.array([[1., 0.], [0., 1.], [2., 0.]])
+    edges = []
+    for tag, target, width, cap, p, expected_error in (
+            ("orientation", new, 1, 20, None, None),
+            ("source", {**new, "source": "another-owner"}, 1, 20, None, "incompatible"),
+            ("degree", {**new, "degree": 0}, 1, 20, None, "incompatible"),
+            ("metric", {**new, "metric": "weighted"}, 1, 20, None, "incompatible"),
+            ("invalid-sign", {**new, "basis": [((0, 1), 0)]}, 1, 20, None, "invalid oriented"),
+            ("storage", new, 1, 1, None, "storage"),
+            ("projected-rank", new, 2, 20, np.diag([1., 0.]), "rank insufficient"),
+            ("zero-width", new, 0, 20, None, None)):
+        if expected_error:
+            try:
+                transfer_block(block, old, target, width, cap, p)
+            except ValueError:
+                pass
+            else:
+                raise ValueError("Python transfer failure unexpectedly succeeded")
+        result = rust_transfer_call(worker, output / (tag + ".txt"), block, old,
+                                    target, width, cap, p, expected_error)
+        if not expected_error:
+            expected, rank = transfer_block(block, old, target, width, cap, p)
+            np.testing.assert_allclose(np.array(result["mapped"]).reshape(len(target["basis"]), width),
+                                       expected, atol=1e-12, rtol=0)
+            if result["rank"] != rank:
+                raise ValueError("Rust edge transfer rank")
+        edges.append({"case": tag, "error": expected_error})
+    large = (1 << 53) + 1
+    old = {"source": "owner with space", "degree": 0, "metric": "euclidean",
+           "basis": [((large,), 1)]}
+    new = {**old, "basis": [((large + 1,), 1), ((large,), -1)]}
+    result = rust_transfer_call(worker, output / "large-integer-identity.txt", np.array([[1.]]), old, new, 1, 20)
+    np.testing.assert_allclose(result["mapped"], [0., -1.], atol=1e-12, rtol=0)
+    edges.append({"case": "large-integer-identity", "error": None})
+    return {"transfers": rows, "edge_controls": edges, "saved_vector_sha256": raw_hashes,
+            "fresh_candidates": "explicit frozen NumPy PCG64(73) inputs, not a Rust RNG port"}
 
 
 def transfer_block(block, old, new, width, max_entries, projector=None):
@@ -530,6 +766,8 @@ def main():
     parser.add_argument("--worker", type=Path, help="fresh standalone Rust parity worker")
     parser.add_argument("--gudhi", action="store_true", help="require torsion-free field-101 topology control")
     parser.add_argument("--papers", type=Path, help="directory containing scsf-v2.pdf and chfsi-v2.pdf")
+    parser.add_argument("--rust-sequences", action="store_true", help="require second-round sequence rewrite parity")
+    parser.add_argument("--frozen", type=Path, help="first-round results.json; reuse exact saved inputs and outputs")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     try:
@@ -561,27 +799,60 @@ def reproduce(args):
     if args.worker:
         args.worker = args.worker.resolve(strict=True)
         manifest["worker_sha256"] = hashlib.sha256(args.worker.read_bytes()).hexdigest()
+    if args.rust_sequences and not args.worker:
+        raise ValueError("--rust-sequences requires --worker")
+    if args.frozen:
+        manifest["frozen_sha256"] = hashlib.sha256(args.frozen.read_bytes()).hexdigest()
     if args.gudhi:
         import gudhi
         manifest["gudhi"] = gudhi.__version__
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    result = {"polynomials": polynomial_controls(), "metric": model_metric_control(),
-              "sequences": [sequence_control(False), sequence_control(True)]}
+    if args.frozen:
+        frozen = json.loads(args.frozen.read_text())
+        for family in frozen["sequences"]:
+            payload = json.dumps({"matrices": family["matrices"], "fields": family["fields"]}, sort_keys=True).encode()
+            if hashlib.sha256(payload).hexdigest() != family["input_sha256"]:
+                raise ValueError("frozen sequence input hash differs")
+        result = {key: frozen[key] for key in ("polynomials", "metric", "sequences")}
+    else:
+        result = {"polynomials": polynomial_controls(), "metric": model_metric_control(),
+                  "sequences": [sequence_control(False), sequence_control(True)]}
     (args.output / "controls.json").write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     if args.worker:
         result["rust_parity"] = rust_parity(args.worker, args.output / "rust", result["sequences"])
+    if args.rust_sequences:
+        result["rust_sequences"] = rust_sequence_parity(args.worker, args.output / "rust-sequences", result["sequences"])
+        result["rust_sequence_failures"] = rust_sequence_failures(args.worker, args.output / "rust-sequence-failures", result["sequences"])
     result["changing_basis"] = changing_basis_control(args.worker, args.output / "changing-basis", args.gudhi)
+    if args.rust_sequences:
+        # A caller can supply the historical first-round bundle. CI first emits
+        # the same prototype bundle, then freezes that bundle for the rewrite.
+        frozen_path = args.frozen or args.output / "prototype-results.json"
+        if not args.frozen:
+            frozen_path.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
+        result["rust_basis"] = rust_basis_parity(args.worker, args.output / "rust-basis", frozen_path)
     for family in result["sequences"]:
         inputs = json.dumps({"matrices": family["matrices"], "fields": family["fields"]},
                             sort_keys=True).encode()
         family["input_sha256"] = hashlib.sha256(inputs).hexdigest()
     (args.output / "results.json").write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
-    print(json.dumps({family["family"]: {
+    summary = {family["family"]: {
         route: {"actions": sum(r["actions"] for r in data["output"]),
                 "iterations": sum(len(r["trace"]) for r in data["output"]),
                 "max_residual": max(r["verification"]["normalized_residual"]
                                     for r in data["output"])}
-        for route, data in family["routes"].items()} for family in result["sequences"]}, indent=2))
+        for route, data in family["routes"].items()} for family in result["sequences"]}
+    if args.rust_sequences:
+        rewrite = result["rust_sequences"]
+        summary["rust_rewrite"] = {
+            "qr_ritz_replays": rewrite["qr_ritz_replays"],
+            "sequence_solves": len(rewrite["solves"]),
+            "max_active_projector_error": rewrite["max_active_projector_error"],
+            "max_lifted_quotient_error": rewrite["max_lifted_quotient_error"],
+            "basis_transfers": len(result["rust_basis"]["transfers"]),
+            "sequence_edge_controls": len(result["rust_sequence_failures"]),
+            "basis_edge_controls": len(result["rust_basis"]["edge_controls"])}
+    print(json.dumps(summary, indent=2))
     return 0
 
 
