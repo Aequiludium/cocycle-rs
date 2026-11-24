@@ -681,7 +681,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let p: usize = read(&mut words);
             let truncation: usize = read(&mut words);
             let route: usize = read(&mut words);
-            if samples == 0 || samples > 64 || p > 32 || route > 2 {
+            if samples == 0
+                || samples > 64
+                || p == 0
+                || p > 32
+                || truncation == 0
+                || truncation > p
+                || route > 2
+            {
                 return Err("sequence input".into());
             }
             let fields: Vec<f64> = (0..samples * p * p).map(|_| read(&mut words)).collect();
@@ -689,6 +696,9 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let initial: Vec<f64> = (0..n * b).map(|_| read(&mut words)).collect();
             if words.next().is_some() {
                 return Err("sequence trailing fields".into());
+            }
+            if fields.iter().any(|value| !value.is_finite()) {
+                return Err("sequence nonfinite fields".into());
             }
             let order: Vec<usize> = if route == 2 {
                 order_fields(&fields, samples, p, truncation)?.0

@@ -500,6 +500,16 @@ def rust_sequence_failures(worker, output, sequences):
         if result["order"] != fft_order(fields)[0]:
             raise ValueError("Rust ordering edge control")
         rows.append({"case": tag, "order": result["order"]})
+    fields = np.array(sequences[0]["fields"], copy=True)
+    fields.flat[0] = np.nan
+    matrices = np.array(sequences[0]["matrices"])
+    samples, p, _ = fields.shape
+    for route in [0, 1]:
+        result = rust_call(worker, output / f"nonfinite-fields-{route}.txt",
+                           f"sequence {n} {b} 3 8 200 1e-11 2 12.1 0.3 {samples} {p} 2 {route}",
+                           np.r_[fields.ravel(), matrices.ravel(), initial.ravel()],
+                           expected_error="sequence nonfinite fields")
+        rows.append({"case": f"nonfinite-fields-{route}", **result})
     return rows
 
 
