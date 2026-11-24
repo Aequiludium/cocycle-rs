@@ -78,6 +78,9 @@ quality, test, and MSRV jobs:
 
 ```sh
 cargo fmt --all -- --check
+rustfmt --edition 2024 --check tools/reference/hecs.rs
+rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests
+target/hecs-tests
 rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs tools/reference/dirac_cocycle.rs
 rustfmt --edition 2024 --check tools/reference/nonbranching.rs tools/reference/nonbranching_library.rs
 rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
