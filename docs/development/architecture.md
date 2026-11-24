@@ -112,6 +112,7 @@ src/
       expansion.rs               shared explicit clique construction
   hodge/
     mod.rs                       real signed chain windows and sparse Hodge action
+    hecs.rs                      bounded ordinary triangular upper-Hodge factors and CGLS
     spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
   eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/

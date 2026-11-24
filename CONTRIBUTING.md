@@ -78,6 +78,9 @@ quality, test, and MSRV jobs:
 
 ```sh
 cargo fmt --all -- --check
+rustfmt --edition 2024 --check tools/reference/hecs.rs
+rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests
+target/hecs-tests
 rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs tools/reference/dirac_cocycle.rs
 rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
 cargo clippy --locked --all-targets --all-features -- -D warnings
@@ -101,6 +104,7 @@ cargo run --locked --example persistent_laplacian
 cargo test --locked --example critical_sets
 cargo test --locked --release --example critical_sets
 cargo run --locked --example hodge_laplacian > target/hodge-rust.jsonl
+cargo run --locked --example hecs
 RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
 cargo +1.91.0 test --locked --all-features
 cargo +1.91.0 check --locked --all-targets --all-features
