@@ -1,186 +1,276 @@
-# Integrated spectral workstreams: resources and correctness
+# Integrated spectral routes versus unaccelerated algorithms
 
 [Benchmarks](../README.md) / [Reporting rules](../reporting.md)
 
-## Question and scope
+## Corrected question and conclusions
 
-Does combining the nine source PRs in [PR #160](https://github.com/Aequiludium/cocycle-rs/pull/160)
-preserve their results, and what resources do the integrated verification
-workloads use compared with their individual original implementations?
-All twelve independent/frozen replay suites pass. The resource snapshot covers
-15 cells, 300 measured processes and 30 discarded warmups, all output-validated.
-It measures bounded worker workflows, including parsing and output; it is not
-an isolated-kernel, cross-library or general scalability comparison.
+This [PR #160](https://github.com/Aequiludium/cocycle-rs/pull/160) experiment
+compares **unaccelerated algorithms with alternative routes inside the same
+integrated build**. The previous original-PR-head comparison answered integration
+regression, not acceleration, and is withdrawn as acceleration evidence. Its raw
+records are preserved; none of its timings enter the tables below.
 
-## Revisions and protocol
+All 30 declared cells completed: 600 measured fresh processes and 60 discarded
+warmups, each checked against an independently frozen expectation. Twenty-six
+cells request equivalent mathematical output. Four sampling cells explicitly
+compare an approximate Gram with an exact dense baseline, retaining quality
+failures separately. This is a local-only bounded resource snapshot.
+
+The fixed-projection action route achieves 1.50-15.34x on the declared star
+workloads. Relevant-pair q1 matrix construction achieves 2.68x, reducing to 1.59x
+when complete spectra are also requested. Enriched HeCS controls achieve
+1.48-2.10x including preparation. These gains do not generalize to every row:
+q0 batching, single-pair batching, the non-branching suite and several Gram,
+restriction and reuse controls do not improve. No aggregate speedup or faster
+default is inferred.
+
+## Measured identity and environment
 
 | Item | Recorded value |
 | --- | --- |
-| Measured candidate and harness | `9588668972873f4cf71860d9ccac7b0738c2cdd0`; committed integration-branch head, not GitHub's synthetic merge commit |
-| Mathematical replay | `eacf0c752914619e9f3eaaab830473aa854b35dd`; identical `src/` and `examples/` in the measured candidate |
-| Controller SHA-256 | `e69361f770993cf5a15ee24c99beac4b715338a1da268c0a23bb34db47f4cd06` |
-| Protocol | `spectral-integration-resource-v1`, implemented by [the controller](../../tools/benchmark_spectral_integration.py) |
+| Measured library, workers and controller | `a02927df3b9ebf119b406c488c345b6ba96a403d`, clean committed integration-branch source |
+| Baseline revision | The same commit; explicit unaccelerated route selection below, never an original PR head |
+| Controller SHA-256 | `93b8d8da2e5e101564b69993202b02006283ddb5717dc63b480133c0ef95fa1c` |
+| Protocol | `spectral-unaccelerated-comparison-v2`; [controller](../../tools/benchmark_spectral_integration.py) |
+| Compiler | `rustc 1.98.1 (48a229cea 2026-09-01)`; edition 2024 and `-C opt-level=3` for every worker and the shared library |
 | Machine | Intel(R) Core(TM) Ultra 7 155H; Windows-11-10.0.26100-SP0 |
-| Compiler | `rustc 1.98.1 (48a229cea 2026-09-01)`; same edition 2024 / `-C opt-level=3` library and worker builds on both sides |
 | Python | 3.12.0rc3 (tags/v3.12.0rc3:b973ab3, Sep 19 2023, 09:39:54) [MSC v.1935 64 bit (AMD64)] |
-| Dirty state | Clean when the run started; worker/library sources exported from immutable Git commits |
-| Controls | Serial workers after all builds; one warmup and ten measured processes per side; seed 160, balanced pair order; thread environment set to one |
-| Uncontrolled factors | Host load, affinity, frequency and allocator/OS state; no address-space cap; 120-second process timeout |
-| Run UTC | 2026-11-24T11:24:09.382305+00:00 through 2026-11-24T11:26:12.710216+00:00; filesystem execution metadata |
+| Measured UTC | 2026-11-24T12:05:49.377432+00:00 through 2026-11-24T12:06:03.709328+00:00 |
+| Repetition/order | One discarded warmup and ten fresh processes per route/cell; seed 160, shuffled cells, balanced pair order |
+| Controls | All builds finish before serial measurement; thread environment one; no concurrent local tests/builds |
+| Limits | 120-second process timeout; no address-space cap; frequency, affinity and host load uncontrolled |
 
-| Group | Original PR baseline SHA |
-| --- | --- |
-| A: sparse action / LSMR (#156) | `0798360c45e63ceb22b55c3a67f4a6787043ff9e` |
-| B: Grams / harmonic restriction (#159, with #151 reference) | `7527c57baad0e9fc8fa420a4808263d6b0a33b26` |
-| C: relevant pairs (#154) | `ef2d763b71a3fc0971009342c32a9b670f042304` |
-| D: non-branching (#153) | `430d1c8a9dbd3508c585f1c99fb3ee6b6a2f8aad` |
-| E: subspace sequences (#152) | `c25e209931dd4003819ccce6a0ca650a2d172868` |
-| F: sampling / moments (#157) | `4b28c5e506a85193501120eafe91c338f4ca143f` |
-| G: HeCS (#158, including #155) | `42db213a3b0fc076d5048cc44a24428aec66e764` |
-| Existing main Schur control | `a3c3e1132800624743ad0f159c9303090e0b3b3f` |
+Sources, generated timing wrappers, compiler invocations, binaries and inputs are
+hashed in the raw member manifest. The report commit is distinct from the
+measured source. The Rust library `src/` is unchanged from the independently
+replayed `eacf0c752914619e9f3eaaab830473aa854b35dd` integration source; changes here
+are comparison adapters, benchmark-only output modes, checks and documentation.
 
-## Workloads and validation
+## Baselines and requested work
 
-A uses late-center stars with 257/1024 retained leaves and 1,000 analytically
-checked actions (`I-11^T/n`), plus the frozen 801-pair/12-control LSMR input.
-B uses the tetrahedron-shell Gram and the 35-dimensional/32-dimensional-kernel
-positive-restriction solve. C uses real degree-zero prefix paths of size 16/32,
-five grid points and every legal pair; the resulting zero/unit path Laplacians
-were checked analytically before measurement. D uses the complete supported
-1,026-pair non-branching fixture stream. E runs complete smooth/abrupt fixed-degree
-sequences on their frozen 97 KB inputs. F replays validated batches 0000/0303,
-preserving the exact probes/draws and full Gram/moment outputs. G uses frozen
-20-vertex enriched-5 inputs, with direct/core selection. The main control uses
-the ordinary full 1,114-pair component fixture stream.
+| Track | Unaccelerated baseline | Current alternative and matched output |
+| --- | --- | --- |
+| A | Full dense Schur construction followed by dense actions | Fixed-projection operator preparation and the same repeated actions; consume/check the final vector |
+| B Gram | Form the primal Gram and solve its complete dense eigenproblem | Current `gram_spectrum`, including both complete Grams/eigensolves; return positive eigenvalues and the original-coordinate projector |
+| B harmonic | Complete dense eigenproblem, then select the positive space | Current `HarmonicRestriction::compute`, including full-matrix checks, kernel normalization/complement and reduced solve; same positive values/projector |
+| C | Direct Schur separately for every requested pair | One exact relevant-pair schedule and all requested full matrices, optionally also all complete spectra |
+| D | Generic direct Schur on every eligible pair | Explicit non-branching construction; same full matrices, optionally complete spectra |
+| E | Cold ChFSI from the original starting block for every matrix | Reuse the preceding block in original order, or pay for descriptor ordering and restore original order; same eigenvalues/projectors |
+| F | Exact dense `B B^T` construction | Current exact-score/moment/sampling prototype; approximate Gram with separately checked seed/draws and quality, not equivalent exact output |
+| G | Zero-start, identity-preconditioned CGLS on the original weighted upper matrix | Public HeCS solve, including topology, selection, exact coverage, factors, CGLS and original residual checks; same minimum-norm solution |
 
-All real calculations retain f64 identity-coordinate contracts. Fixed inputs,
-worker arguments, coefficient/degree/cutoff metadata where applicable and complete
-source/binary/input hashes are in `specification.json`, `environment.json` and
-the member manifest. Full labels and integer identities must agree; numerical
-outputs use the unchanged absolute/relative 1e-10 gate. Only declared elapsed
-timing fields are omitted. Independent correctness is established separately:
+A uses 64/256/512 retained leaves, one late center and 1/100 actions. Both sides
+use an explicit 4,000,000-entry per-buffer dense cap; these are not claims that
+the default dense cap supports the larger cases. The independent action is
+`I-11^T/n`. Source construction and preparation are included.
 
-| Scope | Fresh integrated evidence |
-| --- | --- |
-| Rust library | 353 passing tests/doctests and five explicitly ignored tests in each debug, release and Rust 1.91 run; full all-target Clippy/MSRV checks pass |
-| Python tools | Linux: 230 tests, 92 optional skips; numerical reproduction tests on Windows: 108 tests, no skips/failures |
-| Persistent components / non-branching | 1,114 generic pairs; 1,026 eligible specialized pairs, with 88 explicit branching exclusions; exact rational projection, action, multiplicity and spectral-union checks |
-| A | 801 construction pairs, 12 solver controls; fixed actions and Schur matrices agree with exact rational oracles. LSMR replays 208 updates and five explicit failures |
-| B | 15 independent reproduction groups and 29 frozen Rust parity cases; independent rational/analytic, dense/SciPy and original-operator residual controls |
-| C | 7,120 C outputs plus 801 shared-A pairs; frozen R/V, events, selections and failure contracts preserved |
-| D source | 90 frozen kernel intermediates, 180 standalone comparisons and three unchanged author cubical replays |
-| E | 328 QR/Ritz steps, 48 full sequence solves, 36 mapping/projection controls and 15 failure/edge cases |
-| F | 1,440 moments, 7,036 frozen sampling trials and 1,280 native-RNG cases; all original rank/sandwich failures retained |
-| G | 34 frozen first-round parity cases and 34 independent native controls, including two expected rank-loss cases |
+B uses 32/64-coordinate Hadamard controls with analytic positive spectrum
+`[1,4,9]`, rank three and the corresponding analytic projector. Harmonic kernels
+are supplied to both routes; discovering a topological kernel is not measured.
+These APIs remain deliberately unoptimized references. In particular, timing
+only their final small solve would hide the full eigensolve and normalization
+currently performed during preparation.
 
-Local numerical references use GUDHI 3.11.0, NumPy 2.4.6, SciPy 1.17.0 and
-SymPy 1.14.0; B's frozen parity also uses its original Python 3.10/NumPy 2.2.6
-environment. GUDHI corroborates topology only; exact rational/analytic and
-independent dense controls provide real-matrix/spectral expectations. The PR's
-separate native GUDHI/Ripser/Topp CI regressions do not supply real-spectrum truth.
+C uses the frozen alpha12 seed-0 complex, its complete 32-point grid (528 legal
+pairs), degrees 0/1, and a separate q1 last-pair request to expose setup losses.
+Expected full matrices are original rational Round-1 outputs; independent dense
+spectra and GUDHI field-11 torsion-free topology controls are rechecked before
+measurement. Matrix-only and complete-spectrum workflows are separate rows.
 
-## Worker time
+D uses all 1,026 supported pairs from the non-branching correctness fixture
+stream, preserving degrees, scales and original coordinates. The 88 branching
+exclusions from that suite remain exclusions; no implicit fallback is introduced.
+Direct matrices are independently checked by rational projection where available
+and SVD projection otherwise.
 
-Milliseconds, median [minimum, maximum], ten fresh processes per side.
-The wrapper starts at worker main and ends after flushed output: fixture I/O,
-parsing, computation, checks and output are included; process startup is excluded.
-The ratio is the median of ten paired **candidate / original** ratios; above one
-means the integrated workflow took longer. No rows or outliers are discarded.
+E uses the original smooth/abrupt sequences: eight 24-coordinate matrices,
+block size six, three requested modes, fixed degree eight and tolerance 1e-11.
+All matrices, initial blocks and fields are identical across routes. Cold/warm
+original-order routes do not perform unused descriptor sorting. Existing trace
+construction remains charged internally, while matched output exports only
+values/projectors; every solve still verifies fresh original residuals.
 
-| Workload | Original ms | Integrated ms | Paired ratio |
+F uses the complete eight-point Rips supplied boundaries at threshold 4.0:
+q0 is 8x28 and q1 is 28x56, with one or 512 leverage draws, seed zero, degree
+eight and 32 identical frozen Rademacher probes. The current prototype still
+pays for a full dense eigensolve, exact numerical leverage preparation, moments
+and dense sampled assembly. It is not an optimized sparse-application API.
+Independent rational leverage and integer RNG/CDF controls supply sampled truth.
+
+G uses the weighted shell and the frozen enriched-12/20-extra-5 direct/core
+controls. All weights and right-hand sides are identical. Both outputs are
+checked against independent SVD minimum-norm solutions, and each measured
+original-equation residual must be <= 1e-9. The largest observed residual is
+6.325e-10. Singular ambient systems are not ordinarily inverted.
+
+## Correctness and timer contracts
+
+Each sample must match its independent expected vector/matrix/projector payload,
+not merely the other implementation. The fixed scaled Euclidean/Frobenius gates
+are 1e-10 for A/B/C/F, 1e-9 for D, 1e-8 for E and the existing 1e-7 SVD solution
+gate for G, with the additional 1e-9 original residual gate. Shapes and finite
+values are mandatory. Approximate F outputs are checked against their own exact
+draw reconstruction; this does not turn quality failures into exact agreement.
+
+The new adapters pass 31 standalone tests under stable and actual Rust 1.91.
+Four controller regressions reject original-PR baselines, identical routes,
+changed/nonfinite outputs and wrong shapes. Linux tool discovery passes 234
+tests with 92 optional skips; Windows numerical reproduction discovery passes
+108 tests without skips/failures. Fresh affected full replays retain 34 native
+HeCS controls, 328 QR/Ritz steps, 48 sequence solves and 36 basis transfers.
+Prior full integration debug/release/MSRV and independent seven-track results
+remain bound to their original recorded commits; they are not relabeled here.
+
+The primary worker timer starts at main and ends after flushed output, including
+fixture I/O, source construction, preparation, computation, internal checks,
+cleanup and matched export, but excluding process startup. Process wall time and
+absolute process peak working set are reported separately. Internal preparation
+and solve counters are retained only as phase diagnostics; they are not used
+instead of the complete-workflow comparison.
+
+## Equivalent-output workflow results
+
+Milliseconds, median [minimum, maximum], ten measured processes per side.
+**Speedup = median of paired unaccelerated / alternative times**; above one is
+faster. No rows, outliers, setup costs or failed-quality sampling cases are
+silently removed. F's non-equivalent approximation rows are in their own table.
+
+| Workload | Unaccelerated ms | Alternative ms | Paired speedup |
 | --- | --- | --- | --- |
-| A-star-257-1000 | 2.363 [2.232, 2.754] | 2.433 [2.191, 2.717] | 1.014 |
-| A-star-1024-1000 | 9.689 [9.001, 13.949] | 9.743 [8.988, 11.290] | 0.987 |
-| A-lsmr-frozen | 14.865 [13.461, 17.950] | 14.892 [13.203, 18.189] | 1.000 |
-| B-gram-shell | 0.158 [0.117, 0.296] | 0.135 [0.124, 0.371] | 1.001 |
-| B-large-nullity-solve | 0.613 [0.562, 1.064] | 0.631 [0.547, 1.752] | 0.970 |
-| C-prefix-path-16 | 0.797 [0.752, 1.231] | 0.870 [0.762, 1.149] | 0.997 |
-| C-prefix-path-32 | 2.844 [2.601, 7.863] | 2.941 [2.706, 4.252] | 1.085 |
-| D-nonbranching-suite | 68.480 [61.987, 74.276] | 69.454 [65.628, 76.894] | 1.021 |
-| E-sequence-smooth | 7.758 [6.963, 9.963] | 8.267 [7.450, 9.686] | 1.034 |
-| E-sequence-abrupt | 9.209 [8.298, 10.273] | 9.535 [8.231, 10.573] | 1.045 |
-| F-batch-0000 | 8.124 [7.729, 9.532] | 8.352 [7.701, 9.671] | 1.014 |
-| F-batch-0303 | 27.264 [23.879, 32.393] | 27.126 [25.142, 32.381] | 1.004 |
-| G-hecs-enriched20-direct | 0.113 [0.107, 0.260] | 0.132 [0.114, 0.651] | 1.102 |
-| G-hecs-enriched20-core | 0.119 [0.110, 0.192] | 0.130 [0.116, 0.166] | 1.084 |
-| main-schur-components | 73.236 [67.319, 89.096] | 71.956 [67.746, 82.107] | 1.004 |
+| A-star64-actions1 | 0.270 [0.229, 0.539] | 0.170 [0.159, 0.213] | 1.507x |
+| A-star64-actions100 | 0.388 [0.352, 0.581] | 0.259 [0.214, 0.445] | 1.495x |
+| A-star256-actions1 | 1.534 [1.351, 2.792] | 0.423 [0.393, 0.500] | 3.573x |
+| A-star256-actions100 | 4.477 [4.081, 6.442] | 0.678 [0.570, 0.994] | 6.867x |
+| A-star512-actions1 | 5.621 [5.087, 6.786] | 0.723 [0.671, 2.118] | 7.371x |
+| A-star512-actions100 | 20.038 [16.913, 23.145] | 1.298 [1.036, 2.185] | 15.341x |
+| B-gram32 | 0.541 [0.458, 0.679] | 0.599 [0.509, 1.176] | 0.853x |
+| B-harmonic32 | 0.535 [0.465, 0.859] | 0.736 [0.588, 1.164] | 0.801x |
+| B-gram64 | 3.085 [2.680, 4.905] | 2.883 [2.587, 3.335] | 1.069x |
+| B-harmonic64 | 3.515 [2.648, 5.270] | 4.177 [3.474, 6.021] | 0.826x |
+| C-alpha-q0-matrices | 8.892 [7.974, 10.765] | 11.322 [9.537, 13.914] | 0.843x |
+| C-alpha-q0-spectra | 20.776 [17.573, 25.419] | 21.590 [20.572, 26.564] | 0.918x |
+| C-alpha-q1-matrices | 21.868 [18.468, 27.973] | 8.197 [7.322, 9.760] | 2.685x |
+| C-alpha-q1-spectra | 38.443 [32.616, 44.198] | 23.449 [20.823, 28.412] | 1.593x |
+| C-alpha-q1-single | 0.208 [0.171, 0.248] | 0.281 [0.258, 0.331] | 0.689x |
+| D-nonbranching-matrices | 5.905 [5.114, 7.626] | 6.172 [5.309, 7.769] | 0.946x |
+| D-nonbranching-spectra | 9.081 [7.675, 12.552] | 9.172 [8.660, 13.873] | 0.946x |
+| E-smooth-warm | 8.050 [7.745, 9.646] | 8.576 [7.682, 10.487] | 1.004x |
+| E-smooth-ordered | 8.318 [7.573, 13.774] | 7.762 [6.890, 11.827] | 1.161x |
+| E-abrupt-warm | 8.041 [7.396, 10.293] | 8.603 [7.346, 11.757] | 0.969x |
+| E-abrupt-ordered | 8.658 [7.734, 12.120] | 8.825 [7.246, 9.496] | 1.022x |
+| G-shell-weighted-direct | 0.104 [0.093, 0.196] | 0.127 [0.113, 0.146] | 0.854x |
+| G-enriched-12-5-direct | 0.715 [0.618, 1.526] | 0.436 [0.371, 0.969] | 1.481x |
+| G-enriched-12-5-core | 0.703 [0.581, 1.159] | 0.413 [0.351, 0.822] | 1.562x |
+| G-enriched-20-5-direct | 1.969 [1.628, 2.648] | 1.044 [0.866, 2.146] | 1.851x |
+| G-enriched-20-5-core | 1.826 [1.646, 3.779] | 0.857 [0.791, 1.333] | 2.102x |
 
-## Process time and memory
+## Approximation cost and quality
 
-Process wall time runs from process creation through complete input/output
-transport. Peak working set is the absolute per-process peak after completion;
-it includes runtime, input, allocator retention and output, rather than live
-algorithm allocation. MiB = 2^20 bytes. Values are median [minimum, maximum].
+These are cost ratios against an exact Gram, not equivalent-output speedups.
+The quality column is the independently evaluated epsilon-0.5 PSD sandwich
+and kernel/rank gate. One-draw failures remain visible and cannot be ranked as
+valid replacements for the exact operator. No probability theorem is asserted.
 
-| Workload | Original wall ms | Integrated wall ms | Original peak MiB | Integrated peak MiB |
+| Workload | Exact ms | Prototype ms | Exact/prototype cost ratio | Relative sandwich error | Rank loss | Quality gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-rips-4.0-q0-draws1 | 0.099 [0.084, 0.229] | 0.224 [0.193, 0.337] | 0.441 | 6.0000 | True | fail |
+| F-rips-4.0-q0-draws512 | 0.106 [0.087, 0.139] | 0.235 [0.221, 0.511] | 0.416 | 0.1208 | False | pass |
+| F-rips-4.0-q1-draws1 | 0.275 [0.220, 0.522] | 1.192 [1.035, 2.300] | 0.223 | 20.0000 | True | fail |
+| F-rips-4.0-q1-draws512 | 0.252 [0.197, 0.373] | 1.320 [1.101, 1.819] | 0.187 | 0.3069 | False | pass |
+
+## Complete process costs
+
+Wall time covers process creation through full transport. Peak working set is
+the absolute Windows per-process peak, including runtime/input/allocator/output,
+not live algorithm allocations. MiB = 2^20 bytes. Values are median [min, max].
+
+| Workload | Baseline wall ms | Alternative wall ms | Baseline peak MiB | Alternative peak MiB |
 | --- | --- | --- | --- | --- |
-| A-star-257-1000 | 9.043 [7.964, 10.530] | 9.359 [7.532, 10.492] | 4.580 [4.562, 4.590] | 4.590 [4.578, 4.605] |
-| A-star-1024-1000 | 16.693 [14.815, 22.526] | 16.204 [14.645, 19.095] | 4.855 [4.848, 4.941] | 4.875 [4.871, 4.879] |
-| A-lsmr-frozen | 22.184 [19.081, 25.696] | 22.708 [19.410, 26.728] | 4.340 [4.312, 4.348] | 4.336 [4.328, 4.344] |
-| B-gram-shell | 6.373 [5.283, 11.527] | 6.572 [5.698, 10.284] | 4.336 [4.316, 4.344] | 4.340 [4.332, 4.340] |
-| B-large-nullity-solve | 6.982 [6.045, 9.490] | 7.114 [5.765, 9.252] | 4.359 [4.352, 4.445] | 4.375 [4.352, 4.449] |
-| C-prefix-path-16 | 8.056 [6.540, 11.328] | 7.478 [6.274, 10.468] | 4.600 [4.566, 4.609] | 4.613 [4.605, 4.621] |
-| C-prefix-path-32 | 10.320 [8.253, 13.783] | 10.094 [8.190, 11.069] | 4.604 [4.590, 4.625] | 4.629 [4.609, 4.648] |
-| D-nonbranching-suite | 75.639 [69.437, 83.480] | 76.616 [72.605, 84.444] | 4.672 [4.664, 4.727] | 4.713 [4.703, 4.766] |
-| E-sequence-smooth | 14.536 [13.186, 18.970] | 15.651 [12.947, 17.053] | 6.121 [6.074, 6.379] | 6.121 [6.117, 6.445] |
-| E-sequence-abrupt | 16.472 [14.878, 18.793] | 17.012 [14.796, 18.854] | 6.568 [6.277, 6.574] | 6.547 [6.230, 6.570] |
-| F-batch-0000 | 14.749 [13.992, 16.372] | 15.327 [14.567, 16.898] | 4.602 [4.594, 4.648] | 4.602 [4.590, 4.645] |
-| F-batch-0303 | 34.218 [30.345, 41.053] | 34.163 [32.127, 40.043] | 4.777 [4.633, 4.797] | 4.779 [4.602, 4.785] |
-| G-hecs-enriched20-direct | 6.677 [5.437, 9.307] | 6.609 [5.525, 11.863] | 4.523 [4.516, 4.527] | 4.520 [4.504, 4.535] |
-| G-hecs-enriched20-core | 6.349 [5.633, 8.321] | 6.495 [5.765, 9.072] | 4.520 [4.516, 4.523] | 4.520 [4.516, 4.527] |
-| main-schur-components | 81.110 [74.736, 97.891] | 79.299 [75.691, 90.124] | 4.689 [4.664, 4.699] | 4.732 [4.691, 4.750] |
+| A-star64-actions1 | 6.834 [5.223, 8.741] | 6.158 [5.148, 7.639] | 4.551 [4.527, 4.566] | 4.570 [4.551, 4.578] |
+| A-star64-actions100 | 7.397 [5.841, 9.794] | 7.230 [5.401, 8.118] | 4.543 [4.512, 4.559] | 4.570 [4.555, 4.582] |
+| A-star256-actions1 | 8.541 [6.486, 11.219] | 7.029 [5.824, 8.989] | 5.168 [5.156, 5.180] | 4.553 [4.520, 4.562] |
+| A-star256-actions100 | 11.354 [10.489, 14.266] | 7.925 [6.270, 9.372] | 5.164 [5.152, 5.172] | 4.555 [4.516, 4.566] |
+| A-star512-actions1 | 12.969 [11.474, 16.112] | 7.411 [6.669, 11.341] | 8.295 [8.281, 8.305] | 4.572 [4.562, 4.586] |
+| A-star512-actions100 | 27.145 [23.082, 30.029] | 7.804 [6.583, 11.924] | 8.297 [8.281, 8.305] | 4.566 [4.543, 4.578] |
+| B-gram32 | 7.012 [5.543, 8.464] | 7.696 [5.736, 9.501] | 4.484 [4.461, 4.488] | 4.531 [4.516, 4.539] |
+| B-harmonic32 | 7.854 [5.779, 12.676] | 7.901 [6.889, 10.616] | 4.480 [4.473, 4.484] | 4.551 [4.543, 4.562] |
+| B-gram64 | 9.774 [8.573, 12.017] | 9.474 [8.607, 11.818] | 4.449 [4.445, 4.473] | 4.504 [4.492, 4.512] |
+| B-harmonic64 | 10.819 [8.538, 12.787] | 11.210 [9.633, 13.706] | 4.449 [4.441, 4.457] | 4.512 [4.500, 4.523] |
+| C-alpha-q0-matrices | 16.123 [14.589, 20.113] | 18.675 [16.719, 23.385] | 5.910 [5.898, 5.949] | 7.371 [7.344, 7.387] |
+| C-alpha-q0-spectra | 27.806 [24.549, 33.522] | 28.399 [27.328, 33.162] | 5.984 [5.930, 6.000] | 7.393 [7.352, 7.422] |
+| C-alpha-q1-matrices | 28.563 [26.301, 38.377] | 15.882 [13.626, 17.960] | 6.146 [6.074, 6.223] | 6.986 [6.973, 6.992] |
+| C-alpha-q1-spectra | 45.990 [38.629, 55.222] | 30.233 [27.574, 39.736] | 6.180 [6.078, 6.301] | 7.578 [7.535, 7.605] |
+| C-alpha-q1-single | 6.802 [5.756, 10.033] | 6.457 [5.875, 8.626] | 4.551 [4.547, 4.562] | 4.549 [4.527, 4.570] |
+| D-nonbranching-matrices | 12.894 [11.482, 15.695] | 13.517 [11.673, 18.634] | 4.678 [4.641, 4.699] | 4.693 [4.641, 4.707] |
+| D-nonbranching-spectra | 15.749 [14.979, 24.811] | 16.829 [15.195, 21.672] | 4.689 [4.668, 4.719] | 4.711 [4.680, 4.730] |
+| E-smooth-warm | 14.281 [13.253, 18.238] | 15.103 [13.103, 19.280] | 4.986 [4.941, 5.004] | 4.973 [4.770, 4.992] |
+| E-smooth-ordered | 15.200 [12.906, 23.398] | 13.779 [12.754, 21.939] | 4.986 [4.820, 5.027] | 4.980 [4.809, 4.996] |
+| E-abrupt-warm | 14.760 [13.266, 17.052] | 15.932 [13.213, 18.770] | 4.973 [4.797, 5.008] | 4.986 [4.836, 4.996] |
+| E-abrupt-ordered | 15.091 [13.600, 19.047] | 15.713 [13.522, 17.328] | 4.910 [4.586, 4.992] | 4.975 [4.805, 4.980] |
+| F-rips-4.0-q0-draws1 | 6.956 [5.199, 8.962] | 7.482 [5.821, 15.116] | 4.488 [4.480, 4.508] | 4.543 [4.535, 4.555] |
+| F-rips-4.0-q0-draws512 | 7.535 [6.173, 16.071] | 6.736 [5.459, 10.808] | 4.488 [4.484, 4.500] | 4.549 [4.543, 4.559] |
+| F-rips-4.0-q1-draws1 | 6.811 [5.999, 9.273] | 8.192 [6.095, 10.927] | 4.506 [4.492, 4.520] | 4.520 [4.500, 4.535] |
+| F-rips-4.0-q1-draws512 | 6.668 [5.619, 9.447] | 7.984 [7.318, 9.983] | 4.508 [4.496, 4.527] | 4.527 [4.520, 4.535] |
+| G-shell-weighted-direct | 6.860 [5.563, 10.904] | 6.900 [5.870, 8.871] | 4.336 [4.332, 4.336] | 4.521 [4.512, 4.527] |
+| G-enriched-12-5-direct | 7.844 [5.875, 10.908] | 7.166 [5.909, 12.062] | 4.426 [4.375, 4.441] | 4.580 [4.527, 4.586] |
+| G-enriched-12-5-core | 7.133 [5.711, 9.341] | 6.913 [6.198, 9.660] | 4.432 [4.375, 4.438] | 4.578 [4.531, 4.582] |
+| G-enriched-20-5-direct | 8.646 [7.606, 11.282] | 7.535 [6.744, 12.271] | 4.594 [4.520, 4.598] | 4.561 [4.543, 4.574] |
+| G-enriched-20-5-core | 7.985 [7.518, 11.327] | 7.653 [6.808, 9.880] | 4.598 [4.508, 4.602] | 4.547 [4.531, 4.555] |
 
-## Interpretation and retained limitations
+## Interpretation
 
-This integration does not adopt a new default algorithm. Every measured result
-agrees with its original implementation under the declared contract. The table
-retains slower rows as well as faster ones. Small Gram/path cases are sensitive
-to timer, I/O and OS variation, and process time may be dominated by startup.
-These measurements cannot establish universal equivalence, an optimization
-speedup, a total memory bound or complete-spectrum scalability.
+- A's 512-leaf/100-action row improves from about 20.04 to 1.30 ms (15.34x);
+  median process peak falls from 8.30 to 4.57 MiB. Single-use gains are smaller.
+- C's q1 matrix-only gain is 2.68x and complete-spectrum gain is 1.59x. Preparation
+  does not repay on q0 or the single-pair case (0.69x). Memory is a tradeoff:
+  q1 complete-spectrum peak rises from 6.18 to 7.58 MiB.
+- B's current both-Gram API is about 0.85x/1.07x and harmonic restriction about
+  0.80x/0.83x. Retaining the large eigensolve and validation prevents a consistent
+  Gram/restriction acceleration claim at this stage.
+- D's supported whole-suite ratios are about 0.95x, with and without spectra.
+  Mathematical eligibility alone does not establish a performance win.
+- E's smooth ordered route reduces counted actions from 3,184 to 2,774 and
+  iterations from 56 to 49, with a 1.16x observed workflow ratio. Abrupt reuse
+  retains 3,104 versus 3,074 cold actions and no iteration reduction; its ratios
+  near one do not demonstrate a robust benefit.
+- G's enriched cases reduce 43 to five or 63 to three CGLS updates, while full
+  workflow gains are only 1.48-2.10x after preparation. The small shell is slower
+  at 0.85x despite one fewer update; iteration ratios are not runtime speedups.
+- F's one-draw cases lose rank and fail the quality gate. At 512 draws the
+  epsilon-0.5 gate passes, but the current prototype is slower than exact dense
+  assembly (cost ratios about 0.42 and 0.19). These tiny dense controls do not
+  support a sparsification acceleration or production-adoption claim.
 
-Worker paired ratios range from 0.970 to 1.102. The existing main Schur control
-is 1.004; prefix-path-32 is 1.085, and HeCS direct/core are 1.102/1.084. The latter
-workflows take roughly 0.1 ms before process startup, so their relative changes
-must be read beside their absolute ranges. Subspace smooth/abrupt are 1.034/1.045.
-There is no consistent speedup across the declared matrix. Process peak working
-sets overlap closely; this is not an allocation-equivalence claim.
+Small sub-millisecond rows are sensitive to measurement and OS variation; read
+their absolute ranges, not only ratios. There is no automatic default dispatch,
+universal speedup, asymptotic or total-memory guarantee. The seven tracks are
+exercised in the integrated build; their gains are not multiplied or added into
+an imaginary all-track pipeline. The retained LSMR terminal-breakdown exclusions,
+basic-solver failures, branching exclusions and RP2 HeCS rank rejection remain
+correctness boundaries rather than fabricated successful acceleration cases.
 
-Known mathematical exclusions remain: LSMR has 25 retained terminal continuation
-variable discrepancies under the existing scoped breakdown comparison; basic
-clustered LOBPCG can fail; non-branching inputs exclude branching pairs; sampling
-retains 630 rank-loss and 981 epsilon-0.5 sandwich failures; full KID reconstruction
-and a probability theorem remain unresolved. HeCS rejects selected rank loss.
-These are expected/restricted outcomes, not newly successful cases.
+## Evidence and reproduction
 
-The invalidated pre-measurement warmup at `b3af646308884fa8c2113a2b064480eef08cf13d`
-mistakenly compared `TOTAL_SECONDS` as mathematical output. Its raw files remain
-under that revision. Only elapsed-field parsing was corrected; mathematical
-tolerances were not changed. It contributes no samples to the tables above.
+Raw evidence is **local-only** under
+`target/benchmarks/commit-a02927df3b9e/spectral-unaccelerated/run-001/`.
+Member-manifest SHA-256: `e6237b6dc3d67d1de0e7569a2813b295de9250c6b9bf8ab1ad729f1888b70358`.
+All specifications, oracle payloads, frozen input bytes, source/build/binary
+identities, raw stdout/stderr, warmups, samples and complete summaries are
+retained. The corrected independent preflight bundle is under
+`target/integration-20261124/unaccelerated-inputs-001/`. No durable external
+performance archive is configured; these raw samples are not claimed publicly
+downloadable. Hosted correctness artifacts are separate and expire after 14 days.
 
-## Evidence and replay
-
-Raw performance evidence is **local-only**, under
-`target/benchmarks/commit-958866897287/spectral-integration/run-001/`.
-Its member-manifest SHA-256 is `5f6c6c2418c2654e127d7518a49e6086d4a6751b777102f493ff0eac745fc45b`.
-The independent replays are under
-`target/benchmarks/commit-eacf0c752914/integration-correctness/run-001/`.
-No durable external performance archive is configured. These raw local samples
-are not claimed to be publicly downloadable. The report commit is distinct from
-both measured revisions.
-
-The run retains the exact `specification.json`, all input bytes, per-sample
-stdout/stderr, extracted committed sources, instrumented wrappers, compiler logs,
-binary fingerprints, environment, all samples and summaries. With that frozen
-specification/input bundle and Git objects for the listed SHAs, replay using:
+With the frozen specification/input/oracle bundle, a clean measured checkout,
+and an idle local build/test environment, replay into a new directory:
 
 ```sh
-python tools/benchmark_spectral_integration.py --specification target/integration-plan.json --output target/benchmarks/commit-CANDIDATE/spectral-integration/run-002
+python tools/benchmark_spectral_integration.py --specification target/unaccelerated-plan.json --output target/benchmarks/commit-CANDIDATE/spectral-unaccelerated/run-002
 ```
 
-Use a clean checkout of the measured candidate and a new output directory.
-Relevant public correctness/regeneration commands are maintained in the
-[tools guide](../../tools/README.md#integrated-spectral-resource-snapshots) and
-the included per-track reproduction guides. Hosted CI status belongs in PR #160;
-CI smoke timings, the resulting main merge and a published release are distinct
-from this local resource snapshot.
+The [tools guide](../../tools/README.md#integrated-spectral-resource-snapshots)
+owns route syntax and comparison checks. The original PR-head experiment remains
+under its original `9588668972873f4cf71860d9ccac7b0738c2cdd0` raw path as
+integration-regression evidence excluded from this acceleration comparison. Its numbers do not answer the
+unaccelerated-baseline question. Final hosted status and exact PR head belong in
+PR #160; a later main merge or release is distinct from this measured source.
