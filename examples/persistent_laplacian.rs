@@ -45,15 +45,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
-    let (benchmark, components) = match args.as_slice() {
-        [a] if a == "--oracle" => (None, false),
-        [a] if a == "--components" => (None, true),
+    let (benchmark, components, non_branching) = match args.as_slice() {
+        [a] if a == "--oracle" => (None, false, false),
+        [a] if a == "--components" => (None, true, false),
+        [a] if a == "--non-branching" => (None, true, true),
         [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => {
-            (Some(b.as_str()), false)
+            (Some(b.as_str()), false, false)
         }
         _ => {
             return Err(
-                "usage: persistent_laplacian [--oracle | --components | --benchmark direct|stepwise]".into(),
+                "usage: persistent_laplacian [--oracle | --components | --non-branching | --benchmark direct|stepwise]".into(),
             );
         }
     };
@@ -84,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|s| source.stage(*s))
             .collect::<cocycle::Result<Vec<_>>>()?;
         let options = SpectralOptions {
-            max_dense_entries: if benchmark.is_some() {
+            max_dense_entries: if benchmark.is_some() || non_branching {
                 65_536
             } else {
                 4_000_000
@@ -118,7 +119,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None
         };
         for (index, (k, step)) in starts.iter().zip(steps).enumerate() {
-            let r = PersistentLaplacian::compute(k, &target, degree, options, &execution)?;
+            let r = if non_branching {
+                PersistentLaplacian::compute_non_branching(k, &target, degree, options, &execution)?
+            } else {
+                PersistentLaplacian::compute(k, &target, degree, options, &execution)?
+            };
             let spectrum = r.spectrum(&execution)?;
             println!(
                 "PAIR {} {} {} {}",
@@ -147,7 +152,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 step.solver_residual()
             );
             if let Some(upper_steps) = &upper_steps {
-                let up = PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?;
+                let up = if non_branching {
+                    PersistentLaplacian::compute_up_non_branching(
+                        k, &target, degree, options, &execution,
+                    )?
+                } else {
+                    PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?
+                };
                 let down = PersistentLaplacian::compute_down(k, degree, options, &execution)?;
                 let upper_spectrum = up.spectrum(&execution)?;
                 let lower_spectrum = down.spectrum(&execution)?;

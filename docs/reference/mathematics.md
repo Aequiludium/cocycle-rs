@@ -1125,8 +1125,12 @@ The induced Gram entry is z^T z = support size, so the upper factor uses
 R z / sqrt(support size). The bounded
 [non-branching reproduction](../research/nonbranching.md) documents Algorithms
 1-3 of Botnan-Dong, arXiv:2408.16741v2, their literal-pseudocode discrepancies
-and independent exact checks. This is an external experiment, not a production
-backend or a structural certificate for arbitrary Rips input.
+and independent exact checks. The explicitly selected bounded constructors
+`compute_non_branching` and `compute_up_non_branching` use this corrected
+identity-metric construction. They reject ineligible outside rows, preserve
+the same source/coverage contracts and do not certify arbitrary Rips input.
+Their dense transforms and kernel have separate per-buffer storage checks;
+no compact or automatic backend selection is inferred.
 
 Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
 and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3

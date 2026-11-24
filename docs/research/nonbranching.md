@@ -2,13 +2,15 @@
 
 [Documentation](../index.md) / Research
 
-This is a standalone, bounded reproduction for
+This page records the bounded reproduction and Rust rewrite for
 [#147](https://github.com/Aequiludium/cocycle-rs/issues/147), independently
 implemented from Botnan and Dong, *The persistent Laplacian of non-branching
 complexes*, [arXiv:2408.16741v2](https://arxiv.org/abs/2408.16741v2),
 Algorithms 1-3, PDF pages 8, 9 and 13. It separates the literal pseudocode from
-explicit corrections and a compact Rust experiment. It adds no crate API,
-automatic backend selection or cubical storage interface.
+explicit corrections and a compact Rust experiment. The first-round standalone
+replay remains separate from the second-round
+[explicit library constructors](../guides/persistent-laplacian.md#explicit-non-branching-construction).
+Neither stage enables automatic backend selection or adds cubical storage.
 
 ## Mathematical scope
 
@@ -177,6 +179,57 @@ The dense input protocol still scans m*p entries, and the final U may be dense.
 Small fixed controls cannot establish near-linear total complexity, a complete
 spectral speedup or general production scalability. Algorithm 7/GKL, arbitrary
 weights, larger author datasets and automatic dispatch remain outside this
-delivery. The adoption decision is to retain the compact representation as a
-research candidate; production eligibility and execution policies need a
-separate integration change.
+delivery. The first-round decision retains the compact representation as a
+research candidate. The second round below integrates the unoptimized corrected
+baseline; it does not adopt that compact representation.
+
+## Second-round Rust library rewrite
+
+The Unreleased `PersistentLaplacian::compute_non_branching` and
+`compute_up_non_branching` explicitly select the corrected weak reduction.
+They use the existing source-pair validation, owned bases, coverage/skeleton
+metadata, full/upper result tags, action and complete-spectrum operations.
+Ordinary Schur constructors remain unchanged. The private owner is
+`src/persistent_laplacian/nonbranching.rs`; production code does not depend on
+the standalone first-round worker or the Python oracle.
+
+This baseline retains dense R, diagonal E, V and Z. It builds the actual
+R=D E V and checks the selected zero columns, then forms the original zero
+directions exactly once. Its kernel constraint check, graph traversal, dense
+arithmetic and output share one `Execution` budget. Every f64 incidence,
+transform, kernel, factor, Gram and returned matrix buffer has the supplied
+per-buffer cap. The original target Gram is built and released for the existing
+reference-scale contract. No ineligible or oversized input triggers a fallback,
+and `solver_residual()==0` denotes the absence of a Schur solve, not an exact
+floating assembly or rank certificate.
+
+To reuse a first-round evidence directory, run the original command with
+`--library --frozen-round1 PRIOR_REPLAY`. It verifies that input hashes have
+not changed, copies the frozen R/E/V/Z and metric outputs, compiles the actual
+kernel source with the actual budget/allocator, and compares all 90 cases
+including failure semantics. This matrix worker is a separate source-level
+build for algebraic controls; the public wrappers are checked through the
+ordinary crate separately:
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python tools/compare_persistent_laplacians.py --worker target/release/examples/persistent_laplacian --output target/nonbranching-library-comparison --non-branching --gudhi
+```
+
+The dated 2026-11-24 public comparison checked 1,026 qualifying pairs, all with
+independent rational matrices. It compared the full/upper/lower matrices,
+original-coordinate actions, complete spectra, multiplicities and exact-rank
+spectral unions to independent projection and the generic reverse-elimination
+comparator. Maximum matrix error was 2.89e-15 and maximum component/spectral-union
+error 4.45e-15. GUDHI corroborates only the declared topology cases. Branching
+outside rows are retained in an exclusion manifest and are not counted as
+successful comparisons; library tests separately verify their explicit errors.
+Fallback counters in this comparison describe the generic reverse comparator,
+not the non-branching constructors, which never fall back.
+
+Public tests also cover owned metadata after source release, empty/absent
+degrees, cloned and mixed-certificate sources, insufficient skeletons, degree
+overflow and incidence/kernel storage rejection. Private tests deterministically
+interrupt different phases with cancellation and work limits. This establishes
+bounded Rust parity and interface integration, not a performance adoption or
+the third-round sparse/compact optimization.

@@ -123,6 +123,24 @@ class WeakReductionTests(unittest.TestCase):
                 self.assertNotEqual(proc.returncode, 0)
                 self.assertIn("branching", proc.stderr)
 
+    @unittest.skipUnless(shutil.which("cargo") and shutil.which("rustc"), "Rust library toolchain")
+    def test_production_kernel_preserves_first_round_intermediates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            worker = replay.build_library_worker(Path(directory))
+            cases = replay.fixtures()
+            expected = [dict(name=c["name"], corrected=replay.weak_reduction(c["B1"], c["D"])) for c in cases]
+            self.assertEqual(len(replay.library_parity(worker, cases, expected)), len(cases))
+            excessive = subprocess.run([str(worker)], input="0 65537 0", text=True, capture_output=True)
+            self.assertNotEqual(excessive.returncode, 0)
+            self.assertIn("dimension limit", excessive.stderr)
+
+    def test_library_parity_requires_complete_frozen_input_order(self):
+        case = replay.fixtures()[0]
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            replay.library_parity(Path("not-invoked"), [case], [])
+        with self.assertRaisesRegex(ValueError, "identity"):
+            replay.library_parity(Path("not-invoked"), [case], [dict(name="wrong-case")])
+
 
 if __name__ == "__main__":
     unittest.main()

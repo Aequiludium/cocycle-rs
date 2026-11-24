@@ -388,13 +388,72 @@ def benchmark_summary(measurements):
     return summaries
 
 
+def build_library_worker(output, release=False):
+    """Compile the actual kernel source, budget and allocator; no copied kernel."""
+    output = Path(output).resolve()
+    profile = "release" if release else "debug"
+    build = ["cargo", "build", "--locked", "--lib"] + (["--release"] if release else [])
+    env = dict(os.environ, CARGO_TARGET_DIR=str(ROOT / "target"))
+    proc = subprocess.run(build, cwd=ROOT, env=env, text=True, capture_output=True)
+    (output / "library-build.log").write_text(proc.stdout + proc.stderr, encoding="utf-8")
+    proc.check_returncode()
+    worker = output / ("nonbranching-library.exe" if os.name == "nt" else "nonbranching-library")
+    command = ["rustc", "--edition=2024", "-O", "-Dwarnings",
+               str(ROOT / "tools/reference/nonbranching_library.rs"),
+               "--extern", f"cocycle={ROOT / 'target' / profile / 'libcocycle.rlib'}",
+               "-L", f"dependency={ROOT / 'target' / profile / 'deps'}", "-o", str(worker)]
+    proc = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+    with (output / "library-build.log").open("a", encoding="utf-8") as log:
+        log.write(proc.stdout + proc.stderr)
+    proc.check_returncode()
+    sources = ["tools/reference/nonbranching_library.rs", "src/persistent_laplacian/mod.rs",
+               "src/persistent_laplacian/nonbranching.rs", "src/persistent_laplacian/schur.rs",
+               "src/execution/mod.rs"]
+    for name in sources:
+        target = output / "library-sources" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / name, target)
+    save(output / "library-build.json", {"commands": [build, command],
+         "source_sha256": {name: digest(ROOT / name) for name in sources},
+         "worker_sha256": digest(worker),
+         "kernel_scope": "production kernel source compiled with actual budget/allocator; public stage wrapper checked separately"})
+    return worker
+
+
+def library_parity(worker, cases, frozen):
+    if len(cases) != len(frozen):
+        raise ValueError("incomplete frozen case set")
+    results = []
+    for case, expected in zip(cases, frozen):
+        if case["name"] != expected["name"]:
+            raise ValueError("frozen case order or identity changed")
+        proc = subprocess.run([str(worker)], input=protocol(case), text=True, capture_output=True)
+        if proc.returncode:
+            raise RuntimeError(f"library matrix {case['name']} failed: {proc.stderr}")
+        result = json.loads(proc.stdout)
+        ref = expected["corrected"]
+        for key in ["R", "E", "V", "Z"]:
+            assert result[key] == np.asarray(ref[key]).ravel().tolist(), (case["name"], key)
+        for key in ["nonzero", "original_zero", "transformed_zero"]:
+            assert result[key] == ref[key], (case["name"], key)
+        assert result["metric"] == np.diag(np.asarray(ref["metric"])).tolist()
+        upper = [float(Fraction(x)) for row in ref["upper_exact"] for x in row]
+        np.testing.assert_allclose(result["upper"], upper, rtol=1e-10, atol=1e-10)
+        results.append(dict(name=case["name"], **result))
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--paper", type=Path, required=True)
     parser.add_argument("--author-source", type=Path, required=True)
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--library", action="store_true", help="Also replay the production weak-reduction source")
+    parser.add_argument("--frozen-round1", type=Path, help="Prior replay directory; verify input hash and reuse its intermediate outputs")
     args = parser.parse_args()
+    if args.frozen_round1 and not args.library:
+        parser.error("--frozen-round1 requires --library")
     args.output.mkdir(parents=True, exist_ok=False)
     out = args.output.resolve()
     try:
@@ -495,6 +554,28 @@ def main():
                         assert result[key] == ref[key].ravel().tolist(), (case["name"], key)
                 parity.append(dict(name=case["name"], mode=mode, **result))
         save(out / "rust-parity.json", parity)
+        library_results = []
+        if args.library:
+            references = frozen
+            if args.frozen_round1:
+                if digest(out / "inputs.json") != digest(args.frozen_round1 / "inputs.json"):
+                    raise ValueError("frozen first-round inputs changed")
+                shutil.copy2(args.frozen_round1 / "round1.json", out / "frozen-round1.json")
+                references = json.loads((out / "frozen-round1.json").read_text(encoding="utf-8"))
+                save(out / "frozen-round1-origin.json", {"path": str(args.frozen_round1.resolve()),
+                     "input_sha256": digest(args.frozen_round1 / "inputs.json"),
+                     "intermediate_sha256": digest(args.frozen_round1 / "round1.json")})
+            library = build_library_worker(out, release=True)
+            library_results = library_parity(library, cases, references)
+            save(out / "library-parity.json", library_results)
+            failures = []
+            for data, options in [("1 1 3 1 0 0 1 1 1", []), ("1 1 1 1 2", []),
+                                  ("1 1 1 1 1", ["--max-work", "0"]),
+                                  ("257 0 257", []), ("0 65537 0", []), ("0 0 0 7", [])]:
+                proc = subprocess.run([str(library), *options], input=data, text=True, capture_output=True)
+                assert proc.returncode != 0
+                failures.append(dict(input=data, options=options, stderr=proc.stderr, returncode=proc.returncode))
+            save(out / "library-rejections.json", failures)
         rejection = []
         for name, data in [("branching", "1 1 3 1 0 0 1 1 1"),
                            ("nonunit", "1 1 1 1 2"),
@@ -529,10 +610,11 @@ def main():
             save(out / "benchmark-summary.json", benchmark_summary(measurements))
         save(out / "computation-record.json", {"status": "passed", "evidence_level": "bounded-check",
              "exact_checks": len(cases), "rust_comparisons": len(parity),
+             "library_kernel_comparisons": len(library_results),
              "literal_identity_failures": sum(not r["literal_identity"] for r in rows),
              "literal_upper_failures": sum(not r["literal_upper"] for r in rows),
              "input_sha256": digest(out / "inputs.json"),
-             "exclusions": ["Algorithm 7 GKL", "arbitrary weights", "production dispatch",
+             "exclusions": ["Algorithm 7 GKL", "arbitrary weights", "automatic backend dispatch",
                             "full chest X-ray notebook", "unbounded scalability"],
              "author_replay": len(author_results)})
         print(json.dumps({"output": str(out), "cases": len(cases), "rust_parity": len(parity),

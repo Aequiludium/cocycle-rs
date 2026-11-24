@@ -413,6 +413,15 @@ controls and GUDHI topology checks do not add a general Rips solver. Use the
 documented fixed paper/source inputs and a new output directory; literal-paper
 failures and corrected implementations remain separately labeled.
 
+`reproduce_nonbranching.py --library --frozen-round1 PRIOR_REPLAY` additionally
+replays the actual production kernel source and budget against the prior
+R/E/V/Z, index maps, metric and upper matrices. The ordinary reference checker
+accepts `--non-branching --gudhi` to verify both public constructors, action,
+complete spectra and metadata against rational projection and generic reverse
+elimination. Its explicit exclusion manifest records branching outside rows;
+those pairs are not counted as successful comparisons. The example's
+`--non-branching` mode keeps the default 65,536-entry cap.
+
 ## Native sparse Rips checks
 
 ```sh

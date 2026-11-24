@@ -75,6 +75,378 @@ fn pair(source: &SimplicialComplex, s: f64, t: f64, q: usize) -> PersistentLapla
 }
 
 #[test]
+fn non_branching_path_retains_owned_pair_contracts() {
+    let (specialized, direct) = {
+        let source = complex(&[
+            (&[0], 0.),
+            (&[2], 0.),
+            (&[1], 1.),
+            (&[0, 1], 2.),
+            (&[1, 2], 2.),
+        ]);
+        let k = source.stage(0.).unwrap();
+        let l = source.stage(2.).unwrap();
+        let result = PersistentLaplacian::compute_non_branching(
+            &k,
+            &l,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        let up = PersistentLaplacian::compute_up_non_branching(
+            &k,
+            &l,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(up.matrix(), result.matrix());
+        assert_eq!(up.component(), LaplacianComponent::Up);
+        (result, pair(&source, 0., 2., 0))
+    };
+    close(specialized.matrix(), &[0.5, -0.5, -0.5, 0.5]);
+    close(
+        &specialized
+            .action(&[1., -1.], &Execution::default())
+            .unwrap(),
+        &[1., -1.],
+    );
+    close(
+        &specialized
+            .spectrum(&Execution::default())
+            .unwrap()
+            .eigenvalues,
+        &[0., 1.],
+    );
+    assert_eq!(specialized.component(), LaplacianComponent::Full);
+    assert_eq!(specialized.basis(), direct.basis());
+    assert_eq!(specialized.target_basis(), direct.target_basis());
+    assert_eq!(specialized.scales(), direct.scales());
+    assert_eq!(specialized.source_coverage(), direct.source_coverage());
+    assert_eq!(specialized.source_context(), direct.source_context());
+    assert_eq!(
+        specialized.construction_dimension(),
+        direct.construction_dimension()
+    );
+    assert_eq!(specialized.reference_scale(), direct.reference_scale());
+    assert_eq!(specialized.solver_residual(), 0.);
+    assert!(!specialized.used_direct_fallback());
+}
+
+#[test]
+fn non_branching_surface_controls_match_schur_and_hand_spectra() {
+    let small = (5. - 5_f64.sqrt()) / 2.;
+    let large = (5. + 5_f64.sqrt()) / 2.;
+    let examples = [
+        (
+            vec![vec![0, 1, 2]],
+            vec![vec![0, 1], vec![0, 2], vec![1, 2]],
+            vec![3.; 3],
+        ),
+        (
+            vec![vec![0, 1, 2], vec![0, 2, 3]],
+            vec![vec![0, 1], vec![0, 3], vec![1, 2], vec![2, 3]],
+            vec![2., 2., 2., 4.],
+        ),
+        (
+            vec![vec![0, 1, 2], vec![0, 1, 3], vec![0, 2, 3], vec![1, 2, 3]],
+            vec![
+                vec![0, 1],
+                vec![0, 2],
+                vec![0, 3],
+                vec![1, 2],
+                vec![1, 3],
+                vec![2, 3],
+            ],
+            vec![4.; 6],
+        ),
+        (
+            vec![
+                vec![1, 3, 4],
+                vec![1, 2, 4],
+                vec![2, 4, 5],
+                vec![2, 3, 5],
+                vec![1, 3, 5],
+            ],
+            vec![vec![3, 4], vec![1, 2], vec![4, 5], vec![2, 3], vec![1, 5]],
+            vec![0., small, small, large, large],
+        ),
+    ];
+    for (facets, retained_edges, spectrum) in examples {
+        let mut cells = std::collections::BTreeMap::new();
+        for facet in facets {
+            for mask in 1..(1 << facet.len()) {
+                let simplex: Vec<_> = facet
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &v)| (mask & (1 << i) != 0).then_some(v))
+                    .collect();
+                let birth = if simplex.len() == 1 {
+                    0.
+                } else if retained_edges.contains(&simplex) {
+                    1.
+                } else {
+                    2.
+                };
+                cells.insert(simplex, birth);
+            }
+        }
+        let source = SimplicialComplex::new(
+            cells
+                .into_iter()
+                .map(|(v, t)| Simplex::new(v, t).unwrap())
+                .collect(),
+        )
+        .unwrap();
+        let k = source.stage(1.).unwrap();
+        let l = source.stage(2.).unwrap();
+        let full = PersistentLaplacian::compute_non_branching(
+            &k,
+            &l,
+            1,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        let up = PersistentLaplacian::compute_up_non_branching(
+            &k,
+            &l,
+            1,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        let direct_up = PersistentLaplacian::compute_up(
+            &k,
+            &l,
+            1,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(full.matrix(), pair(&source, 1., 2., 1).matrix());
+        close(up.matrix(), direct_up.matrix());
+        close(
+            &full.spectrum(&Execution::default()).unwrap().eigenvalues,
+            &spectrum,
+        );
+        let reversed = PersistentLaplacian::compute_non_branching(
+            &l,
+            &l,
+            1,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(reversed.matrix(), pair(&source, 2., 2., 1).matrix());
+    }
+}
+
+#[test]
+fn non_branching_eligibility_is_pair_local_and_never_falls_back() {
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 1.),
+        (&[0, 3], 2.),
+        (&[1, 3], 2.),
+        (&[2, 3], 2.),
+    ]);
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(2.).unwrap();
+    for result in [
+        PersistentLaplacian::compute_non_branching(
+            &k,
+            &l,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        ),
+        PersistentLaplacian::compute_up_non_branching(
+            &k,
+            &l,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        ),
+    ] {
+        assert!(matches!(
+            result,
+            Err(Error::InvalidParameter {
+                parameter: "non-branching boundary",
+                ..
+            })
+        ));
+    }
+    assert!(
+        PersistentLaplacian::compute_up(
+            &k,
+            &l,
+            0,
+            SpectralOptions::default(),
+            &Execution::default()
+        )
+        .is_ok()
+    );
+    // The same full boundary branches in a retained row but D is empty.
+    let equal_domain = PersistentLaplacian::compute_up_non_branching(
+        &l,
+        &l,
+        0,
+        SpectralOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    close(equal_domain.matrix(), pair(&source, 2., 2., 0).matrix());
+}
+
+#[test]
+fn non_branching_limits_and_stage_certificates_are_preserved() {
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 0.),
+        (&[0, 1], 1.),
+        (&[0, 2], 1.),
+        (&[0, 3], 1.),
+        (&[1, 2], 1.),
+        (&[1, 3], 1.),
+        (&[2, 3], 1.),
+    ]);
+    let stage = source.stage(1.).unwrap();
+    // N*N=16 and N*p=24 fit; the p*p identity kernel requires 36 entries.
+    let bounded = SpectralOptions {
+        max_dense_entries: 24,
+        ..Default::default()
+    };
+    assert!(
+        PersistentLaplacian::compute_up(&stage, &stage, 0, bounded, &Execution::default()).is_ok()
+    );
+    assert!(matches!(
+        PersistentLaplacian::compute_up_non_branching(
+            &stage,
+            &stage,
+            0,
+            bounded,
+            &Execution::default()
+        ),
+        Err(Error::InvalidParameter {
+            parameter: "max_dense_entries",
+            ..
+        })
+    ));
+    let flag = AtomicBool::new(true);
+    for execution in [
+        Execution::default().max_work(0),
+        Execution::default().cancellation(&flag),
+    ] {
+        assert!(
+            PersistentLaplacian::compute_non_branching(
+                &stage,
+                &stage,
+                0,
+                SpectralOptions::default(),
+                &execution
+            )
+            .is_err()
+        );
+    }
+    let cloned = source.clone();
+    assert!(
+        PersistentLaplacian::compute_non_branching(
+            &stage,
+            &cloned.stage(1.).unwrap(),
+            0,
+            SpectralOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(matches!(
+        PersistentLaplacian::compute_non_branching(
+            &stage,
+            &stage,
+            usize::MAX,
+            SpectralOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::SizeOverflow { .. })
+    ));
+    let points = PointCloudView::new(&[0., 0., 1., 0., 0., 1.], 3, 2).unwrap();
+    let certified = RipsBuilder::from_points(points).build_complex(1).unwrap();
+    let stage = certified.stage(2.).unwrap();
+    assert!(matches!(
+        PersistentLaplacian::compute_up_non_branching(
+            &stage,
+            &stage,
+            1,
+            SpectralOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
+    let result = PersistentLaplacian::compute_up_non_branching(
+        &stage,
+        &stage,
+        0,
+        SpectralOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    assert_eq!(result.construction_dimension(), Some(1));
+    assert_eq!(result.source_coverage(), certified.coverage());
+    assert!(result.source_context().is_some());
+    let bare = certified.complex().stage(2.).unwrap();
+    assert!(
+        PersistentLaplacian::compute_up_non_branching(
+            &bare,
+            &stage,
+            0,
+            SpectralOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    for tolerance in [0., f64::NAN, 1.] {
+        assert!(
+            PersistentLaplacian::compute_up_non_branching(
+                &stage,
+                &stage,
+                0,
+                SpectralOptions {
+                    relative_tolerance: tolerance,
+                    ..Default::default()
+                },
+                &Execution::default()
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn non_branching_zero_and_absent_degrees_are_not_missing_skeletons() {
+    let source = complex(&[(&[10], 0.), (&[40], 1.)]);
+    for (s, t, q) in [(-1., -1., 0), (-1., 1., 0), (0., 1., 0), (1., 1., 5)] {
+        let k = source.stage(s).unwrap();
+        let l = source.stage(t).unwrap();
+        let result = PersistentLaplacian::compute_non_branching(
+            &k,
+            &l,
+            q,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(result.matrix(), pair(&source, s, t, q).matrix());
+    }
+}
+
+#[test]
 fn path_kron_and_owned_action() {
     let result = {
         let source = complex(&[
