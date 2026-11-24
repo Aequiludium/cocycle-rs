@@ -129,6 +129,7 @@ research/filtration-stages
 research/analysis-learning
 research/persistent-spectral-features
 research/split-spectral-reproduction
+research/sequence-subspaces
 research/gudhi-cpp
 research/h1-fast-to-generic
 research/big-steps
