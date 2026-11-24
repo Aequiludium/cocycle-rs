@@ -10,6 +10,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 
 | Report | Scope |
 | --- | --- |
+| [Integrated spectral workstreams](spectral-integration.md) | Seven-track independent replay and paired resources against original PR heads, with retained variation and exclusions |
 | [Dirac resources and conditioning](dirac-resources.md) | Repeated sparse-mode costs, small-singular-value failures and explicit index limits |
 | [Persistent Laplacian reference resources](persistent-laplacian-resources.md) | Repeated direct/reverse dense costs, numeric safeguards and default storage rejections |
 | [Hodge resources and small-gap convergence](hodge-resources.md) | Repeated native time/memory, default nonconvergence and independent preconditioning diagnosis |
