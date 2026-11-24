@@ -6,6 +6,96 @@ The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
 Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
 Its private Jacobi solver retains its own convergence/error/resource policy.
 
+## Factorized action
+
+`PersistentLaplacianOperator` prepares a fixed numerical row-space basis Q of
+the outside boundary B2 and applies B1 (I-Q^T Q) B1^T + A^T A. Two-pass
+modified Gram--Schmidt determines Q once. Actions use no adaptive LSMR solve;
+the separate [paper reproduction](../research/persistent-constructions.md)
+records LSMR composition as an experiment. This API returns actions and explicit
+bounded matrices; it does not return partial or complete spectra.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{OperatorOptions, PersistentLaplacianOperator};
+let cells = [(vec![0], 0.), (vec![2], 0.), (vec![1], 1.),
+             (vec![0, 1], 2.), (vec![1, 2], 2.)];
+let source = SimplicialComplex::new(cells.into_iter()
+    .map(|(v, t)| Simplex::new(v, t)).collect::<cocycle::Result<_>>()?)?;
+let execution = Execution::default();
+let op = PersistentLaplacianOperator::new(&source.stage(0.)?, &source.stage(2.)?,
+    0, OperatorOptions::default(), &execution)?;
+let y = op.action(&[1., -1.], &execution)?;
+assert!((y[0] - 1.).abs() < 1e-12 && (y[1] + 1.).abs() < 1e-12);
+assert_eq!(op.materialize(4, &execution)?.len(), 4);
+assert_eq!(op.projection_rank(), 1);
+# Ok::<(), cocycle::Error>(())
+```
+
+The result owns degree, scales, ordered simplex labels, source coverage/context
+and the construction certificate. Inclusion/skeleton validation is identical to
+the dense full constructor. Each constructor/action/materialization starts a
+fresh terminal budget. Within materialization, all basis actions share the same
+budget. Cancellation, work/storage exhaustion and numerical failures return
+errors; no partial output or dense fallback is returned.
+
+`OperatorOptions` separates incidence entries, cumulative dense Q entries,
+per-vector entries and the spectral policy's per-buffer dense limit.
+Boundaries are sparse signed columns. Preparation/action never allocates a
+target N-by-N, persistent n-by-n or upper-column p-by-p matrix. Action costs
+O(nnz + p*rank(B2) + coordinate counts), including actual transpose traversals.
+`materialize(max_entries, execution)` applies both its explicit limit and the
+configured dense limit. These caps do not bound aggregate RAM. Projection setup
+can fill in, costing O(p*rank(B2)) retained f64 entries. Relative tolerance must
+be at least 128 machine epsilons. A discarded row residual between 64 eps and
+the relative rank cutoff is rejected as ambiguous; smaller residuals are
+numerically dependent. Orthogonality and discarded-row diagnostics are bounded
+by the residual tolerance. They do not certify exact rank, positivity at arbitrary
+scales or forward error for ill-conditioned projections. Existing dense
+`PersistentLaplacian::matrix()` and `spectrum()` retain their contracts.
+
+## LSMR boundary-kernel diagnostic
+
+`project_boundary_kernel_lsmr` transcribes the undamped rectangular least-squares
+recurrence verified in the [paper reproduction](../research/persistent-constructions.md).
+Pass row-major B2, its outside-row and upper-column counts, and y in the same
+upper-column order. The result owns w and the fresh residual z=y-B2^T w, together
+with residual norms and the number of completed updates. Retain the originating
+source, ordered bases and boundary separately: this raw numerical subroutine
+does not authenticate a stage inclusion or revalidate a chain complex.
+
+```rust
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{LsmrOptions, project_boundary_kernel_lsmr};
+let result = project_boundary_kernel_lsmr(
+    &[1., -1.], 1, 2, &[1., 0.], LsmrOptions::default(), &Execution::default())?;
+assert!((result.solution[0] - 0.5).abs() < 1e-12);
+assert!(result.projected.iter().all(|z| (z - 0.5).abs() < 1e-12));
+assert!(result.normal_residual_norm < 1e-12);
+# Ok::<(), cocycle::Error>(())
+```
+
+This first Rust rewrite borrows a dense rectangular boundary and uses
+O(outside_rows+upper_columns) vector storage, with no damping, sparse
+factorization or reorthogonalization. `LsmrOptions` caps input entries, each
+vector and iterations. Its default iteration limit is 4*min(rows,columns)+4.
+One terminal budget covers input validation, every update and fresh residual
+evaluation. Exhaustion, interruption, zero rotations before convergence and
+nonfinite arithmetic return an error without a partial successful result.
+The unscaled reference recurrence also rejects normal/rotation scale underflow
+and overflowing rotation products. It does not silently rescale or regularize
+such inputs; a stable scaled solver is a separate development step.
+
+The project stopping rule is norm(B2*z) <= tolerance*norm(B2,Fro)*norm(y), with
+default tolerance 1e-13. Zero/stationary or empty systems return zero w and y
+with zero updates. A small normal residual does not bound forward projection
+error near singularity. Right-hand-side-dependent iteration stopping does not
+establish a fixed linear/self-adjoint action. The existing fixed-projector
+operator remains the action API; this diagnostic adds no partial eigensolver.
+
+## Dense reference
+
 Reverse elimination skips a near-zero pivot only if its retained coupling is
 exactly zero. Small coupling alone cannot bound the Schur correction: the PSD
 block `[[1, eps], [eps, eps*eps]]` has a unit correction. Coupled near-zero pivots

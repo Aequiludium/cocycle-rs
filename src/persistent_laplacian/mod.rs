@@ -4,6 +4,9 @@
 //! dense reproduction exposes full, upper and lower operators, Algorithm 2 and
 //! fixed-endpoint reverse
 //! elimination of Mémoli--Wan--Wang, arXiv:2012.02808v3, Sections 4 and 5.2.
+//! A separate fixed-projection operator applies sparse boundaries without that
+//! dense matrix. The undamped LSMR diagnostic exposes numerical rectangular
+//! least-squares residuals; it is not the fixed operator's projection policy.
 //! It does not implement weighted Grams, general maps or online endpoint updates.
 //! Signed incidence is assembled directly; no dense boundary matrix is required.
 //! Dense Gram/Schur buffers have explicit limits before allocation. A large
@@ -12,9 +15,13 @@
 //! weak-reduction baseline with dense incidence, transforms and kernel buffers.
 //! They check pair-local eligibility and never select a Schur fallback.
 
+mod lsmr;
 mod nonbranching;
+mod operator;
 mod relevant_pairs;
 mod schur;
+pub use lsmr::{LsmrOptions, LsmrProjection, project_boundary_kernel_lsmr};
+pub use operator::{OperatorOptions, PersistentLaplacianOperator};
 
 pub use relevant_pairs::{RelevantPairLaplacian, relevant_pair_laplacians};
 

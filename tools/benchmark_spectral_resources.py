@@ -107,6 +107,18 @@ def main():
                     row.update(status=value["status"])
                     if value["core_comparisons"] != 160:
                         row["status"] = "validation_failure"
+                elif spec["kind"] == "persistent-action":
+                    value = json.loads(stdout)
+                    row.update(value)
+                    row.update(status="success", prepare_ns=value["setup_seconds"]*1e9,
+                               solve_ns=value["actions_seconds"]*1e9)
+                    import math
+                    if (value["n"] != spec["n"] or value["actions"] != spec["actions"]
+                            or not math.isfinite(value["checksum"])
+                            or abs(value["checksum"] - spec["expected_checksum"]) > 1e-7
+                            or any(not math.isfinite(value[key]) or value[key] < 0
+                                   for key in ("source_seconds", "setup_seconds", "actions_seconds"))):
+                        row["status"] = "validation_failure"
                 else:
                     value = json.loads(stdout)
                     row.update(value)

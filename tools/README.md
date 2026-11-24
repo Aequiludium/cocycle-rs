@@ -279,6 +279,13 @@ That comparison checks full matrices/spectra numerically and matches ordered
 coordinates/scales exactly; representative indices and solve counts differ by
 design. It measures whether saved solves repay preparation for these inputs,
 without selecting an automatic default.
+The separate [SPSC-A construction and LSMR reproduction](../docs/research/persistent-constructions.md)
+freezes shared inputs, exact oracles and intermediate paper quantities for
+Issue #144. Run `reproduce_persistent_constructions.py` using that page's pinned
+sources and a new output directory. It does not replace the existing core suite.
+Its `--replay-lsmr-worker PATH --frozen DIRECTORY` mode performs Round-2 native
+LSMR parity using hash-verified original Python outputs. The opted-in worker
+also checks terminal-breakdown discrepancies under the explicitly scoped policy.
 
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
 release [example worker](../examples/persistent_laplacian.rs) with independently

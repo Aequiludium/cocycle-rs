@@ -131,6 +131,7 @@ research/persistent-spectral-features
 research/split-spectral-reproduction
 research/sequence-subspaces
 research/nonbranching
+research/persistent-constructions
 research/gudhi-cpp
 research/h1-fast-to-generic
 research/big-steps

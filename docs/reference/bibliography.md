@@ -168,3 +168,16 @@ The pinned [HO](#ho) implementation specifies its F2 constraints and finite repl
 domain. Cocycle's `stable_volume` implements the bounded integer optimization
 contract; it does not certify the geometric hypotheses of those theorems or
 claim a perturbation/resampling guarantee.
+
+## FS11
+
+David Chin-Lung Fong and Michael Saunders. **LSMR: An Iterative Algorithm for
+Sparse Least-Squares Problems**. SIAM Journal on Scientific Computing 33(5),
+2950-2971 (2011). [DOI](https://doi.org/10.1137/10079687X),
+[author PDF](https://web.stanford.edu/group/SOL/software/lsmr/LSMR-SISC-2011.pdf).
+
+The undamped boundary-kernel diagnostic independently transcribes Section 2.8,
+steps 1-6. Its fresh normal-residual stopping rule is project-specific; Section
+3's norm estimators are not ported. The [reproduction](../research/persistent-constructions.md)
+records the fixed PDF hash, frozen Python oracle, Rust parity and unresolved raw
+terminal-breakdown directions separately from the paper's mathematical algorithm.
