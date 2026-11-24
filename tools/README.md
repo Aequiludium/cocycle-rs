@@ -404,6 +404,15 @@ outputs are not shipped. Current native tools include `benchmark_native.py`, `co
 correctness and timing responsibilities. Do not mix old wrapper samples into
 native rankings.
 
+## Non-branching weak reduction
+
+The [non-branching reproduction](../docs/research/nonbranching.md) separately
+checks Botnan-Dong Algorithms 1-3, induced kernel metrics, pinned author cubical
+code and standalone Rust baseline/compact parity. Its real signed algebraic
+controls and GUDHI topology checks do not add a general Rips solver. Use the
+documented fixed paper/source inputs and a new output directory; literal-paper
+failures and corrected implementations remain separately labeled.
+
 ## Native sparse Rips checks
 
 ```sh

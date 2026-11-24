@@ -1117,6 +1117,17 @@ and residual checks do not certify exact ranks or a forward-error bound.
 Independent rational projection and rank calculations cover finite fixtures;
 finite-field persistence only corroborates torsion-free examples.
 
+For signed unit outside incidence F with at most two nonzeros in every row,
+consistent unsigned-graph components give disjoint signed kernel indicators z.
+Singleton constraints or inconsistent signed cycles force the component to zero
+over the reals; each original zero column is an independent free direction.
+The induced Gram entry is z^T z = support size, so the upper factor uses
+R z / sqrt(support size). The bounded
+[non-branching reproduction](../research/nonbranching.md) documents Algorithms
+1-3 of Botnan-Dong, arXiv:2408.16741v2, their literal-pseudocode discrepancies
+and independent exact checks. This is an external experiment, not a production
+backend or a structural certificate for arbitrary Rips input.
+
 Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
 and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
 (2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
