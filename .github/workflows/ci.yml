@@ -88,6 +88,8 @@ jobs:
           python tools/check_docs.py --html target/docs/html
       - run: python -m unittest discover -s tools -p 'test_*.py'
       - run: cargo fmt --all -- --check
+      - run: rustfmt --edition 2024 --check tools/reference/hecs.rs
+      - run: rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests && target/hecs-tests
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
@@ -154,6 +156,7 @@ jobs:
           toolchain: 1.91.0
       - run: cargo test --locked --all-features
       - run: cargo check --locked --all-targets --all-features
+      - run: rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests && target/hecs-tests
       - run: cargo test --locked --example complex_construction
       - run: cargo test --locked --example critical_sets
 
