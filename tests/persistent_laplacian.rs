@@ -258,6 +258,53 @@ fn factorized_degenerate_limits_and_inclusion() {
 }
 
 #[test]
+fn sparse_persistent_action_exceeds_dense_cap_with_nontrivial_projection() {
+    let n = 257;
+    let mut cells: Vec<_> = (0..n).map(|v| Simplex::new(vec![v], 0.).unwrap()).collect();
+    cells.push(Simplex::new(vec![n], 1.).unwrap());
+    cells.extend((0..n).map(|v| Simplex::new(vec![v, n], 2.).unwrap()));
+    let source = SimplicialComplex::new(cells).unwrap();
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(2.).unwrap();
+    let op = PersistentLaplacianOperator::new(
+        &k,
+        &l,
+        0,
+        OperatorOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    assert_eq!(op.options().spectral.max_dense_entries, 65_536);
+    assert_eq!(op.projection_rank(), 1);
+    assert_eq!(op.projection_entries(), n);
+    assert_eq!(op.incidence_entries(), n);
+    let x: Vec<_> = (0..n).map(|i| (i % 17) as f64 / 17.).collect();
+    let mean = x.iter().sum::<f64>() / n as f64;
+    let expected: Vec<_> = x.iter().map(|x| x - mean).collect();
+    close(&op.action(&x, &Execution::default()).unwrap(), &expected);
+    assert!(matches!(
+        op.materialize(usize::MAX, &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    assert!(matches!(
+        PersistentLaplacian::compute(&k, &l, 0, SpectralOptions::default(), &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    // Projection storage is an independent cumulative cap, not the dense cap.
+    let small = OperatorOptions {
+        max_projection_entries: n - 1,
+        ..Default::default()
+    };
+    assert!(matches!(
+        PersistentLaplacianOperator::new(&k, &l, 0, small, &Execution::default()),
+        Err(Error::InvalidParameter {
+            parameter: "max_projection_entries",
+            ..
+        })
+    ));
+}
+
+#[test]
 fn ring_to_filled_triangle_and_hodge_degeneracy() {
     let source = complex(&[
         (&[0], 0.),
@@ -377,6 +424,20 @@ fn basis_permutation_and_orientation_under_relabeling() {
     ]);
     let x = pair(&a, 1., 3., 1);
     let y = pair(&b, 1., 3., 1);
+    for (source, expected) in [(&a, &x), (&b, &y)] {
+        let operator = PersistentLaplacianOperator::new(
+            &source.stage(1.).unwrap(),
+            &source.stage(3.).unwrap(),
+            1,
+            OperatorOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(
+            &operator.materialize(4, &Execution::default()).unwrap(),
+            expected.matrix(),
+        );
+    }
     close(
         &x.spectrum(&Execution::default()).unwrap().eigenvalues,
         &y.spectrum(&Execution::default()).unwrap().eigenvalues,
@@ -520,6 +581,16 @@ fn certified_missing_skeleton_is_not_an_empty_upper_boundary() -> Result<()> {
     let p = PointCloudView::new(&[0., 0., 1., 0., 0., 1.], 3, 2)?;
     let source = RipsBuilder::from_points(p).build_complex(1)?;
     let k = source.stage(2.)?;
+    assert!(matches!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &k,
+            1,
+            OperatorOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
     assert!(matches!(
         PersistentLaplacian::compute(&k, &k, 1, SpectralOptions::default(), &Execution::default()),
         Err(Error::InsufficientSkeleton { .. })

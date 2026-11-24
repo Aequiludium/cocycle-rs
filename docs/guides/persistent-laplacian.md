@@ -42,6 +42,9 @@ errors; no partial output or dense fallback is returned.
 
 `OperatorOptions` separates incidence entries, cumulative dense Q entries,
 per-vector entries and the spectral policy's per-buffer dense limit.
+Boundaries are sparse signed columns. Preparation/action never allocates a
+target N-by-N, persistent n-by-n or upper-column p-by-p matrix. Action costs
+O(nnz + p*rank(B2) + coordinate counts), including actual transpose traversals.
 `materialize(max_entries, execution)` applies both its explicit limit and the
 configured dense limit. These caps do not bound aggregate RAM. Projection setup
 can fill in, costing O(p*rank(B2)) retained f64 entries. Relative tolerance must

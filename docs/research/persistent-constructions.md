@@ -92,3 +92,32 @@ idempotence and tighter-inner-action diagnostics passed the selected controls.
 They do not certify a fixed linear/self-adjoint operator in general. Final
 eigenpair residuals use the independent rational-oracle matrix. No performance
 or scalable complete-spectrum claim follows from this reproduction.
+
+## Rust rewrite and representation admission
+
+The unoptimized Rust rewrite is commit
+`b70e984` (`fixed-projection action reference`): dense rectangular incidence,
+two-pass row-space reduction and a fixed I-Q^T Q action. Its 801-pair comparison
+uses the same frozen project inputs and exact-oracle matrices. A separate
+representation change replaces only dense incidence with sparse signed columns;
+the projection policy, coordinate metadata and mathematical output stay fixed.
+LSMR remains in reference tooling, with no adaptive inner solve in the public API.
+
+The nontrivial scale gate uses K containing 257 leaves and L adding one late
+center and all leaf-center edges, q=0, scales (0,2). Its hand-derived action is
+x-mean(x), i.e. I-11^T/257. The sparse path retains 257 incidence terms and 257
+projection entries; the default dense cap remains 65,536. Dense materialization
+and the original dense constructor reject this pair under that cap. This is
+operator-only evidence; full spectra and general sparse projector scalability
+remain outside the acceptance claim. Q still requires O(p*rank(B2)) storage.
+
+The proposed bounded adoption criterion is: preserve all 801 oracle comparisons
+and failures, pass the nontrivial 257 gate under unchanged dense limits, and
+reduce incidence storage with no action-time regression on matched star controls
+of 64, 128 and 256 leaves. Measure one and 1000 actions separately, with a
+retained warmup and ten fresh serial processes per cell. Source preparation,
+operator setup, actions, process wall time and absolute peak working set are
+separate. These project controls do not support a native cross-library ranking
+or a universal speed claim. Formal measurements follow the existing
+`spectral-resource-v1` controller; retain every sample/failure and compare paired
+samples, rather than dividing unrelated medians.

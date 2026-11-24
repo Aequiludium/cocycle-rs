@@ -354,6 +354,9 @@ def run(output, sources, worker, gudhi, operator=False):
     # A new directory is mandatory, including for failed runs.
     output.mkdir(parents=True, exist_ok=False)
     versions = {"python": sys.version, "numpy": np.__version__, "scipy": scipy.__version__}
+    if gudhi:
+        import gudhi as gd
+        versions["gudhi"] = gd.__version__
     identities = {}
     for name, (url, digest) in PAPERS.items():
         data = (sources / name).read_bytes()

@@ -43,6 +43,9 @@ impl Default for OperatorOptions {
 /// owned. Standard inner products, increasing-vertex orientations and ordinary
 /// nonaugmented chains match [`super::PersistentLaplacian`]. This operator does
 /// not change that type's borrowed dense `matrix()` contract.
+/// Boundaries use sparse signed columns and their actual transposes. A single
+/// action costs O(nnz + p*rank(B2) + coordinate counts); Q may fill in. Neither
+/// construction nor action forms an N*N, n*n or p*p operator/projector buffer.
 #[derive(Clone, Debug)]
 pub struct PersistentLaplacianOperator {
     degree: usize,
@@ -52,8 +55,8 @@ pub struct PersistentLaplacianOperator {
     source_context: Option<FiltrationContext>,
     source_coverage: Coverage,
     construction_dimension: Option<usize>,
-    upper: Vec<f64>,
-    lower: Vec<f64>,
+    upper: Vec<Vec<(usize, f64)>>,
+    lower: Vec<Vec<(usize, f64)>>,
     upper_columns: usize,
     lower_rows: usize,
     row_basis: Vec<Vec<f64>>,
@@ -104,21 +107,10 @@ impl PersistentLaplacianOperator {
             check_limit(size, options.max_vector_entries, "max_vector_entries")?;
         }
         let p = next.len();
-        let entries = target
-            .len()
-            .checked_mul(p)
-            .and_then(|v| previous.len().checked_mul(n).and_then(|w| v.checked_add(w)))
-            .ok_or(Error::SizeOverflow {
-                operation: "operator incidence entries",
-            })?;
-        check_limit(
-            entries,
-            options.max_incidence_entries,
-            "max_incidence_entries",
-        )?;
-        let mut upper = super::dense(n, p, &options.spectral, &mut budget)?;
-        let mut outside = super::dense(target.len() - n, p, &options.spectral, &mut budget)?;
-        let mut lower = super::dense(previous.len(), n, &options.spectral, &mut budget)?;
+        let mut upper = incidence(p, &mut budget)?;
+        let mut outside = incidence(target.len() - n, &mut budget)?;
+        let mut lower = incidence(n, &mut budget)?;
+        let mut entries = 0usize;
         for (column, &id) in next.iter().enumerate() {
             budget.step()?;
             for term in l.boundary(id).ok_or(Error::InternalInvariant {
@@ -132,9 +124,19 @@ impl PersistentLaplacianOperator {
                             reason: "upper face missing",
                         })?;
                 if row < n {
-                    upper[row * p + column] = f64::from(term.coefficient);
+                    push_term(
+                        &mut upper[column],
+                        (row, f64::from(term.coefficient)),
+                        &mut entries,
+                        &options,
+                    )?;
                 } else {
-                    outside[(row - n) * p + column] = f64::from(term.coefficient);
+                    push_term(
+                        &mut outside[row - n],
+                        (column, f64::from(term.coefficient)),
+                        &mut entries,
+                        &options,
+                    )?;
                 }
             }
         }
@@ -150,16 +152,28 @@ impl PersistentLaplacianOperator {
                         .map_err(|_| Error::InternalInvariant {
                             reason: "lower face missing",
                         })?;
-                lower[row * n + column] = f64::from(term.coefficient);
+                push_term(
+                    &mut lower[column],
+                    (row, f64::from(term.coefficient)),
+                    &mut entries,
+                    &options,
+                )?;
             }
         }
         let mut row_basis: Vec<Vec<f64>> = Vec::new();
         let mut projection_entries = 0usize;
         let mut projection_residual: f64 = 0.;
-        for row in outside.chunks(p.max(1)) {
+        for row in &outside {
+            budget.step()?;
+            if row.is_empty() {
+                continue;
+            }
             let mut v = vector(p, &options, &mut budget)?;
-            v.copy_from_slice(row);
-            let original_norm = length(row, &mut budget)?;
+            for &(column, value) in row {
+                budget.step()?;
+                v[column] = value;
+            }
+            let original_norm = length(&v, &mut budget)?;
             for _ in 0..2 {
                 remove_rows(&mut v, &row_basis, &mut budget)?;
             }
@@ -269,9 +283,9 @@ impl PersistentLaplacianOperator {
     pub fn options(&self) -> OperatorOptions {
         self.options
     }
-    /// Number of stored f64 incidence entries, excluding the projection basis.
+    /// Number of stored nonzero incidence terms, excluding the projection basis.
     pub fn incidence_entries(&self) -> usize {
-        self.upper.len() + self.lower.len()
+        self.upper.iter().chain(&self.lower).map(Vec::len).sum()
     }
     /// Cumulative f64 entries retained in Q, which may be dense.
     pub fn projection_entries(&self) -> usize {
@@ -316,10 +330,11 @@ impl PersistentLaplacianOperator {
         }
         let p = self.upper_columns;
         let mut y = vector(p, &self.options, budget)?;
-        for (i, &value) in x.iter().enumerate() {
-            for (j, target) in y.iter_mut().enumerate() {
+        for (column, value) in self.upper.iter().zip(&mut y) {
+            budget.step()?;
+            for &(row, coefficient) in column {
                 budget.step()?;
-                *target += self.upper[i * p + j] * value;
+                *value += coefficient * x[row];
             }
         }
         // Compute all coefficients against the original y: I-Q^T Q is a fixed
@@ -335,17 +350,26 @@ impl PersistentLaplacianOperator {
             }
         }
         let mut result = vector(n, &self.options, budget)?;
-        for (i, value) in result.iter_mut().enumerate() {
-            *value = dot(&self.upper[i * p..(i + 1) * p], &y, budget)?;
+        for (column, &value) in self.upper.iter().zip(&y) {
+            budget.step()?;
+            for &(row, coefficient) in column {
+                budget.step()?;
+                result[row] += coefficient * value;
+            }
         }
         let mut lower_action = vector(self.lower_rows, &self.options, budget)?;
-        for (row, value) in lower_action.iter_mut().enumerate() {
-            *value = dot(&self.lower[row * n..(row + 1) * n], x, budget)?;
-        }
-        for (row, &value) in lower_action.iter().enumerate() {
-            for (j, target) in result.iter_mut().enumerate() {
+        for (column, &value) in self.lower.iter().zip(x) {
+            budget.step()?;
+            for &(row, coefficient) in column {
                 budget.step()?;
-                *target += self.lower[row * n + j] * value;
+                lower_action[row] += coefficient * value;
+            }
+        }
+        for (column, target) in self.lower.iter().zip(&mut result) {
+            budget.step()?;
+            for &(row, coefficient) in column {
+                budget.step()?;
+                *target += coefficient * lower_action[row];
             }
         }
         for value in result.iter().chain(&y).chain(&lower_action) {
@@ -395,6 +419,34 @@ fn check_limit(entries: usize, limit: usize, parameter: &'static str) -> Result<
             reason: "operator storage exceeds the declared limit",
         });
     }
+    Ok(())
+}
+fn incidence(count: usize, budget: &mut WorkBudget<'_>) -> Result<Vec<Vec<(usize, f64)>>> {
+    budget.check()?;
+    let mut columns = Vec::new();
+    columns.try_reserve_exact(count).map_err(|_| allocation())?;
+    for _ in 0..count {
+        budget.step()?;
+        columns.push(Vec::new());
+    }
+    Ok(columns)
+}
+fn push_term(
+    column: &mut Vec<(usize, f64)>,
+    term: (usize, f64),
+    entries: &mut usize,
+    options: &OperatorOptions,
+) -> Result<()> {
+    *entries = entries.checked_add(1).ok_or(Error::SizeOverflow {
+        operation: "operator incidence entries",
+    })?;
+    check_limit(
+        *entries,
+        options.max_incidence_entries,
+        "max_incidence_entries",
+    )?;
+    column.try_reserve(1).map_err(|_| allocation())?;
+    column.push(term);
     Ok(())
 }
 fn vector(n: usize, options: &OperatorOptions, budget: &mut WorkBudget<'_>) -> Result<Vec<f64>> {
@@ -452,6 +504,45 @@ mod tests {
         assert!(matches!(
             remove_rows(&mut v, &rows, &mut budget),
             Err(Error::Cancelled)
+        ));
+    }
+
+    #[test]
+    fn materialization_shares_one_action_budget() {
+        use crate::complex::SimplicialComplex;
+        let cells = [
+            (vec![0], 0.),
+            (vec![2], 0.),
+            (vec![1], 1.),
+            (vec![0, 1], 2.),
+            (vec![1, 2], 2.),
+        ];
+        let source = SimplicialComplex::new(
+            cells
+                .into_iter()
+                .map(|(v, t)| Simplex::new(v, t).unwrap())
+                .collect(),
+        )
+        .unwrap();
+        let op = PersistentLaplacianOperator::new(
+            &source.stage(0.).unwrap(),
+            &source.stage(2.).unwrap(),
+            0,
+            OperatorOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        let execution = Execution::default().max_work(10_000);
+        let mut budget = WorkBudget::new(&execution).unwrap();
+        op.action_with(&[1., 0.], &mut budget).unwrap();
+        let one_action = budget.used();
+        assert!(
+            op.action(&[1., 0.], &Execution::default().max_work(one_action))
+                .is_ok()
+        );
+        assert!(matches!(
+            op.materialize(4, &Execution::default().max_work(one_action)),
+            Err(Error::WorkLimitExceeded { .. })
         ));
     }
 }
