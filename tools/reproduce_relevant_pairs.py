@@ -407,7 +407,8 @@ def benchmark_workers(baseline, candidate, cases, output, baseline_revision, dir
                 (directory / "samples.json").write_text(json.dumps(samples, indent=2) + "\n", encoding="utf-8")
         rows = [r for r in samples if r["name"] == name and r["degree"] == degree and not r["warmup"]]
         summary = {"name": name, "degree": degree, "requested_pairs": rows[0]["requested_pairs"],
-                   "actually_solved_pairs": rows[0]["actually_solved_pairs"]}
+                   "actually_solved_pairs": {label: next(r["actually_solved_pairs"] for r in rows if r["route"] == label)
+                                             for label in ["baseline", "candidate"]}}
         for field in ["construction_seconds", "process_seconds", "peak_working_set_bytes"]:
             summary[field] = {label: {"median": statistics.median(r[field] for r in rows if r["route"] == label),
                                      "min": min(r[field] for r in rows if r["route"] == label),
