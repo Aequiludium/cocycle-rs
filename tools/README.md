@@ -25,6 +25,95 @@ controls on the 1024-node path against its complete analytic spectrum, using the
 same SplitMix64 starting span. Warnings and incomplete lookahead convergence
 remain explicit; these controls are numerical diagnosis, not native timing.
 
+## Ordinary-Hodge sparsification reproduction
+
+The optional [sampling/KID controller](reproduce_sparsification.py) and
+[bounded Rust worker](reference/sparsification.rs) implement the reproducible
+subroutines in [Issue #149](https://github.com/Aequiludium/cocycle-rs/issues/149).
+They leave the library's exact, unweighted operators unchanged. Sampling retains
+the complete lower skeleton and original coordinates; filtration values do not
+become weights. These tools are correctness experiments, outside the crate.
+
+The sources are Osting, Palande and Wang,
+[arXiv:1708.08436v3, Section 3/Theorem 3.1](https://arxiv.org/abs/1708.08436v3),
+and Savostianov, Schaub, Guglielmi and Tudisco,
+[arXiv:2502.07558v2](https://arxiv.org/abs/2502.07558v2), PDF Algorithm 3.1
+(physical page 8), Section 4.3 (pages 11-13) and Algorithm 4.1 (page 14).
+PDF versions and SHA-256 are enforced before a run. No author implementation
+was verified in these paper links; this is an independent mathematical rewrite.
+
+For an integer boundary B, an independent rational row-space projector supplies
+the exact rank/kernel and column leverage scores. A numerical pseudoinverse of
+G = B B^T supplies a separate comparison. Positive-rank probabilities are
+p_j = tau_j/rank. Sampling with replacement retains the seed, every draw,
+repeated counts and Gram weights count_j/(k p_j); factor columns use the square
+roots of these weights. Zero rank returns zero without probability normalization.
+Uniform sampling is a separate control. Every trial retains the complete
+generalized spectrum on the positive space of G and explicit kernel checks,
+including rank loss and failed PSD sandwiches. Epsilon targets 0.25/0.5 and delta
+target 0.05 are experiment metadata: no theorem-backed sample count or failure
+probability is asserted, individually or jointly across inputs.
+
+The four-face tetrahedron shell has B^T B = 4I - ss^T, s = [1,-1,1,-1], rank 3,
+scores 3/4 and probabilities 1/4. For H = B^T B/4, all 16 Rademacher probes
+recover odd moments 2 diag(T_m(H)) = 3/2 at degrees 1,3,5,7. A one-face draw
+loses rank and is retained as a failure. The printed Algorithm 4.1 is replayed
+separately: its upper-Gram/probe dimensions disagree on this rectangular input;
+even after substituting the dual Gram, its indexing, conditional recurrence
+update and factor differ from Section 4.3. These are observed discrepancies,
+not author-confirmed errata. The corrected branch updates every degree and
+collects only odd moments, checking scalar polynomials before sampling.
+
+Full paper KID probability reconstruction remains unresolved. Its
+`histogramIntegral` does not specify the executable bin/integration policy.
+The separate **project diagnostic** fixes 64 positive bins of width 1/64,
+undamped Chebyshev expansion, analytic bin integration and normalization by
+the raw score sum. Its bin averages are not asserted to reproduce the paper's
+convolution kernel. Raw scores, sums relative to exact rank, negative bins and
+negative probabilities are retained. Invalid sampling probabilities are rejected
+without clipping. This branch's probability errors and empirical sandwiches
+cannot establish the paper's probability theorem or full KID reproduction.
+
+The frozen project family contains eight points in two seeded Gaussian clusters,
+four inclusive Rips thresholds and q=0/1. It is not author data. The full sweep
+uses maximum polynomial degrees 8/16/32 (4/8/16 odd moments), probes 32/128/512
+and seeds 0 through 19; `--quick` uses seed 0 only. The same nested probes and
+draw seeds are retained across settings. GUDHI checks input simplices, while
+GUDHI and Ripser field-2 Betti0/1 corroborate exact rational ranks on these inputs;
+neither library is a real-spectrum oracle. Rust parity covers numerical scores,
+fixed-draw Gram assembly and corrected moments at all nine degree/probe settings
+with seed 0 on every fixture, plus shell, empty and zero controls. It does not
+claim native RNG parity, a Rust histogram implementation or a persistent extension.
+The worker reuses the existing checked Hodge eigensolver through a formal
+two-degree chain window; its numerical rank threshold is 1e-10 max(1,lambda_max).
+
+One tested environment uses Python 3.12.13, NumPy 2.4.6, SciPy 1.17.1,
+GUDHI 3.12.0 and Ripser 0.6.12. Create an isolated environment, save its complete
+dependency lock, and download both pinned PDFs to `target/sparsification-sources/`
+using their arXiv PDF URLs. Then run from the repository root:
+
+```sh
+python3 -m venv target/sparsification-venv
+target/sparsification-venv/bin/python -m pip install numpy==2.4.6 scipy==1.17.1 gudhi==3.12.0 ripser==0.6.12
+target/sparsification-venv/bin/python -m pip freeze > target/sparsification-lock.txt
+cargo build --locked --release
+rustfmt --edition 2024 --check tools/reference/sparsification.rs
+rustc --edition 2024 -O tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-worker
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --sources target/sparsification-sources --worker target/sparsification-worker --output target/sparsification-run-001
+target/sparsification-venv/bin/python -m unittest discover -s tools -p test_reproduce_sparsification.py
+```
+
+On Windows use `Scripts/python.exe`, append `.exe` to the worker and set the
+three thread environment variables in PowerShell before starting Python.
+The PDFs must hash to `373640de5a96c8fce16784aecc072ef240cdacb96476fffde7ef3263426fa8f8`
+(2502.07558v2) and `1470ef2d8785dc9872f525479253b00e6d7d84b6b5b08ef8804b981e0983305e`
+(1708.08436v3). An existing output directory is rejected. Sources, inputs, probes,
+moments, all trials, Rust requests/results/rejections and environment identities
+are retained under the new output. Phase durations and Python-allocation peaks
+are diagnostics; they are not formal benchmarks, process RSS or speedup evidence.
+Core integration, persistent Schur sampling and optimization remain deferred
+until the full probability/error contract and matched cost evidence are resolved.
+
 ## Spectral reference CI
 
 The `Real Hodge reference comparisons` CI job requires `--iterative
