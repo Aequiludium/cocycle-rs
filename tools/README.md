@@ -74,6 +74,52 @@ real topology, whole-package compatibility or performance rankings.
 
 ## Real persistent Laplacian reproduction
 
+The bounded [relevant-pair reproduction](reproduce_relevant_pairs.py) transcribes
+Kirchner--Vittorietti arXiv:2611.09610v1 Algorithms 1-2 over Q. It freezes the PDF
+SHA-256, input bytes, R/V columns, event buckets, selected pairs, predecessor
+embeddings and every exact upper/full matrix. Its independent row-RREF restricted
+kernel oracle comes from `compare_persistent_laplacians.py`, not the new column
+reducer. GUDHI 3.12.0 corroborates topology over F11; this is not a real-spectrum
+oracle. NumPy 2.2.6 supplies numerical cross-checks. These remain external tools.
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --paper-style --rust-worker target/release/examples/persistent_laplacian \
+  --output target/relevant-pair-reproduction
+```
+
+Obtain the exact PDF from [arXiv v1](https://arxiv.org/pdf/2611.09610v1); its
+required SHA-256 is `81731c460bbeb12a210fd5745fa862919d4f9992e30e23c07e08419c483009cc`.
+Output directories must be fresh. The tool fails on a different PDF or missing
+dependencies. No author implementation has been verified; this is a mathematical
+transcription. Controls include joint-bucket events, delayed vertices, ties,
+zero columns, RP2 and tetrahedral shells. Every tiny-grid pair, including internal
+empty stages, is checked. The optional paper-style inputs use 12 planar alpha
+points and 8 spatial Rips points at radius 0.3, project-selected seeds 0/1/2 and
+degrees 0-3. These are scaled instances, not author data or Figure 9 timings.
+The Rust worker checks every real-grid pair's full matrix, spectrum, ordered
+labels, scales, degree and evaluated representative against frozen rational
+results. Its `--relevant` mode accepts the existing whitespace fixture protocol,
+treating the start list as the entire grid and evaluating all legal pairs.
+
+Serial single-run Python timings compare exhaustive Schur, selective Schur and
+new-chain upper construction with identical returned matrices/spectra. They
+exclude input construction, oracle validation and export, and remain exploratory
+phase diagnostics. They do not establish an adopted optimization, formal timing
+acceptance, total process memory or complete-spectrum scalability.
+
+On Windows, add `--benchmark-baseline PATH --baseline-revision FULL_SHA` to
+compare a frozen unoptimized Rust worker with `--rust-worker`. Commit the
+implementation/harness first and run without concurrent builds/tests. The
+controller retains one warmup and ten fresh-process paired samples per cell,
+seeded alternating order, full-output equality, construction time, process wall
+time and absolute peak working set. All-pair alpha/Rips, shell/filling controls
+and an alpha single-pair case retain adverse/no-benefit outcomes. It is a bounded
+resource snapshot; process memory includes input/runtime/output and is not an
+allocation peak. The raw manifest records both commits, binary/source/input
+hashes and the uncontrolled host-load limitation.
+
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
 release [example worker](../examples/persistent_laplacian.rs) with independently
 assembled signed boundaries, NumPy Schur and SVD nullspace computations, exact

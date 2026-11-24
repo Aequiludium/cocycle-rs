@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add bounded `persistent_laplacian::relevant_pair_laplacians`: checked rational
+  real-event scheduling, joint-bucket selection, new-chain orthogonalization and
+  owned full operators in every requested basis. Preserve duplicate requests,
+  zero extension and each start's lower term; reject overflow and resource limits.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

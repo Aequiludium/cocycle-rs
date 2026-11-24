@@ -130,6 +130,60 @@ adopt it as the default or establish online endpoint-update support.
 `fixed_endpoint_up_laplacians` performs the same elimination while returning
 only the tagged upper results, without constructing any source lower terms.
 
+## Relevant pairs and new chains
+
+`relevant_pair_laplacians` is an explicit bounded batch alternative for a
+nondecreasing same-source stage grid and a list of `(start_index,end_index)`
+requests. It preserves request order, duplicates and each request's full basis,
+scales and certificates. Equal births enter together; repeated grid scales use
+the earliest event index. A grid can skip birth scales. Each returned
+`RelevantPairLaplacian::operator()` is a full owned operator, while
+`representative()` identifies the evaluated upper term, or `None` for zero.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{SpectralOptions, relevant_pair_laplacians};
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![2], 0.)?,
+    Simplex::new(vec![1], 1.)?, Simplex::new(vec![0,1], 2.)?,
+    Simplex::new(vec![1,2], 2.)?,
+])?;
+let stages = [source.stage(0.)?, source.stage(1.)?, source.stage(2.)?];
+let results = relevant_pair_laplacians(&stages, &[(0,2), (0,0), (0,2)], 0,
+    SpectralOptions::default(), &Execution::default())?;
+assert_eq!(results[0].representative(), Some((0,2)));
+assert!((results[0].operator().matrix()[0] - 0.5).abs() < 1e-10);
+assert_eq!(results[1].representative(), None);
+assert_eq!(results[0].operator().matrix(), results[2].operator().matrix());
+# Ok::<(), cocycle::Error>(())
+```
+
+The implementation follows Kirchner--Vittorietti [Algorithms 1-2](https://arxiv.org/pdf/2611.09610v1#page=18).
+It retains signed R=B V over checked i128 rationals, including zero columns.
+Integer incidence has the same rank over Q and R. Overflow returns `SizeOverflow`;
+finite-field or uncertain floating pivots never prune the schedule. A pair can be
+selected by two different event buckets. Reconstruction chooses maximal endpoint
+then maximal start, embeds the upper matrix with zero rows/columns and adds the
+requested start's own lower term. Reusing the representative's full matrix would
+lose that lower term and the new domain's zero multiplicity.
+
+At an evaluated pair, all eligible V columns are orthonormalized together in final
+chain coordinates with twice-reorthogonalized Gram--Schmidt. Nearly dependent
+numerical columns fail rather than being discarded. `solver_residual()` reports
+Q-orthogonality and outside-K boundary error, as normalized in its rustdoc;
+these are numerical checks, not forward-error bounds. The event schedule alone
+is exact. Spectra remain complete numerical spectra, computed separately.
+
+Preparation retains dense rational boundary and transformation buffers; every
+rational entry uses 32 bytes. The existing entry cap also bounds those buffers,
+floating buffers, grid pair count and cumulative returned matrix entries.
+Buffers and owned metadata coexist, so this is not a total RAM quota. There is
+one cumulative execution budget and no automatic exhaustive fallback. This
+first implementation rebuilds the orthogonal basis at every needed selected
+pair; incremental bases and sparse scheduling are separate experiments. Fewer
+evaluated pairs alone do not establish end-to-end speedup or scalable full spectra.
+
 The default cap is 65,536 f64 entries per dense buffer, limiting the target
 q-basis to 256 entries. Fixed-endpoint results additionally cap their cumulative
 matrix entries. Buffers coexist; the cap is not a total RAM quota. Storage is
