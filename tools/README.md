@@ -19,6 +19,111 @@ snapshots do not establish native cross-library rankings or general speedups.
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Ordinary HeCS reproduction
+
+`reproduce_hecs.py` implements the bounded ordinary q=1 upper-Hodge experiment
+from [Issue #150](https://github.com/Aequiludium/cocycle-rs/issues/150).
+It is experiment infrastructure, with no production preconditioner API or
+persistent/eigensolver integration. The mathematical source is Savostianov,
+Tudisco and Guglielmi, [arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1),
+PDF Algorithms 5.1/6.1 (physical pages 10/15), Sections 6.2, 7.1 and 7.3.
+The PDF SHA-256 is
+`20f7fa2ba91d308a97b1ad98f9d688a4a6ae00ce630bd457dd9e71f1e6c6d537`.
+
+Keep downloaded sources and generated evidence under ignored `target/`:
+
+```sh
+python3 -m venv target/hecs-venv
+target/hecs-venv/bin/python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.11.0
+git clone https://github.com/COMPiLELab/HeCS target/hecs-author
+git -C target/hecs-author checkout cd4d23e5d53900ece219fc0cdafc5c5e1eb81bf3
+curl -L https://arxiv.org/pdf/2401.15492v1 -o target/hecs-paper.pdf
+target/hecs-venv/bin/python tools/reproduce_hecs.py --output target/hecs-round1 --author-source target/hecs-author --paper target/hecs-paper.pdf --julia /path/to/julia
+```
+
+On Windows the venv interpreter is `Scripts/python.exe`; the tested author
+runtime is Julia 1.10.10. The adapter uses only its LinearAlgebra, SparseArrays
+and SHA standard libraries with one BLAS thread. It checks source hashes and
+includes the unchanged pinned files; it does not run the plotting/large loops
+or install their unrelated packages. No author source is redistributed; a
+top-level license was not verified. Rust and Python implement the mathematics
+independently. `--fixtures PATH` replays saved JSON and `--case NAME` restricts a
+diagnostic run. Every output directory must be new.
+
+Both direct heavy selection and Section 6.2's preliminary 2-core peeling are
+exercised. The complete original vertex/edge skeleton stays in each fixture.
+Weight-descending order uses original triangle ID to resolve ties. Python/Rust
+choose the smallest free edge, while Julia's Set may choose another valid one;
+each certificate is replayed independently from vertex containment. Save every
+trial, rejection, selected triangle, collapse, permutation and factor. With
+`B=boundary_2`, weights mean `U=B diag(w) B^T`, never `B diag(w^2) B^T`.
+
+The compact factor is `C=(B[:,T] diag(sqrt(w[T])))[edge_order,:]`, shape m by r,
+with a nonsingular lower triangular r by r leading minor. Its weighted Gram
+identity and selected rank are checked independently. For the weighted shell
+`w=[1,2,4,8]`, faces 1,2,3 (zero-based IDs) are retained; `B0=B1-B2+B3` also gives
+an independent analytic active-matrix check. The ambient m by m upper Hodge is
+singular: only the r by r matrix `C+ U_permuted C+^T` is solved. A dense SVD oracle
+checks both the original equation and the lifted minimum-norm HeCS solution.
+GUDHI corroborates supported topology and simplex counts, never real spectra.
+
+The real-projective-plane control has rational rank 10, but heavy selection has
+rank 9. It must return `rank_loss`, rather than solve an incomplete active space.
+The Rust worker certifies image coverage by checked i128 unit-triangular solves
+and exact reconstruction of every original boundary column in every edge row.
+Overflow rejects the certificate. Its dense active Gram solve rejects ambiguous
+pivots; it adds no ridge and performs no fallback to the ambient inverse.
+
+CGLS starts at zero. Identity, diagonal and HeCS use the same compatible original
+RHS and fresh `||Ux-b||2 / max(1,||b||2) <= 1e-9` stopping target, with at most 4000
+iterations. The diagonal scale is `1/sqrt(Uii)` for positive entries, identity
+for zero entries. It may produce a different kernel component; compare its
+solution modulo ker(U). HeCS uses the Moore-Penrose lift. Traces retain iterates,
+alpha/beta/gamma and original/normal/recursive residuals. Zero RHS, breakdown,
+iteration limit and nonfinite arithmetic have explicit outcomes. The author's
+zero-RHS nonfinite result and empty-collapse exception are retained as source
+limitations. The adapter separately records that the README's `Perm` orientation
+and acceptance-order triangle lookup need not yield a triangular factor; the
+paper's explicit row/column indexing is the parity target.
+
+After Round 1 passes, compile the independent Rust worker and replay those bytes:
+
+```sh
+rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests
+target/hecs-tests
+rustc --edition 2024 -D warnings -C opt-level=3 tools/reference/hecs.rs -o target/hecs
+target/hecs-venv/bin/python tools/reproduce_hecs.py --parity-from target/hecs-round1 --rust-worker target/hecs --output target/hecs-round2
+```
+
+Worker stdin is whitespace-separated: `n m t peel`, m increasing vertex pairs,
+t increasing vertex triples followed by positive finite weights, and m finite
+RHS entries. Vertex IDs are in `0..n`; duplicate simplices, missing lower edges,
+trailing input and limits n>256, m>512, t>1024 are rejected. `peel` is 0 or 1.
+This bounded dense reference does not expose library execution/cancellation or
+memory-quota contracts. Ordinary Hodge/Dirac wrappers remain untouched.
+
+The only Round-3 candidate is `--adjacency` on the worker: dynamic adjacency sets
+replace rescanning for free edges. Round-2 parity checks both paths against the
+same certificates/factors/active matrices/statuses and original residuals. For
+a measured comparison, commit the worker/controller first, then run:
+
+```sh
+target/hecs-venv/bin/python tools/reproduce_hecs.py --compare-from target/hecs-round1 --rust-worker target/hecs --samples 10 --output target/hecs-collapse-comparison
+```
+
+The paired serial experiment retains one warmup and ten fresh-process samples
+per route on nine regenerated enriched triangulations and both peeling modes.
+Seed 150 fixes points, deleted/added edges, triangle weights and sample order;
+all arrays are exported. These are smaller Section 7.3-style inputs, not the
+authors' original data. Incomplete Cholesky is not run, so the comparison is
+narrower than the paper. Phase timings, factor nnz and failures are retained;
+process startup, I/O and final JSON export are outside worker timings. Dense
+reference costs and diagnostic trace construction are included. Peak process
+memory, amortized reuse and persistent inner/outer adaptation are unmeasured.
+No general speedup, sparse-scaling, production adoption or persistent guarantee
+follows from this experiment. Run source/document checks, the Python tool tests,
+standalone rustfmt/rustc tests and Rust MSRV checks for changes to this path.
+
 The existing Hodge checker also accepts `--path-convergence`: it records
 independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
 controls on the 1024-node path against its complete analytic spectrum, using the
