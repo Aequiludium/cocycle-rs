@@ -53,6 +53,8 @@ src/
   persistent_laplacian/
     mod.rs                       real stage-pair Schur operators and reverse elimination
     schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
+    operator.rs                  factorized persistent action and fixed row-space projection
+    lsmr.rs                      bounded undamped rectangular least-squares diagnostic
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/

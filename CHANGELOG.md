@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add a bounded undamped LSMR boundary-kernel diagnostic with owned numerical
+  solution/residual coordinates, fresh residuals, explicit iteration/input/vector
+  caps and cooperative execution controls. Preserve the fixed-projection action
+  API; right-hand-side-dependent solves do not certify a self-adjoint operator.
+
+- Add `PersistentLaplacianOperator` for fixed-projection real stage-pair actions
+  and explicitly bounded materialization, with owned basis/source metadata and
+  separate incidence, projection and vector limits. Preserve the existing dense
+  matrix and complete-spectrum API; numerical ranks remain uncertified.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

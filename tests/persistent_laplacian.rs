@@ -4,8 +4,9 @@ use cocycle::execution::Execution;
 use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
 use cocycle::persistent_laplacian::{
-    LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
-    fixed_endpoint_up_laplacians,
+    LaplacianComponent, LsmrOptions, OperatorOptions, PersistentLaplacian,
+    PersistentLaplacianOperator, SpectralOptions, fixed_endpoint_laplacians,
+    fixed_endpoint_up_laplacians, project_boundary_kernel_lsmr,
 };
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -24,6 +25,200 @@ fn close(a: &[f64], b: &[f64]) {
     for (x, y) in a.iter().zip(b) {
         assert!((x - y).abs() < 1e-9, "{a:?} != {b:?}");
     }
+}
+
+#[test]
+fn lsmr_returns_minimum_norm_fit_and_inconsistent_residual() {
+    // M=B2^T has dependent columns [1,2,0] and [2,4,0].
+    // Its minimum-norm fit of [3,6,7] is [3/5,6/5], residual [0,0,7].
+    let b2 = [1., 2., 0., 2., 4., 0.];
+    let result = project_boundary_kernel_lsmr(
+        &b2,
+        2,
+        3,
+        &[3., 6., 7.],
+        LsmrOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    close(&result.solution, &[0.6, 1.2]);
+    close(&result.projected, &[0., 0., 7.]);
+    assert!((result.residual_norm - 7.).abs() < 1e-10);
+    assert!(result.normal_residual_norm < 1e-10);
+    assert!(result.iterations > 0);
+}
+
+#[test]
+fn lsmr_empty_zero_and_stationary_inputs_have_explicit_shapes() {
+    for (b2, rows, columns, y, expected_x, expected_z) in [
+        (vec![], 0, 2, vec![1., 2.], vec![], vec![1., 2.]),
+        (vec![], 2, 0, vec![], vec![0., 0.], vec![]),
+        (
+            vec![0.; 6],
+            2,
+            3,
+            vec![1., 2., 3.],
+            vec![0., 0.],
+            vec![1., 2., 3.],
+        ),
+        (vec![1., 0.], 1, 2, vec![0., 3.], vec![0.], vec![0., 3.]),
+    ] {
+        let result = project_boundary_kernel_lsmr(
+            &b2,
+            rows,
+            columns,
+            &y,
+            LsmrOptions {
+                max_iterations: Some(0),
+                ..Default::default()
+            },
+            &Execution::default(),
+        )
+        .unwrap();
+        close(&result.solution, &expected_x);
+        close(&result.projected, &expected_z);
+        assert_eq!(result.iterations, 0);
+        assert_eq!(result.normal_residual_norm, 0.);
+    }
+}
+
+#[test]
+fn lsmr_rejects_invalid_inputs_caps_and_unconverged_output() {
+    let matrix = [1., 0., 0., 0., 2., 0., 0., 0., 4.];
+    for limit in [0, 1] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(
+                &matrix,
+                3,
+                3,
+                &[1.; 3],
+                LsmrOptions {
+                    max_iterations: Some(limit),
+                    ..Default::default()
+                },
+                &Execution::default()
+            ),
+            Err(Error::NumericalFailure {
+                context: "LSMR iteration limit"
+            })
+        ));
+    }
+    for options in [
+        LsmrOptions {
+            max_matrix_entries: 8,
+            ..Default::default()
+        },
+        LsmrOptions {
+            max_vector_entries: 2,
+            ..Default::default()
+        },
+        LsmrOptions {
+            relative_tolerance: f64::NAN,
+            ..Default::default()
+        },
+        LsmrOptions {
+            relative_tolerance: 0.,
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(&matrix, 3, 3, &[1.; 3], options, &Execution::default()),
+            Err(Error::InvalidParameter { .. })
+        ));
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[],
+            usize::MAX,
+            2,
+            &[],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::SizeOverflow { .. })
+    ));
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[],
+            1,
+            1,
+            &[1.],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[1.],
+            1,
+            1,
+            &[],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    for (matrix, y) in [([f64::INFINITY], [1.]), ([1.], [f64::NAN])] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(
+                &matrix,
+                1,
+                1,
+                &y,
+                LsmrOptions::default(),
+                &Execution::default()
+            ),
+            Err(Error::NonFiniteValue { .. })
+        ));
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[f64::MAX],
+            1,
+            1,
+            &[f64::MAX],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::NumericalFailure { .. })
+    ));
+    // The raw paper recurrence forms products of rotation scales. This simple
+    // rewrite rejects overflow/underflow, rather than silently losing an update.
+    for (boundary, rhs, context) in [
+        (1e200, 1e-100, "LSMR nonfinite arithmetic"),
+        (1e-200, 1e100, "LSMR rotation scale underflow"),
+        (1e-200, 1e-200, "LSMR normal scale underflow"),
+    ] {
+        assert!(
+            matches!(project_boundary_kernel_lsmr(&[boundary], 1, 1, &[rhs],
+            LsmrOptions::default(), &Execution::default()),
+            Err(Error::NumericalFailure { context: actual }) if actual == context)
+        );
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &matrix,
+            3,
+            3,
+            &[1.; 3],
+            LsmrOptions::default(),
+            &Execution::default().max_work(0)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &matrix,
+            3,
+            3,
+            &[1.; 3],
+            LsmrOptions::default(),
+            &Execution::default().cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
 }
 #[test]
 fn long_thin_filtrations_keep_direct_and_reverse_operators_consistent() {
@@ -105,6 +300,203 @@ fn path_kron_and_owned_action() {
         cocycle::filtration::Coverage::Complete
     );
     assert_eq!(result.construction_dimension(), None);
+}
+
+#[test]
+fn fixed_projection_action_and_bounded_materialization() {
+    let operator = {
+        let source = complex(&[
+            (&[0], 0.),
+            (&[2], 0.),
+            (&[1], 1.),
+            (&[0, 1], 2.),
+            (&[1, 2], 2.),
+        ]);
+        PersistentLaplacianOperator::new(
+            &source.stage(0.).unwrap(),
+            &source.stage(2.).unwrap(),
+            0,
+            OperatorOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap()
+    };
+    close(
+        &operator.materialize(4, &Execution::default()).unwrap(),
+        &[0.5, -0.5, -0.5, 0.5],
+    );
+    close(
+        &operator.action(&[1., -1.], &Execution::default()).unwrap(),
+        &[1., -1.],
+    );
+    assert_eq!(operator.projection_rank(), 1);
+    assert_eq!(operator.projection_entries(), 2);
+    assert_eq!(operator.basis()[0].vertices(), &[2]);
+    assert_eq!(operator.degree(), 0);
+    assert_eq!(operator.scales(), (0., 2.));
+    assert!(operator.source_context().is_none());
+    assert_eq!(
+        operator.source_coverage(),
+        cocycle::filtration::Coverage::Complete
+    );
+    assert_eq!(operator.construction_dimension(), None);
+    assert!(matches!(
+        operator.materialize(3, &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[], &Execution::default()),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[f64::NAN, 0.], &Execution::default()),
+        Err(Error::NonFiniteValue { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[f64::MAX, f64::MAX], &Execution::default()),
+        Err(Error::NumericalFailure { .. })
+    ));
+    assert!(
+        operator
+            .action(&[1., -1.], &Execution::new(Some(0), None))
+            .is_err()
+    );
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        operator.action(&[1., -1.], &Execution::new(None, Some(&flag))),
+        Err(Error::Cancelled)
+    ));
+}
+
+#[test]
+fn factorized_degenerate_limits_and_inclusion() {
+    let empty = complex(&[]);
+    let stage = empty.stage(0.).unwrap();
+    let op = PersistentLaplacianOperator::new(
+        &stage,
+        &stage,
+        2,
+        OperatorOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    assert!(op.action(&[], &Execution::default()).unwrap().is_empty());
+    assert!(op.materialize(0, &Execution::default()).unwrap().is_empty());
+    let source = complex(&[
+        (&[0], 0.),
+        (&[2], 0.),
+        (&[1], 1.),
+        (&[0, 1], 2.),
+        (&[1, 2], 2.),
+    ]);
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(2.).unwrap();
+    let other = source.clone();
+    let make =
+        |options| PersistentLaplacianOperator::new(&k, &l, 0, options, &Execution::default());
+    for options in [
+        OperatorOptions {
+            max_incidence_entries: 0,
+            ..Default::default()
+        },
+        OperatorOptions {
+            max_projection_entries: 0,
+            ..Default::default()
+        },
+        OperatorOptions {
+            max_vector_entries: 1,
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(make(options), Err(Error::InvalidParameter { .. })));
+    }
+    assert!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &other.stage(2.).unwrap(),
+            0,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        PersistentLaplacianOperator::new(
+            &l,
+            &k,
+            0,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &l,
+            usize::MAX,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(matches!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &l,
+            0,
+            OperatorOptions::default(),
+            &Execution::new(Some(0), None)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+}
+
+#[test]
+fn sparse_persistent_action_exceeds_dense_cap_with_nontrivial_projection() {
+    let n = 257;
+    let mut cells: Vec<_> = (0..n).map(|v| Simplex::new(vec![v], 0.).unwrap()).collect();
+    cells.push(Simplex::new(vec![n], 1.).unwrap());
+    cells.extend((0..n).map(|v| Simplex::new(vec![v, n], 2.).unwrap()));
+    let source = SimplicialComplex::new(cells).unwrap();
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(2.).unwrap();
+    let op = PersistentLaplacianOperator::new(
+        &k,
+        &l,
+        0,
+        OperatorOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    assert_eq!(op.options().spectral.max_dense_entries, 65_536);
+    assert_eq!(op.projection_rank(), 1);
+    assert_eq!(op.projection_entries(), n);
+    assert_eq!(op.incidence_entries(), n);
+    let x: Vec<_> = (0..n).map(|i| (i % 17) as f64 / 17.).collect();
+    let mean = x.iter().sum::<f64>() / n as f64;
+    let expected: Vec<_> = x.iter().map(|x| x - mean).collect();
+    close(&op.action(&x, &Execution::default()).unwrap(), &expected);
+    assert!(matches!(
+        op.materialize(usize::MAX, &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    assert!(matches!(
+        PersistentLaplacian::compute(&k, &l, 0, SpectralOptions::default(), &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    // Projection storage is an independent cumulative cap, not the dense cap.
+    let small = OperatorOptions {
+        max_projection_entries: n - 1,
+        ..Default::default()
+    };
+    assert!(matches!(
+        PersistentLaplacianOperator::new(&k, &l, 0, small, &Execution::default()),
+        Err(Error::InvalidParameter {
+            parameter: "max_projection_entries",
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -227,6 +619,20 @@ fn basis_permutation_and_orientation_under_relabeling() {
     ]);
     let x = pair(&a, 1., 3., 1);
     let y = pair(&b, 1., 3., 1);
+    for (source, expected) in [(&a, &x), (&b, &y)] {
+        let operator = PersistentLaplacianOperator::new(
+            &source.stage(1.).unwrap(),
+            &source.stage(3.).unwrap(),
+            1,
+            OperatorOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        close(
+            &operator.materialize(4, &Execution::default()).unwrap(),
+            expected.matrix(),
+        );
+    }
     close(
         &x.spectrum(&Execution::default()).unwrap().eigenvalues,
         &y.spectrum(&Execution::default()).unwrap().eigenvalues,
@@ -370,6 +776,16 @@ fn certified_missing_skeleton_is_not_an_empty_upper_boundary() -> Result<()> {
     let p = PointCloudView::new(&[0., 0., 1., 0., 0., 1.], 3, 2)?;
     let source = RipsBuilder::from_points(p).build_complex(1)?;
     let k = source.stage(2.)?;
+    assert!(matches!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &k,
+            1,
+            OperatorOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::InsufficientSkeleton { .. })
+    ));
     assert!(matches!(
         PersistentLaplacian::compute(&k, &k, 1, SpectralOptions::default(), &Execution::default()),
         Err(Error::InsufficientSkeleton { .. })
