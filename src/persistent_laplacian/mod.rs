@@ -8,8 +8,17 @@
 //! Signed incidence is assembled directly; no dense boundary matrix is required.
 //! Dense Gram/Schur buffers have explicit limits before allocation. A large
 //! source is rejected rather than silently densified beyond those limits.
+//! Separate raw-coordinate operations provide bounded dual Grams, component
+//! spectral union and genuine harmonic restriction with paper-basic LOBPCG.
+//! They do not change stage-pair construction or complete `spectrum()` output.
 
 mod schur;
+mod split;
+
+pub use split::{
+    GramSpectrum, HarmonicRestriction, PositiveEigenpairs, SplitSpectrum, gram_spectrum,
+    split_spectrum,
+};
 
 use crate::complex::{Simplex, SimplexId};
 use crate::execution::{Execution, WorkBudget};
@@ -33,6 +42,8 @@ pub enum LaplacianComponent {
 pub struct SpectralOptions {
     /// Relative eigenvalue cutoff for the Schur pseudoinverse (default 1e-12).
     /// Also controls Jacobi convergence and the stepwise zero-pivot test.
+    /// Separate Gram/restriction operations use it for numerical rank; their
+    /// dense eigensolves use a fixed machine-level convergence tolerance.
     pub relative_tolerance: f64,
     /// Maximum relative eigensystem/range residual (default 1e-9).
     /// Also bounds the accumulated positive-mode discarded Schur correction,

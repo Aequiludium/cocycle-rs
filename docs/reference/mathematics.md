@@ -1130,6 +1130,16 @@ its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
 z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
 exact ranks from arbitrary floating-point near-zero cutoffs.
 
+Positive dual Gram modes lift by `v=A^T z/sqrt(lambda)`. A supplied complete
+harmonic kernel N must satisfy Delta N=0 in the actual real coordinates. An
+orthonormal complement X gives the positive restriction X^T Delta X. The
+connected edge refutes replacing N with arbitrary homology representatives:
+Delta*[1,0]^T=[1,-1]^T for Delta=[[1,-1],[-1,1]]. The
+[bounded Rust rewrite](../research/split-spectral-rust.md) independently checks
+these operations and basic LOBPCG Algorithms 1/2 against the frozen first-round
+transcription. It retains numerical ambiguity and uncertified iterative index
+coverage; complete persistent spectra remain unchanged.
+
 The implementation exposes full/upper/lower results and separately tagged
 spectra. The lower term depends only on K and requires its q-skeleton; it does
 not require L or a q+1 skeleton. Full and upper operators retain the stronger

@@ -16,6 +16,40 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  split-spectral-rust:
+    name: Split-spectral Rust parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Aequiludium/cocycle-rs
+          ref: 8ee8f49b1aed55816456a0ef46eeec2501151235
+          path: target/split-round1-reference
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.98.1
+      - run: python -m pip install numpy==2.2.6 scipy==1.15.3 sympy==1.14.0 gudhi==3.12.0
+      - run: python -m unittest discover -s tools -p 'test_compare_split_spectra.py' -v
+      - run: cargo build --locked --release --example split_spectra
+      - run: python tools/compare_split_spectra.py --worker target/release/examples/split_spectra --reference target/split-round1-reference/tools/reproduce_split_spectra.py --output target/split-rust-parity
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: split-rust-parity-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: target/split-rust-parity/
+
   operator-reference:
     name: F2 operator reference comparisons
     runs-on: ubuntu-latest

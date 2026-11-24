@@ -2,6 +2,74 @@
 
 [Documentation](../index.md) / Usage
 
+## Bounded Gram and harmonic-restriction operations
+
+The Unreleased `gram_spectrum`, `split_spectrum` and `HarmonicRestriction` APIs
+provide the bounded Rust rewrite for Issue #145. Inputs are explicit row-major
+real-coordinate matrices with standard inner products. They own their results;
+no source inclusion, degree, pair or simplex labels are inferred from a matrix.
+Keep the originating `PersistentLaplacian` and its basis/source metadata when
+using its `matrix()` as input. Existing `spectrum()` still returns its complete
+unfiltered numerical spectrum.
+
+```rust
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{gram_spectrum, HarmonicRestriction, SpectralOptions};
+
+let options = SpectralOptions::default();
+let execution = Execution::default();
+// Signed vertex-edge boundary of a triangle, in explicit coordinate order.
+let a = [-1., -1., 0., 1., 0., -1., 0., 1., 1.];
+let grams = gram_spectrum(&a, 3, 3, options, &execution)?;
+assert_eq!(grams.numerical_rank, 2);
+assert_eq!(grams.reconstructed.len(), 3);
+
+// The connected edge has actual harmonic kernel span([1,1]), not [1,0].
+let h = [1., -1., -1., 1.];
+let positive = HarmonicRestriction::compute(&h, 2, &[1., 1.], 1, options, &execution)?;
+let pairs = positive.smallest_eigenpairs(&[1., -1.], 1, 1, 120, 1e-9, &execution)?;
+assert!((pairs.values[0] - 2.).abs() < 1e-10);
+assert!(pairs.residuals[0] < 1e-9);
+assert!(!pairs.is_index_coverage_certified());
+# Ok::<(), cocycle::Error>(())
+```
+
+`gram_spectrum(A,m,n,...)` constructs **both** complete Grams, their full raw
+spectra and lifted positive dual vectors. It reconstructs n values from the
+numerical positive rank, with multiplicity. `dual_is_smaller` is advisory shape
+metadata; it does not select a faster implementation. `split_spectrum(A,m,n,F,p,...)`
+checks the chain product and merges only positive component values, adding
+`n-rank(A)-rank(F)` numerical zeros. F must already include the correct kernel
+metric. It does not construct a persistent boundary from arbitrary factors.
+
+`HarmonicRestriction::compute(H,n,N,k,...)` verifies and normalizes the supplied
+kernel, constructs its orthonormal complement X and retains the complete
+`X^T H X` spectrum and original-coordinate vectors. Preparation deliberately
+uses complete dense decompositions. A tiny positive value is retained and marked
+ambiguous within ten times `relative_tolerance * ||H||2`. The separate partial
+iteration rejects an ambiguous positive domain or an excessive request.
+Numerical kernel/rank tests are not exact homology certificates.
+
+Initial iteration columns are **n by block_size in original coordinates** and
+are projected by X^T. The requested count must not exceed the block or reduced
+domain. Basic LOBPCG uses identity preconditioning, diagonal metric scaling and
+checked Cholesky. A dependent search, metric condition above 1e12 or iteration
+exhaustion returns an error. It does not use the first-round SVD search correction
+or robust Algorithm 8. Returned residuals are freshly measured against H and
+normalized by `max(1,||H||2)`; leakage and orthogonality are also checked. Residual
+success does not certify smallest indexes or multiplicity outside the block.
+
+Each terminal shares one `Execution` budget through preparation, projection,
+solves and final verification. Every dense buffer obeys `max_dense_entries`;
+buffers coexist, so the cap is not a process memory quota. Both Gram dimensions
+must fit the cap. These are unoptimized baselines: they add no automatic side
+selection, lower cache, range-only method or speedup claim. Run
+`cargo run --locked --example split_spectra` for the example, and see the
+[Round-2 parity protocol](../research/split-spectral-rust.md) for independent
+reference checks and failure records.
+
+## Pair construction and complete spectra
+
 The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
 Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
 Its private Jacobi solver retains its own convergence/error/resource policy.
