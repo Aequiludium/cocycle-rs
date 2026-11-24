@@ -348,7 +348,7 @@ def orientation_controls():
     return records
 
 
-def run(output, sources, worker, gudhi):
+def run(output, sources, worker, gudhi, operator=False):
     import numpy as np
     import scipy
     # A new directory is mandatory, including for failed runs.
@@ -437,19 +437,31 @@ def run(output, sources, worker, gudhi):
     if worker:
         frozen = output / ("worker.exe" if sys.platform == "win32" else "worker")
         shutil.copy2(worker, frozen)
-        process = subprocess.run([str(frozen.resolve()), "--oracle"], input=data,
+        process = subprocess.run([str(frozen.resolve()), "--operator" if operator else "--oracle"], input=data,
                                  capture_output=True, text=True)
         (output / "worker-stdout.txt").write_text(process.stdout, encoding="utf-8")
         (output / "worker-stderr.txt").write_text(process.stderr, encoding="utf-8")
         process.check_returncode()
-        records = list(reference.parse_worker(process.stdout))
+        lines = process.stdout.splitlines()
+        factorized = [line for line in lines if line.startswith("FACTORIZED_")]
+        records = list(reference.parse_worker("\n".join(line for line in lines
+                                                        if not line.startswith("FACTORIZED_"))))
         if len(records) != len(rows):
             raise AssertionError("Rust pair count mismatch")
-        for record, row in zip(records, rows):
+        if operator and len(factorized) != 3 * len(rows):
+            raise AssertionError("missing factorized operator output")
+        for index, (record, row) in enumerate(zip(records, rows)):
             detail = json.loads((output / row["artifact"]).read_text())
             expected = np.array([[float(Fraction(x)) for x in line]
                                  for line in detail["exact_delta"]]).reshape(record["MATRIX"].shape)
             check_close(record["MATRIX"], expected, "existing Rust Schur")
+            if operator:
+                values = [np.array([float(x) for x in line.split()[1:]])
+                          for line in factorized[3*index:3*index+3]]
+                check_close(values[0].reshape(expected.shape), expected, "Rust fixed operator")
+                check_close(values[1], expected @ np.array(detail["frozen_x"]), "Rust fixed action")
+                if not np.isfinite(values[2]).all() or max(values[2], default=0) > RESIDUAL_TOLERANCE:
+                    raise AssertionError("Rust projection residual")
     topology = None
     if gudhi:
         import gudhi as gd
@@ -490,6 +502,7 @@ def run(output, sources, worker, gudhi):
                "maximum_matrix_frobenius_error": maximum_matrix,
                "maximum_fresh_eigenpair_residual": maximum_residual,
                "solver_controls": 12, "rust_schur_compared": bool(worker),
+               "rust_operator_compared": operator,
                "gudhi": topology is not None,
                "limitations": ["no MATLAB/Octave execution", "no PETLS execution",
                    "LSMR composition diagnostics do not certify a fixed self-adjoint action",
@@ -509,8 +522,11 @@ def main():
     parser.add_argument("--sources", type=Path, required=True)
     parser.add_argument("--worker", type=Path)
     parser.add_argument("--gudhi", action="store_true")
+    parser.add_argument("--operator", action="store_true", help="also compare the Rust factorized operator")
     args = parser.parse_args()
-    run(args.output, args.sources, args.worker, args.gudhi)
+    if args.operator and not args.worker:
+        parser.error("--operator requires --worker")
+    run(args.output, args.sources, args.worker, args.gudhi, args.operator)
 
 
 if __name__ == "__main__":

@@ -2,13 +2,19 @@
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
-    PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator, SpectralOptions,
+    fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
 };
 use std::io::{self, Read};
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [command, n, actions] = args.as_slice()
+        && command == "--operator-benchmark"
+    {
+        return operator_benchmark(n.parse()?, actions.parse()?);
+    }
     if args.is_empty() {
         let source = SimplicialComplex::new(vec![
             Simplex::new(vec![0], 0.)?,
@@ -45,11 +51,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
-    let (benchmark, components) = match args.as_slice() {
-        [a] if a == "--oracle" => (None, false),
-        [a] if a == "--components" => (None, true),
+    let (benchmark, components, operator) = match args.as_slice() {
+        [a] if a == "--oracle" => (None, false, false),
+        [a] if a == "--components" => (None, true, false),
+        [a] if a == "--operator" => (None, false, true),
         [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => {
-            (Some(b.as_str()), false)
+            (Some(b.as_str()), false, false)
         }
         _ => {
             return Err(
@@ -146,6 +153,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 spectrum.residual,
                 step.solver_residual()
             );
+            if operator {
+                let factorized = PersistentLaplacianOperator::new(
+                    k,
+                    &target,
+                    degree,
+                    OperatorOptions {
+                        spectral: options,
+                        ..Default::default()
+                    },
+                    &execution,
+                )?;
+                print_values(
+                    "FACTORIZED_MATRIX",
+                    &factorized.materialize(4_000_000, &execution)?,
+                );
+                print_values("FACTORIZED_ACTION", &factorized.action(&x, &execution)?);
+                println!("FACTORIZED_RESIDUAL {}", factorized.projection_residual());
+            }
             if let Some(upper_steps) = &upper_steps {
                 let up = PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?;
                 let down = PersistentLaplacian::compute_down(k, degree, options, &execution)?;
@@ -175,6 +200,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+    Ok(())
+}
+
+fn operator_benchmark(n: usize, actions: usize) -> Result<(), Box<dyn std::error::Error>> {
+    // Project control: n retained leaves and one late center. U=I-11^T/n.
+    // Source creation is separate from operator preparation and action timing.
+    if n == 0 || n > 4096 || actions == 0 || actions > 100_000 {
+        return Err("benchmark requires 1 <= n <= 4096 and 1 <= actions <= 100000".into());
+    }
+    let begin = Instant::now();
+    let mut cells: Vec<_> = (0..n)
+        .map(|v| Simplex::new(vec![v], 0.))
+        .collect::<cocycle::Result<_>>()?;
+    cells.push(Simplex::new(vec![n], 1.)?);
+    cells.extend((0..n).map(|v| Simplex::new(vec![v, n], 2.).unwrap()));
+    let source = SimplicialComplex::new(cells)?;
+    let k = source.stage(0.)?;
+    let l = source.stage(2.)?;
+    let source_seconds = begin.elapsed().as_secs_f64();
+    let execution = Execution::default();
+    let begin = Instant::now();
+    let operator =
+        PersistentLaplacianOperator::new(&k, &l, 0, OperatorOptions::default(), &execution)?;
+    let setup_seconds = begin.elapsed().as_secs_f64();
+    let x: Vec<_> = (0..n).map(|i| (i % 17) as f64 / 17.).collect();
+    let mean = x.iter().sum::<f64>() / n as f64;
+    let begin = Instant::now();
+    let mut checksum = 0.;
+    for _ in 0..actions {
+        let result = operator.action(&x, &execution)?;
+        if result
+            .iter()
+            .zip(&x)
+            .any(|(y, x)| (y - (x - mean)).abs() > 1e-10)
+        {
+            return Err("star action disagrees with analytic I-11^T/n".into());
+        }
+        checksum += result.iter().map(|v| v * v).sum::<f64>();
+    }
+    let actions_seconds = begin.elapsed().as_secs_f64();
+    println!(
+        "{{\"n\":{n},\"actions\":{actions},\"source_seconds\":{source_seconds},\"setup_seconds\":{setup_seconds},\"actions_seconds\":{actions_seconds},\"incidence_entries\":{},\"projection_entries\":{},\"checksum\":{checksum}}}",
+        operator.incidence_entries(),
+        operator.projection_entries()
+    );
     Ok(())
 }
 fn next<T: std::str::FromStr>(

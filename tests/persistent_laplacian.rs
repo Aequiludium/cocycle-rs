@@ -4,8 +4,8 @@ use cocycle::execution::Execution;
 use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
 use cocycle::persistent_laplacian::{
-    LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
-    fixed_endpoint_up_laplacians,
+    LaplacianComponent, OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator,
+    SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
 };
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -105,6 +105,156 @@ fn path_kron_and_owned_action() {
         cocycle::filtration::Coverage::Complete
     );
     assert_eq!(result.construction_dimension(), None);
+}
+
+#[test]
+fn fixed_projection_action_and_bounded_materialization() {
+    let operator = {
+        let source = complex(&[
+            (&[0], 0.),
+            (&[2], 0.),
+            (&[1], 1.),
+            (&[0, 1], 2.),
+            (&[1, 2], 2.),
+        ]);
+        PersistentLaplacianOperator::new(
+            &source.stage(0.).unwrap(),
+            &source.stage(2.).unwrap(),
+            0,
+            OperatorOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap()
+    };
+    close(
+        &operator.materialize(4, &Execution::default()).unwrap(),
+        &[0.5, -0.5, -0.5, 0.5],
+    );
+    close(
+        &operator.action(&[1., -1.], &Execution::default()).unwrap(),
+        &[1., -1.],
+    );
+    assert_eq!(operator.projection_rank(), 1);
+    assert_eq!(operator.projection_entries(), 2);
+    assert_eq!(operator.basis()[0].vertices(), &[2]);
+    assert_eq!(operator.degree(), 0);
+    assert_eq!(operator.scales(), (0., 2.));
+    assert!(operator.source_context().is_none());
+    assert_eq!(
+        operator.source_coverage(),
+        cocycle::filtration::Coverage::Complete
+    );
+    assert_eq!(operator.construction_dimension(), None);
+    assert!(matches!(
+        operator.materialize(3, &Execution::default()),
+        Err(Error::InvalidParameter { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[], &Execution::default()),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[f64::NAN, 0.], &Execution::default()),
+        Err(Error::NonFiniteValue { .. })
+    ));
+    assert!(matches!(
+        operator.action(&[f64::MAX, f64::MAX], &Execution::default()),
+        Err(Error::NumericalFailure { .. })
+    ));
+    assert!(
+        operator
+            .action(&[1., -1.], &Execution::new(Some(0), None))
+            .is_err()
+    );
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        operator.action(&[1., -1.], &Execution::new(None, Some(&flag))),
+        Err(Error::Cancelled)
+    ));
+}
+
+#[test]
+fn factorized_degenerate_limits_and_inclusion() {
+    let empty = complex(&[]);
+    let stage = empty.stage(0.).unwrap();
+    let op = PersistentLaplacianOperator::new(
+        &stage,
+        &stage,
+        2,
+        OperatorOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    assert!(op.action(&[], &Execution::default()).unwrap().is_empty());
+    assert!(op.materialize(0, &Execution::default()).unwrap().is_empty());
+    let source = complex(&[
+        (&[0], 0.),
+        (&[2], 0.),
+        (&[1], 1.),
+        (&[0, 1], 2.),
+        (&[1, 2], 2.),
+    ]);
+    let k = source.stage(0.).unwrap();
+    let l = source.stage(2.).unwrap();
+    let other = source.clone();
+    let make =
+        |options| PersistentLaplacianOperator::new(&k, &l, 0, options, &Execution::default());
+    for options in [
+        OperatorOptions {
+            max_incidence_entries: 0,
+            ..Default::default()
+        },
+        OperatorOptions {
+            max_projection_entries: 0,
+            ..Default::default()
+        },
+        OperatorOptions {
+            max_vector_entries: 1,
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(make(options), Err(Error::InvalidParameter { .. })));
+    }
+    assert!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &other.stage(2.).unwrap(),
+            0,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        PersistentLaplacianOperator::new(
+            &l,
+            &k,
+            0,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &l,
+            usize::MAX,
+            OperatorOptions::default(),
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(matches!(
+        PersistentLaplacianOperator::new(
+            &k,
+            &l,
+            0,
+            OperatorOptions::default(),
+            &Execution::new(Some(0), None)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
 }
 
 #[test]

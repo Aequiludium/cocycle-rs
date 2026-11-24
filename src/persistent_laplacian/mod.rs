@@ -9,7 +9,9 @@
 //! Dense Gram/Schur buffers have explicit limits before allocation. A large
 //! source is rejected rather than silently densified beyond those limits.
 
+mod operator;
 mod schur;
+pub use operator::{OperatorOptions, PersistentLaplacianOperator};
 
 use crate::complex::{Simplex, SimplexId};
 use crate::execution::{Execution, WorkBudget};
