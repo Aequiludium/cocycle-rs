@@ -301,26 +301,45 @@ and an existing complete Round-1 output.
 
 ## Integrated spectral resource snapshots
 
-`benchmark_spectral_integration.py` compares committed verification workers with
-their original PR revisions on Windows. First run the relevant independent
-correctness controller and retain its validated input files. Supply a JSON object
-with a `cells` list; each entry has `name`, full `baseline` SHA, worker `source`
-path, optional `args`/`cfg` lists and `stdin_file` or `argument_file`.
+`benchmark_spectral_integration.py` compares explicit **unaccelerated algorithms**
+with alternative routes in the same integrated Windows build. A PR-head versus
+integrated-head comparison measures integration regression and is rejected here.
+The [maintained report](../benches/reports/spectral-integration.md) identifies
+which current APIs actually accelerate a workload and which remain reference or
+approximation experiments.
+
+First freeze independently validated inputs and expected results. Supply a JSON
+object with `cells`: each has `name`, `baseline_description`,
+`candidate_description`, `oracle_file`, `tolerance` and `routes`. The two route
+objects, `baseline` and `candidate`, each name a worker `source`, optional
+`args`/`cfg`, and `stdin_file` or `argument_file`. Oracles contain a `values` array
+for each route. Exact workflows use the same mathematical expectation; approximate
+ones retain separate expected sampled output and explicit quality diagnostics.
 
 ```sh
 python tools/benchmark_spectral_integration.py --specification target/integration-plan.json --output target/benchmarks/commit-CANDIDATE/spectral-integration/run-001
 ```
 
-The controller exports immutable Git sources and builds both revisions with the
-same `rustc -C opt-level=3` flags. It runs one discarded warmup and ten serial
+The controller exports one immutable Git source tree and builds all workers with
+the same `rustc -C opt-level=3` flags. It runs one discarded warmup and ten serial
 fresh-process paired rounds, with balanced order per cell. A private generated
 wrapper times worker main through flushed output, including fixture I/O, parsing,
 computation, validation and export. Process wall time and absolute peak working
-set are separate. Full output comparisons preserve labels and integer identities;
-float absolute/relative tolerance is 1e-10. JSON timing fields and the `BATCH`
-header's elapsed time and `SETUP_SECONDS`/`SOLVE_SECONDS`/`TOTAL_SECONDS` are
-excluded; requested/solved pair counts remain checked.
+set are separate. Every returned payload is checked against its independent
+oracle with the predeclared scaled Frobenius/Euclidean tolerance. Weighted-solve
+rows also require a freshly recomputed original-equation residual <= 1e-9.
 Mismatch, nonzero exit or timeout stops the run with retained diagnostics.
+
+`reference/spectral_comparison.rs` supplies dense-Schur/factorized actions,
+full-dense/current Gram or harmonic APIs, exhaustive/relevant-pair construction,
+and generic/non-branching construction with optional complete spectra. The
+subspace worker's `--summary` retains eigenvalues and original-coordinate
+projectors, with cold/warm/ordered routes selected by the frozen protocol.
+`reference/hecs.rs --identity-only` supplies unpreconditioned CGLS; the public
+HeCS example's `--stdin --solution-only` returns the same minimum-norm solution
+payload. The sparsification worker's `--benchmark exact|sampled` separates exact
+Gram cost from the complete current sampling prototype; its quality failures
+remain visible and are not exact-output speedups.
 
 Commit the controller and candidate before running, keep local builds/tests idle,
 and retain all inputs, source/binary hashes, raw samples and median/min/max under

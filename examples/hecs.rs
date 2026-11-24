@@ -27,7 +27,7 @@ fn rows(a: &[f64], count: usize, columns: usize) -> Vec<&[f64]> {
         .map(|i| &a[i * columns..(i + 1) * columns])
         .collect()
 }
-fn emit(input: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn emit(input: &str, solution_only: bool) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut tokens = input.split_whitespace();
     let mut take = || tokens.next().ok_or("missing fixture token");
     let n: usize = take()?.parse()?;
@@ -101,6 +101,14 @@ fn emit(input: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
         other => other?,
     };
+    if solution_only {
+        println!(
+            "{{\"values\":{:?},\"iterations\":{}}}",
+            solution.values(),
+            solution.residual_history().len().saturating_sub(1)
+        );
+        return Ok(());
+    }
     let r = solution.rank();
     let trace: Vec<_> = solution
         .residual_history()
@@ -123,16 +131,17 @@ fn emit(input: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
 }
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args == ["--stdin"] {
+    if args == ["--stdin"] || args == ["--stdin", "--solution-only"] {
         let mut input = String::new();
         io::stdin().read_to_string(&mut input)?;
-        emit(&input)
+        emit(&input, args.len() == 2)
     } else if args.is_empty() {
         // Four lexicographic faces, weights [1,2,4,8], compatible hand-derived b.
         emit(
             "4 6 4 0  0 1 0 2 0 3 1 2 1 3 2 3  0 1 2 1 0 1 3 2 0 2 3 4 1 2 3 8  2 -22 20 -22 24 -44",
+            false,
         )
     } else {
-        Err("only optional argument is --stdin".into())
+        Err("expected --stdin [--solution-only] or no arguments".into())
     }
 }

@@ -153,6 +153,11 @@ jobs:
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo build --locked
+      - name: Test unaccelerated spectral comparison controls
+        run: |
+          rustfmt --edition 2024 --check tools/reference/spectral_comparison.rs
+          rustc --edition 2024 -D warnings --test tools/reference/spectral_comparison.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/spectral-comparison-tests
+          target/spectral-comparison-tests
       - name: Test the bounded sparsification Rust worker
         run: |
           rustfmt --edition 2024 --check tools/reference/sparsification.rs

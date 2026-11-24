@@ -92,6 +92,13 @@ fn native_draws(probabilities: &[f64], count: usize, seed: u64) -> Vec<usize> {
 }
 
 fn evaluate(input: &str) -> Result<String, Box<dyn std::error::Error>> {
+    evaluate_route(input, None)
+}
+
+fn evaluate_route(
+    input: &str,
+    benchmark: Option<&str>,
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut tokens = input.split_whitespace();
     let first = tokens.next().ok_or("missing request")?;
     let native = first == "native";
@@ -163,6 +170,15 @@ fn evaluate(input: &str) -> Result<String, Box<dyn std::error::Error>> {
         .collect::<Result<_, _>>()?;
     if tokens.next().is_some() {
         return Err("trailing input".into());
+    }
+    if benchmark == Some("exact") {
+        let mut values = vec![0.; n * n];
+        for i in 0..n {
+            for j in 0..n {
+                values[i * n + j] = (0..p).map(|k| b[i * p + k] * b[j * p + k]).sum();
+            }
+        }
+        return Ok(format!("{{\"values\":{values:?}}}"));
     }
     let hodge = HodgeLaplacian::new(&source, 0, HodgeSelection::Upper)?;
     let spectrum = hodge.spectrum(0..n, &SpectrumOptions::default(), &Execution::default())?;
@@ -274,6 +290,9 @@ fn evaluate(input: &str) -> Result<String, Box<dyn std::error::Error>> {
         return Err("nonfinite numeric result".into());
     }
     let seed_json = seed.map_or_else(|| "null".to_owned(), |value| value.to_string());
+    if benchmark == Some("sampled") {
+        return Ok(format!("{{\"values\":{sampled:?}}}"));
+    }
     Ok(format!(
         "{{\"rank\":{rank},\"scores\":{scores:?},\"score_sum\":{score_sum},\"scale\":{scale},\"moments\":{moments:?},\"probabilities\":{probabilities:?},\"draws\":{draws:?},\"weights\":{weights:?},\"sampled\":{sampled:?},\"seed\":{seed_json},\"route\":\"{route}\"}}"
     ))
@@ -281,7 +300,17 @@ fn evaluate(input: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args == ["--batch"] {
+    if let [flag, route] = args.as_slice()
+        && flag == "--benchmark"
+        && (route == "exact" || route == "sampled")
+    {
+        let mut input = String::new();
+        io::stdin().take(2_000_001).read_to_string(&mut input)?;
+        if input.len() > 2_000_000 {
+            return Err("input cap exceeded".into());
+        }
+        println!("{}", evaluate_route(&input, Some(route))?);
+    } else if args == ["--batch"] {
         let mut reader = io::stdin().lock();
         let mut requests = 0;
         loop {

@@ -21,7 +21,7 @@ Windows Python/native comparisons and separate Linux timing/RSS measurements.
 
 | Question | Tool and contract | Evidence |
 | --- | --- | --- |
-| What changes when the spectral workstreams are integrated? | [Integrated resource snapshots](reports/spectral-integration.md), `tools/benchmark_spectral_integration.py` | Paired original-PR/integrated worker time, process wall time and peak working set |
+| Do the integrated spectral routes accelerate unaccelerated algorithms? | [Integrated resource snapshots](reports/spectral-integration.md), `tools/benchmark_spectral_integration.py` | Matched algorithm routes, complete workflow time, process memory and approximation quality |
 | How does precomputed F2 H0/H1 compare, including GUDHI edge collapse? | [Native setup](native/README.md), [H0/H1 protocol](protocol.md); `tools/benchmark_native.py` | Time to owned intervals and process memory |
 | What do complete public Rips workflows cost? | [Pipeline protocol](pipeline/README.md); `tools/benchmark_rips_pipeline.py` | Validation/construction/expansion/compute/export, end-to-end time and process memory |
 | Do bottleneck/W1/W2 agree, and which distance optimizations help? | [Distance protocol](distances/README.md); `tools/compare_distances.py` and `tools/benchmark_distances.py` | Independent matching checks, Rust/Topp timing and memory ablations |

@@ -532,7 +532,12 @@ fn chfsi(
 }
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let text = std::fs::read_to_string(std::env::args().nth(1).ok_or("fixture path")?)?;
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let summary = args.get(1).is_some_and(|arg| arg == "--summary");
+    if args.len() > 2 || (args.len() == 2 && !summary) {
+        return Err("fixture path [--summary]".into());
+    }
+    let text = std::fs::read_to_string(args.first().ok_or("fixture path")?)?;
     let mut words = text.split_whitespace();
     let mode = words.next().ok_or("mode")?;
     if mode == "transfer" {
@@ -685,14 +690,16 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             if words.next().is_some() {
                 return Err("sequence trailing fields".into());
             }
-            let (sorted, _, _) = order_fields(&fields, samples, p, truncation)?;
             let order: Vec<usize> = if route == 2 {
-                sorted
+                order_fields(&fields, samples, p, truncation)?.0
             } else {
                 (0..samples).collect()
             };
             let mut previous = initial.clone();
             let mut results: Vec<String> = (0..samples).map(|_| String::new()).collect();
+            let mut payload = vec![vec![]; samples];
+            let mut total_actions = 0;
+            let mut total_iterations = 0;
             for &index in &order {
                 let a = &matrices[index * n * n..(index + 1) * n * n];
                 let start = if route == 0 { &initial } else { &previous };
@@ -705,10 +712,36 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     parameters,
                     tolerance,
                 )?;
-                results[index] = result.json();
+                if summary {
+                    let mut values = result.values.clone();
+                    for i in 0..n {
+                        for j in 0..n {
+                            values.push(
+                                (0..count)
+                                    .map(|k| {
+                                        result.vectors[i * count + k]
+                                            * result.vectors[j * count + k]
+                                    })
+                                    .sum(),
+                            );
+                        }
+                    }
+                    payload[index] = values;
+                    total_actions += result.actions;
+                    total_iterations += result.trace.len();
+                } else {
+                    results[index] = result.json();
+                }
                 previous = result.retained;
             }
-            println!("{{\"order\":{order:?},\"output\":[{}]}}", results.join(","));
+            if summary {
+                let values: Vec<_> = payload.into_iter().flatten().collect();
+                println!(
+                    "{{\"values\":{values:?},\"actions\":{total_actions},\"iterations\":{total_iterations}}}"
+                );
+            } else {
+                println!("{{\"order\":{order:?},\"output\":[{}]}}", results.join(","));
+            }
         }
     } else if mode == "filter" {
         let lower: f64 = read(&mut words);

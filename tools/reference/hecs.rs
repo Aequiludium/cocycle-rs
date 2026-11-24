@@ -325,6 +325,30 @@ fn solve_json(solve: Solve, setup_ns: u128) -> Result<String, &'static str> {
 }
 
 fn run(input: &str, adjacency: bool) -> Result<String, Box<dyn std::error::Error>> {
+    run_route(input, adjacency, false)
+}
+
+fn weighted_gram(b: &[Vec<i128>], weights: &[f64]) -> Matrix {
+    b.iter()
+        .map(|left| {
+            b.iter()
+                .map(|right| {
+                    left.iter()
+                        .zip(right)
+                        .zip(weights)
+                        .map(|((&a, &b), &w)| a as f64 * b as f64 * w)
+                        .sum()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn run_route(
+    input: &str,
+    adjacency: bool,
+    identity_only: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     let total = Instant::now();
     let mut tokens = input.split_whitespace();
     let mut take = || tokens.next().ok_or("missing input");
@@ -385,6 +409,19 @@ fn run(input: &str, adjacency: bool) -> Result<String, Box<dyn std::error::Error
     if tokens.next().is_some() || !rhs.iter().all(|x| x.is_finite()) {
         return Err("trailing input or nonfinite RHS".into());
     }
+    if identity_only {
+        let u = weighted_gram(&b, &weights);
+        finite(&u)?;
+        let solve = cgls(&u, &rhs, &u, &rhs, &eye(m), m);
+        if solve.status != "converged" {
+            return Err(format!("unpreconditioned CGLS {}", solve.status).into());
+        }
+        return Ok(format!(
+            "{{\"values\":{:?},\"iterations\":{}}}",
+            solve.x,
+            solve.trace.len().saturating_sub(1)
+        ));
+    }
     let preparation_ns = total.elapsed().as_nanos();
     let selection_start = Instant::now();
     let (selected, pairs) = heavy(&incidence, m, &weights, peel == 1, adjacency);
@@ -411,20 +448,7 @@ fn run(input: &str, adjacency: bool) -> Result<String, Box<dyn std::error::Error
         })
         .collect();
     let factor: Matrix = edge_permutation.iter().map(|&e| f[e].clone()).collect();
-    let u: Matrix = b
-        .iter()
-        .map(|left| {
-            b.iter()
-                .map(|right| {
-                    left.iter()
-                        .zip(right)
-                        .zip(&weights)
-                        .map(|((&a, &b), &w)| a as f64 * b as f64 * w)
-                        .sum()
-                })
-                .collect()
-        })
-        .collect();
+    let u = weighted_gram(&b, &weights);
     finite(&u)?;
     let coverage = covers(&b, &pairs, t)?;
     let mut active = Vec::new();
@@ -488,12 +512,16 @@ fn run(input: &str, adjacency: bool) -> Result<String, Box<dyn std::error::Error
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if !args.is_empty() && args != ["--adjacency"] {
-        return Err("only optional argument is --adjacency".into());
+    if !args.is_empty() && args != ["--adjacency"] && args != ["--identity-only"] {
+        return Err("optional argument is --adjacency or --identity-only".into());
     }
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
-    println!("{}", run(&input, !args.is_empty())?);
+    if args == ["--identity-only"] {
+        println!("{}", run_route(&input, false, true)?);
+    } else {
+        println!("{}", run(&input, !args.is_empty())?);
+    }
     Ok(())
 }
 
