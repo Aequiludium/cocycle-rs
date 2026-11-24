@@ -148,6 +148,42 @@ uploads the raw `subspace-reference-<sha>-<attempt>` artifact even on failure,
 with 14-day retention. CI uses the documented mathematical source pins without
 downloading the PDFs; `--papers` additionally enforces their exact hashes locally.
 
+## Retained numerical run
+
+The local Windows run used clean implementation commit
+`271c7ef2b4b0779946220358bde1c7a9f1886056`, Python 3.10, NumPy 2.2.6 and
+GUDHI 3.12.0, with the three declared thread variables set to 1. Its manifest
+retains exact versions, code/PDF/worker hashes and fixture hashes. The selected
+rewrite replayed **334** fixed/mixed-degree and actual iteration filter inputs;
+maximum normalized filter disagreement was `9.91e-16`. All **32** cold/warm
+Rust sequence solves passed the known spectrum and repeated-cluster projector
+checks. All **29** tiny persistent pair/degree controls passed exact-rational
+expectations and GUDHI topology; the largest mapped current-operator residual
+was `2.16e-15`.
+
+Diagnostic counts sum vector actions in filtering, Rayleigh-Ritz and fresh
+residuals across eight samples, with the same accuracy and block size:
+
+| Family | Cold ChFSI | Original-order warm | FFT-ordered SCSF |
+| --- | --- | --- | --- |
+| Smooth rotations | 3194 | 3004 | 2764 |
+| Abrupt independent rotations | 3104 | 3124 | 3104 |
+
+These counts do not measure sorting, mapping, verification or total runtime;
+they do not select a faster default. The adverse family retains the lack of an
+FFT advantage. The defining-polynomial check rejects the printed recurrence
+at degree 2 (maximum entry error about 6.32), while the corrected recurrence
+passes the independent scalar controls.
+
+Local validation passed Clippy, complete debug/release and Rust 1.91 tests/checks,
+the CONTRIBUTING examples/doctests, strict rustdoc/Sphinx and source/link checks.
+The 157-test Python suite passed on Ubuntu WSL with 39 optional skips; all six
+new numerical tests separately passed in the pinned Windows reference
+environment. Its Windows full-suite run retains an existing pipeline test's
+unsupported `resource` import rather than modifying unrelated code. Hosted CI
+results and artifact identities belong to the associated PR, separately from
+this local run.
+
 Timing fields include diagnostic trace preparation and are not formal benchmark
 results. No optimization or changed default is selected. The remaining Issue
 148 work is adaptive companion ChFSI, the broader paper model/data replay,
