@@ -54,6 +54,7 @@ src/
     mod.rs                       real stage-pair Schur operators and reverse elimination
     schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
     nonbranching.rs              bounded corrected weak reduction and induced kernel metric
+    relevant_pairs.rs            exact real-event scheduling and bounded pair batches
     operator.rs                  factorized persistent action and fixed row-space projection
     lsmr.rs                      bounded undamped rectangular least-squares diagnostic
     split.rs                     bounded dual Grams, harmonic restriction and paper-basic LOBPCG

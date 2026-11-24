@@ -299,6 +299,34 @@ CI compiles and runs the standalone analytic/protocol tests; the optional full
 numerical replay additionally needs the declared Python reference environment
 and an existing complete Round-1 output.
 
+## Integrated spectral resource snapshots
+
+`benchmark_spectral_integration.py` compares committed verification workers with
+their original PR revisions on Windows. First run the relevant independent
+correctness controller and retain its validated input files. Supply a JSON object
+with a `cells` list; each entry has `name`, full `baseline` SHA, worker `source`
+path, optional `args`/`cfg` lists and `stdin_file` or `argument_file`.
+
+```sh
+python tools/benchmark_spectral_integration.py --specification target/integration-plan.json --output target/benchmarks/commit-CANDIDATE/spectral-integration/run-001
+```
+
+The controller exports immutable Git sources and builds both revisions with the
+same `rustc -C opt-level=3` flags. It runs one discarded warmup and ten serial
+fresh-process paired rounds, with balanced order per cell. A private generated
+wrapper times worker main through flushed output, including fixture I/O, parsing,
+computation, validation and export. Process wall time and absolute peak working
+set are separate. Full output comparisons preserve labels and integer identities;
+float absolute/relative tolerance is 1e-10 and JSON timing fields are excluded.
+Mismatch, nonzero exit or timeout stops the run with retained diagnostics.
+
+Commit the controller and candidate before running, keep local builds/tests idle,
+and retain all inputs, source/binary hashes, raw samples and median/min/max under
+the fresh output directory. These are bounded resource snapshots, with uncontrolled
+host load and CPU frequency; they do not isolate kernel allocations, establish
+cross-library rankings or certify general speedups. Follow the
+[reporting rules](../benches/reporting.md) for interpretation and storage.
+
 ## Spectral reference CI
 
 The [Gram and harmonic-restriction reproduction](../docs/research/split-spectral-reproduction.md)
