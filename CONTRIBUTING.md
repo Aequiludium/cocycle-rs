@@ -104,6 +104,7 @@ cargo run --locked --example persistent_laplacian
 cargo test --locked --example critical_sets
 cargo test --locked --release --example critical_sets
 cargo run --locked --example hodge_laplacian > target/hodge-rust.jsonl
+cargo run --locked --example hecs
 RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
 cargo +1.91.0 test --locked --all-features
 cargo +1.91.0 check --locked --all-targets --all-features

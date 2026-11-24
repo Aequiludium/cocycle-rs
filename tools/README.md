@@ -23,8 +23,9 @@ These tools are outside the Rust library and crate package. See
 
 `reproduce_hecs.py` implements the bounded ordinary q=1 upper-Hodge experiment
 from [Issue #150](https://github.com/Aequiludium/cocycle-rs/issues/150).
-It is experiment infrastructure, with no production preconditioner API or
-persistent/eigensolver integration. The mathematical source is Savostianov,
+It is experiment infrastructure; the bounded library terminal is documented in
+the [Hodge guide](../docs/guides/hodge-laplacian.md#bounded-ordinary-triangular-hecs-solve).
+Persistent/eigensolver integration is separate. The mathematical source is Savostianov,
 Tudisco and Guglielmi, [arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1),
 PDF Algorithms 5.1/6.1 (physical pages 10/15), Sections 6.2, 7.1 and 7.3.
 The PDF SHA-256 is
@@ -95,12 +96,29 @@ rustc --edition 2024 -D warnings -C opt-level=3 tools/reference/hecs.rs -o targe
 target/hecs-venv/bin/python tools/reproduce_hecs.py --parity-from target/hecs-round1 --rust-worker target/hecs --output target/hecs-round2
 ```
 
+For Round-2 library parity, build the public example and replay the SAME saved
+inputs with `--native-worker` (the standalone worker can also be supplied):
+
+```sh
+cargo build --locked --release --example hecs
+target/hecs-venv/bin/python tools/reproduce_hecs.py --parity-from target/hecs-round1 --native-worker target/release/examples/hecs --output target/hecs-native-parity
+target/hecs-venv/bin/python tools/reproduce_hecs.py --check-native --native-worker target/release/examples/hecs --output target/hecs-native-controls
+```
+
+`--check-native` regenerates the independent rational/analytic/SVD/GUDHI
+controls for CI and saves them with actual dependency/source identities. It
+does not execute Julia or claim a new author-program replay. Native rank loss
+is an explicit library error, while successful factors, active matrices,
+solutions and original residuals are compared with the independent oracle.
+
 Worker stdin is whitespace-separated: `n m t peel`, m increasing vertex pairs,
 t increasing vertex triples followed by positive finite weights, and m finite
 RHS entries. Vertex IDs are in `0..n`; duplicate simplices, missing lower edges,
 trailing input and limits n>256, m>512, t>1024 are rejected. `peel` is 0 or 1.
-This bounded dense reference does not expose library execution/cancellation or
-memory-quota contracts. Ordinary Hodge/Dirac wrappers remain untouched.
+The standalone reference does not expose library execution controls. The native
+terminal adds checked shared execution budgets and per-buffer entry caps;
+neither route provides an aggregate memory quota. Existing Hodge/Dirac spectral
+wrappers retain their behavior.
 
 The only Round-3 candidate is `--adjacency` on the worker: dynamic adjacency sets
 replace rescanning for free edges. Round-2 parity checks both paths against the

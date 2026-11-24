@@ -81,6 +81,10 @@ jobs:
           cargo build --locked --release
           rustdoc --edition 2024 -D warnings --test docs/guides/hodge-laplacian.md --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps
           cargo run --locked --example hodge_laplacian > target/hodge-reference/example.jsonl
+      - name: Check native ordinary HeCS against independent controls
+        run: |
+          cargo build --locked --release --example hecs
+          python tools/reproduce_hecs.py --check-native --native-worker target/release/examples/hecs --output target/hodge-reference/hecs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

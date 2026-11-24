@@ -26,6 +26,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// conversion, solving and error measurement. Passing the same Execution to
 /// preparation and solving does not combine their counters. Hodge `new` uses
 /// default unlimited preparation controls.
+/// Hodge `solve_hecs` shares one budget across topology checks, collapse trials,
+/// exact image coverage, dense factors, CGLS, original residuals and result copies.
+/// Its dense-entry limit is independent of work limits and bounds each buffer.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.

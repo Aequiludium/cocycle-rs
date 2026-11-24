@@ -96,6 +96,79 @@ The API fixes real f64 coefficients and the standard inner product. General
 SPD/Hermitian Grams, complex coefficients and normalized operators cannot be
 expressed through this API; no input is implicitly converted to those variants.
 
+## Bounded ordinary triangular HeCS solve
+
+`solve_hecs(weights, rhs, options, execution)` is an opt-in ordinary q=1 Upper
+terminal. It follows Savostianov, Tudisco and Guglielmi,
+[arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1), Algorithms 5.1/6.1 and
+Sections 6.2/7.1. It solves `U x=b`, where `U=B diag(weights) B^T` and B is the
+snapshot's edge-triangle boundary. Weights are explicit, finite and strictly
+positive in `next_basis()` order; `rhs` is in `basis()` order. The existing
+action/matrix/spectrum terminals use their original unit-incidence definition.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::hodge::{HecsOptions, HodgeLaplacian, HodgeSelection};
+
+let source = SimplicialComplex::new(
+    [vec![0], vec![1], vec![2], vec![0,1], vec![0,2], vec![1,2], vec![0,1,2]]
+        .into_iter().map(|v| Simplex::new(v, 0.)).collect::<cocycle::Result<_>>()?
+)?;
+let execution = Execution::default().max_work(100_000);
+let upper = HodgeLaplacian::new_with(&source, 1, HodgeSelection::Upper, &execution)?;
+let rhs = upper.action(&[1., 2., 3.], &execution)?; // compatible, unit face weight
+let answer = upper.solve_hecs(&[1.], &rhs, &HecsOptions::default(), &execution)?;
+assert_eq!(answer.rank(), 1);
+assert_eq!(answer.basis(), upper.basis());
+assert_eq!(answer.factor().len(), answer.basis().len() * answer.rank());
+assert!(*answer.residual_history().last().unwrap() <= 1e-9);
+# Ok::<(), cocycle::Error>(())
+```
+
+The window must have degree 1 and selection Upper. Edges require two distinct
+endpoints and opposite signed unit incidence; faces require three signed unit
+edges supported on three vertices. Parallel edges, repeated faces and general
+cellular boundary columns are rejected. Higher source degrees are irrelevant
+to this q=1 equation. Every original vertex/edge is retained, including unused
+edges. Weight ties use original triangle indexes and collapse uses the smallest
+free edge. `peel_core` optionally enables the preliminary Section 6.2 peel;
+the default is direct heavy selection.
+
+The selected factor must span the entire real boundary image. Checked i128
+unit-triangular reconstruction verifies every original column in every edge
+row; rank loss returns `InvalidParameter` with parameter `HeCS rank`. RP2 is an
+explicit negative control: real rank 10, selected rank 9. Ambient singular edge
+matrices are not inverted. Only the certified r-dimensional active problem is
+solved; the Moore-Penrose lift returns the numerical minimum-norm solution.
+See the [factor argument](../reference/mathematics.md#ordinary-q1-hecs-solve).
+
+`HecsOptions` defaults to 4000 updates, residual tolerance 1e-9 and 1,048,576
+entries per dense buffer. The m by m original buffer is checked before dense
+allocation. Other buffers have shapes m by r or r by r; several coexist and
+the limit does not bound aggregate process memory. This is a dense reference
+rewrite. Forming the factor's Gram can amplify conditioning; ambiguous pivots,
+nonfinite arithmetic, CGLS breakdown and iteration exhaustion are errors.
+There is no ridge or dense fallback after failure.
+
+Success checks a fresh `||Ux-b||2 / max(1,||b||2)` at each iterate, including
+zero. A preliminary `||F F+ b-b||2 / max(1,||b||2)` uses the same tolerance for
+numerical RHS compatibility. Small-scale inputs therefore have an absolute
+component in the stopping target; this is not a universal forward-error bound.
+Zero RHS returns zero updates. `HecsSolution` owns basis handles, weights,
+selected indexes, collapse pairs/permutations, weighted factor, active matrix,
+solution and original residual history. Its rank is an exact incidence-image
+certificate; residuals and positivity checks are floating-point evidence.
+
+Topology checking, selection, exact coverage, setup, CGLS, residuals and result
+copies share one execution budget; snapshot preparation has its separate budget.
+Cancellation/work exhaustion returns no partial result. Cooperative polling
+surrounds sorting/reservations and cannot interrupt those operations internally.
+No caching, persistent eliminated-block adaptation or outer eigensolver
+preconditioning is exposed. Existing Hodge/Dirac solver wrappers are unchanged.
+The runnable `cargo run --locked --example hecs` uses a weighted tetrahedron shell;
+its `--stdin` mode replays the frozen [HeCS protocol](../../tools/README.md#ordinary-hecs-reproduction).
+
 ## Matrix-free partial eigenpairs
 
 `smallest_eigenpairs(count, options, execution)` targets a small number of low

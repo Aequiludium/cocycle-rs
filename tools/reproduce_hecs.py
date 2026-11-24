@@ -380,7 +380,49 @@ def verify_rust(actual, expected, case):
                 assert np.linalg.norm(np.asarray(solve["original_x"]) - expected["oracle_x"]) <= 1e-7 * max(1., np.linalg.norm(expected["oracle_x"]))
 
 
-def rust_parity(source, worker, output):
+def verify_native(actual, expected, case):
+    if actual.get("status") == "rank_loss":
+        assert expected["solves"]["hecs"]["status"] == "rank_loss"
+    else:
+        assert set(actual["solves"]) == {"hecs"}
+        verify_rust(actual, expected, case)
+
+
+def native_check(worker, output):
+    """Independent CI controls; does not claim to rerun the author program."""
+    output.mkdir(parents=True, exist_ok=False)
+    import numpy as np
+    import scipy
+    import gudhi
+    cases = fixtures()
+    write_json(output / "fixtures.json", cases)
+    write_json(output / "environment.json", {"python": sys.version, "numpy": np.__version__,
+        "scipy": scipy.__version__, "gudhi": gudhi.__version__, "seed": SEED,
+        "scope": "independent rational/analytic/SVD/GUDHI controls; author program is not executed",
+        "worker_sha256": digest(worker), "controller_sha256": digest(Path(__file__)),
+        "native_sources": {p: digest(ROOT / p) for p in ("src/hodge/hecs.rs", "src/hodge/mod.rs", "examples/hecs.rs")}})
+    rows = []
+    try:
+        for case in cases:
+            for peel in (False, True):
+                name = case["name"] + ("-core" if peel else "-direct")
+                directory = output / name
+                directory.mkdir()
+                text = protocol(case, peel)
+                (directory / "input.txt").write_text(text, encoding="utf-8")
+                expected = python_case(case, peel)
+                write_json(directory / "oracle.json", expected)
+                actual = run_logged([str(worker.resolve()), "--stdin"], text, directory, "native")
+                verify_native(actual, expected, case)
+                rows.append({"case": name, "status": "passed", "native_status": actual.get("status", "converged")})
+        write_json(output / "summary.json", {"status": "passed", "cases": rows})
+    except Exception as error:
+        write_json(output / "summary.json", {"status": "failed", "completed": rows, "error": str(error)})
+        raise
+    print(json.dumps({"status": "passed", "native_cases": len(rows), "output": str(output)}))
+
+
+def rust_parity(source, worker, output, native_worker=None):
     """Replay Round 1 bytes, without regenerating fixtures or rerunning Julia."""
     output.mkdir(parents=True, exist_ok=False)
     summary = json.loads((source / "summary.json").read_text(encoding="utf-8"))
@@ -391,7 +433,10 @@ def rust_parity(source, worker, output):
     write_json(output / "environment.json", {"source": str(source.resolve()),
                "fixtures_sha256": digest(source / "fixtures.json"),
                "round1_summary_sha256": digest(source / "summary.json"),
-               "worker_sha256": digest(worker), "rust_source_sha256": digest(ROOT / "tools/reference/hecs.rs")})
+               "worker_sha256": digest(worker) if worker else None,
+               "rust_source_sha256": digest(ROOT / "tools/reference/hecs.rs"),
+               "native_worker_sha256": digest(native_worker) if native_worker else None,
+               "native_sources": {p: digest(ROOT / p) for p in ("src/hodge/hecs.rs", "src/hodge/mod.rs", "examples/hecs.rs")} if native_worker else None})
     try:
         for row in summary["cases"]:
             case = next(c for c in cases if c["name"] == row["case"])
@@ -400,13 +445,20 @@ def rust_parity(source, worker, output):
             directory.mkdir()
             text = (source / name / "input.txt").read_text(encoding="utf-8")
             expected = json.loads((source / name / "python.json").read_text(encoding="utf-8"))
-            actual = run_logged([str(worker.resolve())], text, directory, "rust")
-            verify_rust(actual, expected, case)
-            candidate = run_logged([str(worker.resolve()), "--adjacency"], text, directory, "adjacency")
-            verify_rust(candidate, expected, case)
+            actual = None
+            if worker:
+                actual = run_logged([str(worker.resolve())], text, directory, "rust")
+                verify_rust(actual, expected, case)
+                candidate = run_logged([str(worker.resolve()), "--adjacency"], text, directory, "adjacency")
+                verify_rust(candidate, expected, case)
+            native = None
+            if native_worker:
+                native = run_logged([str(native_worker.resolve()), "--stdin"], text, directory, "native")
+                verify_native(native, expected, case)
             rows.append({"case": name, "input_sha256": digest(source / name / "input.txt"),
                          "expected_sha256": digest(source / name / "python.json"),
-                         "status": "passed", "solves": {k: v["status"] for k, v in actual["solves"].items()}})
+                         "status": "passed", "solves": {k: v["status"] for k, v in actual["solves"].items()} if actual else None,
+                         "native_status": (native.get("status", "converged") if native else None)})
     except Exception as error:
         write_json(output / "summary.json", {"status": "failed", "completed": rows, "error": str(error)})
         raise
@@ -473,21 +525,28 @@ def main():
     parser.add_argument("--paper", type=Path)
     parser.add_argument("--julia", type=Path)
     parser.add_argument("--rust-worker", type=Path)
+    parser.add_argument("--native-worker", type=Path, help="compiled library hecs example; use with --parity-from")
+    parser.add_argument("--check-native", action="store_true", help="run the library example against independent CI controls")
     parser.add_argument("--fixtures", type=Path, help="replay an existing frozen fixtures.json")
     parser.add_argument("--case", help="run only this named fixture")
     parser.add_argument("--parity-from", type=Path, help="Rust-only replay of a passed Round-1 directory")
     parser.add_argument("--compare-from", type=Path, help="one-change paired Rust experiment on frozen enriched inputs")
     parser.add_argument("--samples", type=int, default=10)
     args = parser.parse_args()
+    if args.check_native:
+        if not args.native_worker:
+            parser.error("--check-native requires --native-worker")
+        native_check(args.native_worker, args.output)
+        return
     if args.compare_from:
         if not args.rust_worker or args.samples < 1:
             parser.error("--compare-from requires --rust-worker and positive --samples")
         compare_collapse(args.compare_from, args.rust_worker, args.output, args.samples)
         return
     if args.parity_from:
-        if not args.rust_worker:
-            parser.error("--parity-from requires --rust-worker")
-        rust_parity(args.parity_from, args.rust_worker, args.output)
+        if not args.rust_worker and not args.native_worker:
+            parser.error("--parity-from requires --rust-worker or --native-worker")
+        rust_parity(args.parity_from, args.rust_worker, args.output, args.native_worker)
         return
     if not all((args.author_source, args.paper, args.julia)):
         parser.error("Round 1 requires --author-source, --paper and --julia")

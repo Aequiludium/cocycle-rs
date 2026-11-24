@@ -4,13 +4,18 @@
 //! is `A^T A + D D^T`. Degree zero is ordinary, nonaugmented homology. This
 //! module reads a finite supplied complex or stage without running persistence
 //! or expanding an implicit Rips source. Filtration values are not weights.
+//! The opt-in [`HodgeLaplacian::solve_hecs`] terminal accepts explicit positive
+//! triangle weights for a bounded ordinary q=1 upper-Hodge equation. Existing
+//! action, matrix and spectrum terminals retain their unit-incidence model.
 //! General Gram matrices, complex coefficients, normalized and persistent
 //! Laplacians are outside this API's explicitly real, standard-inner-product
 //! definition. See Lim, *Hodge Laplacians on Graphs* (2020), Theorems 5.2–5.3,
 //! <https://doi.org/10.1137/18M1223101>.
 
+mod hecs;
 mod spectrum;
 pub use crate::eigensolver::IterativeOptions;
+pub use hecs::{HecsOptions, HecsSolution};
 pub use spectrum::{HodgeEigenpairs, HodgeSpectrum, SpectrumOptions};
 
 use crate::complex::FilteredComplex;
