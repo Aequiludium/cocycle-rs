@@ -28,6 +28,482 @@ fn close(a: &[f64], b: &[f64]) {
 }
 
 #[test]
+fn partial_spectra_use_fixed_actions_and_current_operator_for_reused_vectors() {
+    use cocycle::persistent_laplacian::{IterativeOptions, PersistentSpectrumTarget as Target};
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[0, 1], 1.),
+        (&[1, 2], 1.),
+    ]);
+    let e = Execution::default();
+    let op = PersistentLaplacianOperator::new(
+        &source.stage(1.).unwrap(),
+        &source.stage(1.).unwrap(),
+        0,
+        OperatorOptions::default(),
+        &e,
+    )
+    .unwrap();
+    let options = IterativeOptions {
+        block_size: 3,
+        ..Default::default()
+    };
+    let small = op
+        .eigenpairs(3, Target::Smallest, None, &options, &e)
+        .unwrap();
+    close(&small.values, &[0., 1., 3.]);
+    let large = op
+        .eigenpairs(2, Target::Largest, None, &options, &e)
+        .unwrap();
+    close(&large.values, &[3., 1.]);
+    let positive = op
+        .eigenpairs(2, Target::SmallestPositive, None, &options, &e)
+        .unwrap();
+    close(&positive.values, &[1., 3.]);
+    assert_eq!(positive.range_rank, Some(2));
+    assert!(positive.range_residual < 1e-12);
+    assert!(positive.residuals.iter().all(|v| *v < 1e-10));
+    assert!(!positive.is_index_coverage_certified());
+    // Same source basis, changed endpoint: only vectors, not old Ritz values, transfer.
+    let old = PersistentLaplacianOperator::new(
+        &source.stage(0.).unwrap(),
+        &source.stage(0.).unwrap(),
+        0,
+        OperatorOptions::default(),
+        &e,
+    )
+    .unwrap();
+    let seed = old
+        .eigenpairs(3, Target::Smallest, None, &options, &e)
+        .unwrap();
+    let warm = op
+        .eigenpairs(3, Target::Smallest, Some(&seed.vectors), &options, &e)
+        .unwrap();
+    close(&warm.values, &[0., 1., 3.]);
+    let warm_positive = op
+        .eigenpairs(
+            2,
+            Target::SmallestPositive,
+            Some(&positive.vectors),
+            &IterativeOptions {
+                block_size: 2,
+                ..options
+            },
+            &e,
+        )
+        .unwrap();
+    close(&warm_positive.values, &[1., 3.]);
+}
+
+#[test]
+fn positive_spectrum_exceeds_dense_cap_without_first_computing_zero_modes() {
+    use cocycle::persistent_laplacian::{IterativeOptions, PersistentSpectrumTarget as Target};
+    let e = Execution::default();
+    let op = {
+        let mut cells: Vec<_> = (0..300)
+            .map(|v| Simplex::new(vec![v], 0.).unwrap())
+            .collect();
+        cells.push(Simplex::new(vec![0, 1], 1.).unwrap());
+        let source = SimplicialComplex::new(cells).unwrap();
+        PersistentLaplacianOperator::new(
+            &source.stage(1.).unwrap(),
+            &source.stage(1.).unwrap(),
+            0,
+            OperatorOptions {
+                spectral: SpectralOptions {
+                    max_dense_entries: 0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            &e,
+        )
+        .unwrap()
+    };
+    assert!(op.materialize(90_000, &e).is_err());
+    let options = IterativeOptions {
+        block_size: 2,
+        max_basis_entries: 600,
+        ..Default::default()
+    };
+    // 299 exact harmonic dimensions, one positive eigenvalue 2 from a single edge.
+    let result = op
+        .eigenpairs(1, Target::SmallestPositive, None, &options, &e)
+        .unwrap();
+    close(&result.values, &[2.]);
+    assert_eq!(result.basis.len(), 300);
+    assert_eq!(result.range_rank, Some(1));
+    assert_eq!(result.vectors.len(), 300);
+    assert!(
+        op.eigenpairs(2, Target::SmallestPositive, None, &options, &e)
+            .is_err()
+    );
+    assert!(
+        op.eigenpairs(
+            1,
+            Target::SmallestPositive,
+            None,
+            &IterativeOptions {
+                max_basis_entries: 299,
+                ..options
+            },
+            &e
+        )
+        .is_err()
+    );
+    assert!(
+        op.eigenpairs(
+            1,
+            Target::SmallestPositive,
+            None,
+            &IterativeOptions {
+                absolute_tolerance: 3.,
+                ..options
+            },
+            &e
+        )
+        .is_err()
+    );
+    for input in [vec![0.; 299], vec![f64::NAN; 300], vec![f64::INFINITY; 300]] {
+        assert!(
+            op.eigenpairs(1, Target::SmallestPositive, Some(&input), &options, &e)
+                .is_err()
+        );
+    }
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        op.eigenpairs(
+            1,
+            Target::SmallestPositive,
+            None,
+            &options,
+            &Execution::default().cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
+    assert!(matches!(
+        op.eigenpairs(
+            1,
+            Target::SmallestPositive,
+            None,
+            &options,
+            &Execution::default().max_work(1)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+}
+
+#[test]
+fn positive_range_does_not_normalize_annihilated_upper_roundoff() {
+    use cocycle::persistent_laplacian::{IterativeOptions, PersistentSpectrumTarget as Target};
+    let source = complex(&[
+        (&[0], 1.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 0.),
+        (&[0, 1], 2.),
+        (&[0, 2], 1.),
+        (&[0, 3], 2.),
+        (&[1, 2], 0.),
+        (&[1, 3], 2.),
+        (&[2, 3], 0.),
+        (&[0, 1, 2], 3.),
+        (&[0, 1, 3], 2.),
+        (&[0, 2, 3], 4.),
+        (&[1, 2, 3], 3.),
+        (&[0, 1, 2, 3], 4.),
+    ]);
+    let e = Execution::default();
+    let op = PersistentLaplacianOperator::new(
+        &source.stage(0.).unwrap(),
+        &source.stage(3.).unwrap(),
+        1,
+        OperatorOptions::default(),
+        &e,
+    )
+    .unwrap();
+    // B2 is injective. Only the two tree-edge lower boundary images remain.
+    let result = op
+        .eigenpairs(
+            2,
+            Target::SmallestPositive,
+            None,
+            &IterativeOptions::default(),
+            &e,
+        )
+        .unwrap();
+    close(&result.values, &[1., 3.]);
+    assert_eq!(result.range_rank, Some(2));
+}
+
+#[test]
+fn incremental_start_projection_and_batch_spectra_preserve_every_pair() {
+    use cocycle::persistent_laplacian::{
+        IterativeOptions, PersistentSpectrumTarget as Target, fixed_endpoint_eigenpairs,
+    };
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 1.),
+        (&[3], 2.),
+        (&[0, 1], 2.),
+        (&[1, 2], 2.),
+        (&[2, 3], 2.),
+    ]);
+    let e = Execution::default();
+    let stages: Vec<_> = [0., 1., 1., 2.]
+        .into_iter()
+        .map(|s| source.stage(s).unwrap())
+        .collect();
+    let endpoint = source.stage(2.).unwrap();
+    let options = IterativeOptions {
+        block_size: 4,
+        ..Default::default()
+    };
+    let mut op =
+        PersistentLaplacianOperator::new(&endpoint, &endpoint, 0, OperatorOptions::default(), &e)
+            .unwrap();
+    for stage in stages.iter().rev() {
+        op = op.restrict_start(stage.scale(), &e).unwrap();
+        let direct =
+            PersistentLaplacian::compute(stage, &endpoint, 0, SpectralOptions::default(), &e)
+                .unwrap();
+        close(&op.materialize(16, &e).unwrap(), direct.matrix());
+        assert_eq!(op.basis(), direct.basis());
+    }
+    assert!(op.clone().restrict_start(1., &e).is_err());
+    assert!(op.restrict_start(f64::NAN, &e).is_err());
+    for reuse in [false, true] {
+        let batch = fixed_endpoint_eigenpairs(
+            &stages,
+            &endpoint,
+            0,
+            1,
+            Target::SmallestPositive,
+            OperatorOptions::default(),
+            &options,
+            reuse,
+            &e,
+        )
+        .unwrap();
+        for (stage, pairs) in stages.iter().zip(&batch) {
+            let direct =
+                PersistentLaplacian::compute(stage, &endpoint, 0, SpectralOptions::default(), &e)
+                    .unwrap();
+            let spectrum = direct.spectrum(&e).unwrap();
+            let expected = spectrum
+                .eigenvalues
+                .iter()
+                .copied()
+                .find(|v| *v > 1e-8)
+                .unwrap();
+            close(&pairs.values, &[expected]);
+            assert_eq!(pairs.scales, (stage.scale(), 2.));
+        }
+    }
+    assert!(
+        fixed_endpoint_eigenpairs(
+            &[stages[3], stages[0]],
+            &endpoint,
+            0,
+            1,
+            Target::Largest,
+            OperatorOptions::default(),
+            &options,
+            true,
+            &e
+        )
+        .is_err()
+    );
+    assert!(matches!(
+        fixed_endpoint_eigenpairs(
+            &stages,
+            &endpoint,
+            0,
+            1,
+            Target::Largest,
+            OperatorOptions::default(),
+            &options,
+            true,
+            &Execution::default().max_work(10)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+}
+
+#[test]
+fn compact_nonbranching_projection_uses_linear_storage_and_the_same_spectral_path() {
+    use cocycle::persistent_laplacian::{IterativeOptions, PersistentSpectrumTarget as Target};
+    let mut cells: Vec<_> = (0..300)
+        .map(|v| Simplex::new(vec![v], v as f64).unwrap())
+        .collect();
+    for v in 0..299 {
+        cells.push(Simplex::new(vec![v, v + 1], 300.).unwrap());
+    }
+    let source = SimplicialComplex::new(cells).unwrap();
+    let e = Execution::default();
+    let options = OperatorOptions {
+        max_projection_entries: 600,
+        spectral: SpectralOptions {
+            max_dense_entries: 0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let start = source.stage(1.).unwrap();
+    let end = source.stage(300.).unwrap();
+    assert!(PersistentLaplacianOperator::new(&start, &end, 0, options, &e).is_err());
+    let op = PersistentLaplacianOperator::new_non_branching(&start, &end, 0, options, &e).unwrap();
+    assert!(op.projection_entries() <= 600);
+    // Every outside path vertex forces its incident edge flow to zero.
+    close(&op.action(&[1., -1.], &e).unwrap(), &[2., -2.]);
+    let pairs = op
+        .eigenpairs(
+            1,
+            Target::SmallestPositive,
+            None,
+            &IterativeOptions::default(),
+            &e,
+        )
+        .unwrap();
+    close(&pairs.values, &[2.]);
+    let smaller = op.restrict_start(0., &e).unwrap();
+    close(&smaller.action(&[1.], &e).unwrap(), &[0.]);
+    assert_eq!(smaller.projection_rank(), 299);
+    let triangle = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[0, 1], 1.),
+        (&[0, 2], 1.),
+        (&[1, 2], 1.),
+    ]);
+    let all = triangle.stage(1.).unwrap();
+    let compact = PersistentLaplacianOperator::new_non_branching(
+        &all,
+        &all,
+        0,
+        OperatorOptions::default(),
+        &e,
+    )
+    .unwrap()
+    .restrict_start(0., &e)
+    .unwrap();
+    close(&compact.action(&[1., -1., 0.], &e).unwrap(), &[3., -3., 0.]);
+    assert!(
+        PersistentLaplacianOperator::new_non_branching(
+            &start,
+            &end,
+            0,
+            OperatorOptions {
+                max_projection_entries: 1,
+                ..options
+            },
+            &e
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn relevant_partial_spectra_reuse_only_upper_terms_and_keep_request_order() {
+    use cocycle::persistent_laplacian::{
+        IterativeOptions, PersistentSpectrumTarget as Target, relevant_pair_eigenpairs,
+    };
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 0.),
+        (&[3], 1.),
+        (&[0, 1], 0.),
+        (&[1, 2], 0.),
+        (&[0, 2], 1.),
+        (&[2, 3], 2.),
+        (&[0, 1, 2], 3.),
+    ]);
+    let stages: Vec<_> = [0., 1., 1., 2., 3.]
+        .into_iter()
+        .map(|s| source.stage(s).unwrap())
+        .collect();
+    let mut requests: Vec<_> = (0..stages.len())
+        .flat_map(|t| (0..=t).map(move |s| (s, t)))
+        .collect();
+    requests.reverse();
+    requests.push((0, 0));
+    let options = IterativeOptions {
+        block_size: 8,
+        ..Default::default()
+    };
+    let e = Execution::default();
+    for degree in [0, 1] {
+        for reuse in [false, true] {
+            let batch = relevant_pair_eigenpairs(
+                &stages,
+                &requests,
+                degree,
+                1,
+                Target::Largest,
+                OperatorOptions::default(),
+                &options,
+                reuse,
+                &e,
+            )
+            .unwrap();
+            for (&(s, t), result) in requests.iter().zip(&batch) {
+                let direct = PersistentLaplacian::compute(
+                    &stages[s],
+                    &stages[t],
+                    degree,
+                    SpectralOptions::default(),
+                    &e,
+                )
+                .unwrap();
+                close(
+                    &result.values,
+                    &[*direct.spectrum(&e).unwrap().eigenvalues.last().unwrap()],
+                );
+                assert_eq!(result.basis, direct.basis());
+                assert_eq!(result.target_basis, direct.target_basis());
+                assert_eq!(result.scales, (stages[s].scale(), stages[t].scale()));
+            }
+        }
+    }
+    assert!(
+        relevant_pair_eigenpairs(
+            &stages,
+            &[(4, 0)],
+            0,
+            1,
+            Target::Largest,
+            OperatorOptions::default(),
+            &options,
+            false,
+            &e
+        )
+        .is_err()
+    );
+    assert!(
+        relevant_pair_eigenpairs(
+            &stages,
+            &requests,
+            0,
+            1,
+            Target::Largest,
+            OperatorOptions::default(),
+            &IterativeOptions {
+                max_basis_entries: 4,
+                ..options
+            },
+            false,
+            &e
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn lsmr_returns_minimum_norm_fit_and_inconsistent_residual() {
     // M=B2^T has dependent columns [1,2,0] and [2,4,0].
     // Its minimum-norm fit of [3,6,7] is [3/5,6/5], residual [0,0,7].

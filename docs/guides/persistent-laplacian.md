@@ -2,6 +2,73 @@
 
 [Documentation](../index.md) / Usage
 
+## Composed matrix-free partial spectra
+
+`PersistentLaplacianOperator::eigenpairs` connects fixed sparse action to shared
+block LOBPCG. `PersistentSpectrumTarget::Smallest` includes harmonic zeros;
+`Largest` returns descending modes. `SmallestPositive` streams `[B1 P, A^T]`
+columns into a numerical range basis, without a full persistent matrix,
+complete eigensolve or supplied harmonic representatives.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{IterativeOptions, OperatorOptions,
+    PersistentLaplacianOperator, PersistentSpectrumTarget};
+let source = SimplicialComplex::new(vec![Simplex::new(vec![0], 0.)?,
+    Simplex::new(vec![1], 0.)?, Simplex::new(vec![0, 1], 1.)?])?;
+let stage = source.stage(1.)?;
+let execution = Execution::default();
+let op = PersistentLaplacianOperator::new(&stage, &stage, 0,
+    OperatorOptions::default(), &execution)?;
+let result = op.eigenpairs(1, PersistentSpectrumTarget::SmallestPositive,
+    None, &IterativeOptions::default(), &execution)?;
+assert!((result.values[0] - 2.).abs() < 1e-10);
+assert_eq!(result.range_rank, Some(1));
+assert!(!result.is_index_coverage_certified());
+# Ok::<(), cocycle::Error>(())
+```
+
+Optional initial vectors are row-major `n * min(block_size,n)` in the current
+original basis. Only vectors transfer; current values and residuals are freshly
+computed. Positive requests project starts into the range. Dependent columns
+are completed by the shared solver. Outside batch functions, the caller maps
+bases and source identities.
+
+Two-pass range QR uses `relative_tolerance * max(1, largest generator norm)`;
+annihilated roundoff is not normalized into a direction. Ambiguous surviving
+pivots fail. The range costs O(n*r), obeys `max_basis_entries`, and can remain
+quadratic at high rank. Positive values must exceed the iterative absolute
+tolerance plus relative tolerance times the total squared generator norms,
+a trace bound for the exact PSD operator. Original residuals, range leakage
+and orthogonality are checked. Neither numerical rank nor residual convergence
+certifies exact real Betti numbers or extremal-index coverage.
+
+`new_non_branching` explicitly selects signed-component projection when outside
+rows have at most two signed unit entries. It needs O(p) factor storage and
+projection work, with no dense R/E/V/Z or Q. Zero columns, forced directions and
+inconsistent components are handled. Ineligible pairs fail without fallback.
+Its outside rank is exact for this signed structural model; positive range rank
+remains numerical. The dense weak-reduction constructor stays as a reference.
+
+`restrict_start` consumes a snapshot and moves its start backward at one fixed
+endpoint, appending outside constraints and truncating the lower boundary.
+Compact updates require continued eligibility. `fixed_endpoint_eigenpairs`
+combines reverse factor updates with optional warm vectors. The separate
+`relevant_pair_eigenpairs` caches each needed exact-event upper factor and
+zero-extends it, giving each request its own lower boundary. It never reuses
+a representative's full operator. Scheduling retains a capped rational boundary
+without a p-by-p transform. Cumulative cached-factor and returned-vector caps
+apply; each entire batch shares one work budget through output verification.
+Neither batch implements online endpoint insertion or promises speedups.
+
+`gram_eigenpairs` constructs only the smaller Gram, lifts its positive vectors
+and restores zeros in the original domain. It returns no matrix and measures
+residuals through rectangular actions. Its transpose, smaller Gram, vectors and
+output each obey the dense cap. The old `gram_spectrum` retains both Grams.
+Adaptive LSMR, research Chebyshev filters, sampling and ordinary HeCS are not
+silently substituted into these fixed persistent actions.
+
 ## Bounded Gram and harmonic-restriction operations
 
 The Unreleased `gram_spectrum`, `split_spectrum` and `HarmonicRestriction` APIs
@@ -80,8 +147,9 @@ Its private Jacobi solver retains its own convergence/error/resource policy.
 the outside boundary B2 and applies B1 (I-Q^T Q) B1^T + A^T A. Two-pass
 modified Gram--Schmidt determines Q once. Actions use no adaptive LSMR solve;
 the separate [paper reproduction](../research/persistent-constructions.md)
-records LSMR composition as an experiment. This API returns actions and explicit
-bounded matrices; it does not return partial or complete spectra.
+records LSMR composition as an experiment. Partial spectra use the composed
+interface above; complete dense spectra remain the separate
+`PersistentLaplacian::spectrum` contract.
 
 ```rust
 use cocycle::complex::{Simplex, SimplicialComplex};

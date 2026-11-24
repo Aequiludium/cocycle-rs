@@ -1,5 +1,19 @@
 # Developer tools
 
+The composed persistent partial-spectrum check runs the example's
+`--partial smallest|largest|positive|compact|fixed-cold|fixed|relevant` routes:
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python3 tools/compare_persistent_partial.py --worker target/release/examples/persistent_laplacian --output target/persistent-partial-check --gudhi
+```
+
+It freezes raw outputs and checks signed explicit complexes against Fraction
+real ranks, the independent kernel/SVD matrix oracle, NumPy eigenvalues and
+original-coordinate residuals. GUDHI F11 corroborates topology only. Unsupported
+compact rows and zero-rank positive requests are explicit expected rejections.
+The tiny complete-block controls do not certify general iterative index coverage.
+
 The optional [sequence-subspace reproduction](../docs/research/sequence-subspaces.md)
 checks corrected fixed-degree SCSF/ChFSI controls, frozen Rust Fourier/QR/Ritz/sequence parity,
 private supplied-block LOBPCG and tiny changing-basis experiments. It preserves

@@ -70,6 +70,7 @@ jobs:
           cargo build --locked --release --example persistent_laplacian 2>&1 | tee target/persistent-laplacian-reference/build.log
           python tools/compare_persistent_laplacians.py --worker target/release/examples/persistent_laplacian --output target/persistent-laplacian-reference/comparison --components --gudhi --reference-python target/persistent-laplacian-sources/perslap/src/perslap.py 2>&1 | tee target/persistent-laplacian-reference/check.log
           python tools/compare_persistent_laplacians.py --worker target/release/examples/persistent_laplacian --output target/persistent-laplacian-reference/nonbranching-comparison --non-branching --gudhi 2>&1 | tee target/persistent-laplacian-reference/nonbranching.log
+          python tools/compare_persistent_partial.py --worker target/release/examples/persistent_laplacian --output target/persistent-laplacian-reference/partial-comparison --gudhi 2>&1 | tee target/persistent-laplacian-reference/partial.log
       - name: Check domain worker, guide and example
         run: |
           cargo build --locked --release

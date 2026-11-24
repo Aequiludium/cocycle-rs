@@ -7,6 +7,188 @@ use crate::{Error, Result};
 
 use super::schur::dense;
 
+/// Disjoint signed supports of ker(B2), with no dense R/E/V/Z buffers.
+#[derive(Clone, Debug)]
+pub(super) struct KernelProjection {
+    groups: Vec<usize>,
+    signs: Vec<f64>,
+    sizes: Vec<usize>,
+}
+impl KernelProjection {
+    pub(super) fn new(
+        rows: &[Vec<(usize, f64)>],
+        columns: usize,
+        max_entries: usize,
+        max_incidence: usize,
+        budget: &mut WorkBudget<'_>,
+    ) -> Result<Self> {
+        let mut adjacency: Vec<Vec<(usize, f64)>> = buffer(columns, Vec::new(), budget)?;
+        let mut forced = buffer(columns, false, budget)?;
+        let mut entries = 0usize;
+        for row in rows {
+            budget.step_by(row.len())?;
+            if row.len() > 2 || row.iter().any(|&(_, v)| v != 1. && v != -1.) {
+                return Err(ineligible(
+                    "outside rows must have at most two signed unit entries",
+                ));
+            }
+            if row.len() == 1 {
+                forced[row[0].0] = true;
+            } else if row.len() == 2 {
+                let (a, b) = (row[0], row[1]);
+                entries = entries.checked_add(2).ok_or(Error::SizeOverflow {
+                    operation: "compact projection adjacency",
+                })?;
+                if entries > max_incidence {
+                    return Err(ineligible("compact adjacency exceeds incidence cap"));
+                }
+                for (u, v) in [(a.0, b.0), (b.0, a.0)] {
+                    adjacency[u].try_reserve(1).map_err(|_| allocation())?;
+                    adjacency[u].push((v, -a.1 * b.1));
+                }
+            }
+        }
+        let mut groups = buffer(columns, usize::MAX, budget)?;
+        let mut signs = buffer(columns, 0., budget)?;
+        let mut sizes = Vec::new();
+        let mut pending = Vec::new();
+        let mut support = Vec::new();
+        pending
+            .try_reserve_exact(columns)
+            .map_err(|_| allocation())?;
+        support
+            .try_reserve_exact(columns)
+            .map_err(|_| allocation())?;
+        sizes.try_reserve_exact(columns).map_err(|_| allocation())?;
+        for root in 0..columns {
+            budget.step()?;
+            if signs[root] != 0. {
+                continue;
+            }
+            support.clear();
+            pending.push(root);
+            signs[root] = 1.;
+            let mut blocked = false;
+            while let Some(u) = pending.pop() {
+                budget.step()?;
+                support.push(u);
+                blocked |= forced[u];
+                for &(v, relation) in &adjacency[u] {
+                    budget.step()?;
+                    let wanted = signs[u] * relation;
+                    if signs[v] == 0. {
+                        signs[v] = wanted;
+                        pending.push(v);
+                    } else {
+                        blocked |= signs[v] != wanted;
+                    }
+                }
+            }
+            if !blocked {
+                for &i in &support {
+                    budget.step()?;
+                    groups[i] = sizes.len();
+                }
+                sizes.push(support.len());
+            }
+        }
+        let stored = columns
+            .checked_add(sizes.len())
+            .ok_or(Error::SizeOverflow {
+                operation: "compact projection entries",
+            })?;
+        if stored > max_entries {
+            return Err(ineligible("compact projection exceeds entry cap"));
+        }
+        budget.check()?;
+        Ok(Self {
+            groups,
+            signs,
+            sizes,
+        })
+    }
+    pub(super) fn entries(&self) -> usize {
+        self.signs.len() + self.sizes.len()
+    }
+    pub(super) fn rank(&self) -> usize {
+        self.signs.len() - self.sizes.len()
+    }
+    pub(super) fn copy(&self, budget: &mut WorkBudget<'_>) -> Result<Self> {
+        let mut groups = buffer(self.groups.len(), 0, budget)?;
+        let mut signs = buffer(self.signs.len(), 0., budget)?;
+        let mut sizes = buffer(self.sizes.len(), 0, budget)?;
+        groups.copy_from_slice(&self.groups);
+        signs.copy_from_slice(&self.signs);
+        sizes.copy_from_slice(&self.sizes);
+        Ok(Self {
+            groups,
+            signs,
+            sizes,
+        })
+    }
+    pub(super) fn apply(&self, y: &mut [f64], budget: &mut WorkBudget<'_>) -> Result<()> {
+        let mut sums = buffer(self.sizes.len(), 0., budget)?;
+        for (i, &value) in y.iter().enumerate() {
+            budget.step()?;
+            let group = self.groups[i];
+            if group != usize::MAX {
+                sums[group] += self.signs[i] * value;
+            }
+        }
+        for (sum, &size) in sums.iter_mut().zip(&self.sizes) {
+            budget.step()?;
+            *sum /= size as f64;
+            if !sum.is_finite() {
+                return Err(super::numerical("compact kernel projection"));
+            }
+        }
+        for (i, value) in y.iter_mut().enumerate() {
+            budget.step()?;
+            *value = if self.groups[i] == usize::MAX {
+                0.
+            } else {
+                self.signs[i] * sums[self.groups[i]]
+            };
+        }
+        Ok(())
+    }
+    // Equivalent signed constraints, used when extending an existing kernel.
+    pub(super) fn constraints(
+        &self,
+        budget: &mut WorkBudget<'_>,
+    ) -> Result<Vec<Vec<(usize, f64)>>> {
+        let mut roots = buffer(self.sizes.len(), usize::MAX, budget)?;
+        let mut rows = Vec::new();
+        rows.try_reserve_exact(self.groups.len())
+            .map_err(|_| allocation())?;
+        for (i, &group) in self.groups.iter().enumerate() {
+            budget.step()?;
+            let mut row = Vec::new();
+            row.try_reserve_exact(2).map_err(|_| allocation())?;
+            if group == usize::MAX {
+                row.push((i, 1.));
+            } else if roots[group] == usize::MAX {
+                roots[group] = i;
+            } else {
+                let root = roots[group];
+                row.push((root, -self.signs[root] * self.signs[i]));
+                row.push((i, 1.));
+            }
+            if !row.is_empty() {
+                rows.push(row);
+            }
+        }
+        Ok(rows)
+    }
+}
+fn buffer<T: Clone>(n: usize, value: T, budget: &mut WorkBudget<'_>) -> Result<Vec<T>> {
+    budget.step_by(n)?;
+    let mut out = Vec::new();
+    out.try_reserve_exact(n).map_err(|_| allocation())?;
+    out.resize(n, value);
+    Ok(out)
+}
+
 // The nonzero-column index map is separate from the original zero columns.
 // R, diagonal E and V are all consumed when selecting kernel directions.
 pub(super) struct WeakReduction {

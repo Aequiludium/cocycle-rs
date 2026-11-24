@@ -2,8 +2,10 @@
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
-    HarmonicRestriction, OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator,
-    SpectralOptions, gram_spectrum, relevant_pair_laplacians,
+    HarmonicRestriction, IterativeOptions, OperatorOptions, PersistentLaplacian,
+    PersistentLaplacianOperator, PersistentSpectrumTarget, SpectralOptions,
+    fixed_endpoint_eigenpairs, gram_eigenpairs, gram_spectrum, relevant_pair_eigenpairs,
+    relevant_pair_laplacians,
 };
 pub use cocycle::{Error, Result};
 use std::io::{self, Read};
@@ -157,6 +159,9 @@ fn spectral(route: &str, kind: &str, n: usize) -> Trial {
     } else if kind == "gram" && route == "both-grams" {
         let result = gram_spectrum(&a, rank, n, options(), &Execution::default())?;
         (result.positive, result.lifted_vectors)
+    } else if kind == "gram" && route == "single-gram" {
+        let result = gram_eigenpairs(&a, rank, n, options(), &Execution::default())?;
+        (result.eigenvalues[n - rank..].to_vec(), result.vectors)
     } else if kind == "harmonic" && route == "restriction" {
         let result = HarmonicRestriction::compute(
             &supplied_h,
@@ -246,6 +251,95 @@ fn pairs(input: &str, kind: &str, route: &str, spectra: bool, single: bool) -> T
         let execution = Execution::default();
         prepare_ns += start.elapsed().as_nanos();
         let start = Instant::now();
+        if kind == "partial-pairs" {
+            let iteration = IterativeOptions {
+                absolute_tolerance: 1e-10,
+                relative_tolerance: 1e-10,
+                ..Default::default()
+            };
+            let operator_options = OperatorOptions {
+                spectral: options(),
+                max_projection_entries: 4_000_000,
+                ..Default::default()
+            };
+            let nonempty = |stage: &cocycle::filtration::SimplicialStage<'_>| {
+                stage.simplices().iter().any(|s| s.dimension() == q)
+            };
+            if route == "relevant" || route == "exhaustive" {
+                let requests: Vec<_> = requests
+                    .into_iter()
+                    .filter(|&(s, _)| nonempty(&stages[s]))
+                    .collect();
+                if route == "relevant" {
+                    for result in relevant_pair_eigenpairs(
+                        &stages,
+                        &requests,
+                        q,
+                        1,
+                        PersistentSpectrumTarget::Largest,
+                        operator_options,
+                        &iteration,
+                        true,
+                        &execution,
+                    )? {
+                        values.extend(result.values);
+                    }
+                } else {
+                    for (s, t) in requests {
+                        values.push(
+                            *PersistentLaplacian::compute(
+                                &stages[s],
+                                &stages[t],
+                                q,
+                                options(),
+                                &execution,
+                            )?
+                            .spectrum(&execution)?
+                            .eigenvalues
+                            .last()
+                            .ok_or("empty requested spectrum")?,
+                        );
+                    }
+                }
+            } else {
+                let starts: Vec<_> = stages.iter().copied().filter(nonempty).collect();
+                if route == "direct-fixed" {
+                    for stage in &starts {
+                        values.push(
+                            *PersistentLaplacian::compute(
+                                stage,
+                                &target,
+                                q,
+                                options(),
+                                &execution,
+                            )?
+                            .spectrum(&execution)?
+                            .eigenvalues
+                            .last()
+                            .ok_or("empty requested spectrum")?,
+                        );
+                    }
+                } else if route == "fixed-cold" || route == "fixed-warm" {
+                    for result in fixed_endpoint_eigenpairs(
+                        &starts,
+                        &target,
+                        q,
+                        1,
+                        PersistentSpectrumTarget::Largest,
+                        operator_options,
+                        &iteration,
+                        route == "fixed-warm",
+                        &execution,
+                    )? {
+                        values.extend(result.values);
+                    }
+                } else {
+                    return Err("invalid partial batch route".into());
+                }
+            }
+            solve_ns += start.elapsed().as_nanos();
+            continue;
+        }
         if kind == "pairs" && route == "batch" {
             let operators = relevant_pair_laplacians(&stages, &requests, q, options(), &execution)?;
             for operator in &operators {
@@ -292,6 +386,96 @@ fn pairs(input: &str, kind: &str, route: &str, spectra: bool, single: bool) -> T
     Ok((values, prepare_ns, solve_ns))
 }
 
+fn partial(route: &str, kind: &str, n: usize) -> Trial {
+    let start = Instant::now();
+    let mut cells = Vec::new();
+    for v in 0..n {
+        cells.push(Simplex::new(
+            vec![v],
+            if kind == "compact" { v as f64 } else { 0. },
+        )?);
+    }
+    let (s, t, positive) = match kind {
+        "partial" => {
+            for j in 0..3 {
+                cells.push(Simplex::new(vec![2 * j, 2 * j + 1], 1.)?);
+            }
+            (1., 1., true)
+        }
+        "compact" => {
+            for v in 0..n - 1 {
+                cells.push(Simplex::new(vec![v, v + 1], n as f64)?);
+            }
+            (1., n as f64, true)
+        }
+        "partial-star" | "partial-star-positive" => {
+            cells.push(Simplex::new(vec![n], 1.)?);
+            for v in 0..n {
+                cells.push(Simplex::new(vec![v, n], 2.)?);
+            }
+            (0., 2., kind == "partial-star-positive")
+        }
+        _ => return Err("unknown partial fixture".into()),
+    };
+    let source = SimplicialComplex::new(cells)?;
+    let (k, l) = (source.stage(s)?, source.stage(t)?);
+    let execution = Execution::default();
+    let prepare_ns = start.elapsed().as_nanos();
+    let start = Instant::now();
+    let count = if kind == "compact" { 1 } else { 3 };
+    let values = if route == "dense" {
+        let full = PersistentLaplacian::compute(&k, &l, 0, options(), &execution)?
+            .spectrum(&execution)?
+            .eigenvalues;
+        if positive {
+            full.into_iter()
+                .filter(|v| *v > 1e-8)
+                .take(count)
+                .collect::<Vec<_>>()
+        } else {
+            full.into_iter().rev().take(count).collect::<Vec<_>>()
+        }
+    } else {
+        let policy = OperatorOptions {
+            spectral: options(),
+            max_projection_entries: 4_000_000,
+            ..Default::default()
+        };
+        let op = if route == "compact" {
+            PersistentLaplacianOperator::new_non_branching(&k, &l, 0, policy, &execution)?
+        } else if route == "factorized" {
+            PersistentLaplacianOperator::new(&k, &l, 0, policy, &execution)?
+        } else {
+            return Err("invalid partial route".into());
+        };
+        op.eigenpairs(
+            count,
+            if positive {
+                PersistentSpectrumTarget::SmallestPositive
+            } else {
+                PersistentSpectrumTarget::Largest
+            },
+            None,
+            &IterativeOptions {
+                absolute_tolerance: 1e-10,
+                relative_tolerance: 1e-10,
+                ..Default::default()
+            },
+            &execution,
+        )?
+        .values
+    };
+    let expected = if kind.starts_with("partial-star") {
+        1.
+    } else {
+        2.
+    };
+    if values.len() != count || values.iter().any(|v| (v - expected).abs() > 1e-8) {
+        return Err("independent partial-spectrum expectation failed".into());
+    }
+    Ok((values, prepare_ns, start.elapsed().as_nanos()))
+}
+
 fn append_operator(
     operator: &PersistentLaplacian,
     values: &mut Vec<f64>,
@@ -313,6 +497,13 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
     let (kind, route) = (args[0].as_str(), args[1].as_str());
     let (values, prepare_ns, solve_ns) = match kind {
+        "partial" | "partial-star" | "partial-star-positive" | "compact" if args.len() == 3 => {
+            let n = args[2].parse()?;
+            if !(8..=512).contains(&n) {
+                return Err("partial dimension limit".into());
+            }
+            partial(route, kind, n)?
+        }
         "action" if args.len() == 4 => {
             let n = args[2].parse()?;
             let repeats = args[3].parse()?;
@@ -328,7 +519,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             }
             spectral(route, kind, n)?
         }
-        "pairs" | "nonbranching" if args.len() == 4 => {
+        "pairs" | "nonbranching" | "partial-pairs" if args.len() == 4 => {
             if !["matrices", "spectra"].contains(&args[2].as_str())
                 || !["all", "single"].contains(&args[3].as_str())
             {

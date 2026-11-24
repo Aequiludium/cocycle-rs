@@ -2,9 +2,10 @@
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
-    LsmrOptions, OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator,
-    SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
-    project_boundary_kernel_lsmr, relevant_pair_laplacians,
+    IterativeOptions, LsmrOptions, OperatorOptions, PersistentLaplacian,
+    PersistentLaplacianOperator, PersistentSpectrumTarget, SpectralOptions,
+    fixed_endpoint_laplacians, fixed_endpoint_up_laplacians, project_boundary_kernel_lsmr,
+    relevant_pair_laplacians,
 };
 use std::io::{self, Read};
 use std::time::Instant;
@@ -64,6 +65,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
+    let partial = match args.as_slice() {
+        [a, b] if a == "--partial" => Some(b.as_str()),
+        _ => None,
+    };
     let relevant = args.as_slice() == ["--relevant"] || args.as_slice() == ["--relevant-direct"];
     let (benchmark, components, non_branching, operator) = match args.as_slice() {
         [a] if a == "--relevant" || a == "--relevant-direct" => (None, false, false, false),
@@ -71,6 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         [a] if a == "--components" => (None, true, false, false),
         [a] if a == "--non-branching" => (None, true, true, false),
         [a] if a == "--operator" => (None, false, false, true),
+        [a, _] if a == "--partial" => (None, false, false, false),
         [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => {
             (Some(b.as_str()), false, false, false)
         }
@@ -115,6 +121,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         };
         let execution = Execution::default();
+        if let Some(mode) = partial {
+            partial_spectra(mode, &starts, &target, degree, options, &execution)?;
+            continue;
+        }
         if relevant {
             let requests: Vec<_> = (0..starts.len())
                 .flat_map(|t| (0..=t).map(move |s| (s, t)))
@@ -274,6 +284,126 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     u8::from(upper_steps[index].used_direct_fallback())
                 );
             }
+        }
+    }
+    Ok(())
+}
+
+fn partial_spectra(
+    mode: &str,
+    starts: &[cocycle::filtration::SimplicialStage<'_>],
+    endpoint: &cocycle::filtration::SimplicialStage<'_>,
+    degree: usize,
+    spectral: SpectralOptions,
+    execution: &Execution<'_>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use cocycle::persistent_laplacian::{
+        PersistentEigenpairs, fixed_endpoint_eigenpairs, relevant_pair_eigenpairs,
+    };
+    let options = IterativeOptions {
+        block_size: 64,
+        max_basis_entries: 4_000_000,
+        absolute_tolerance: 1e-11,
+        relative_tolerance: 1e-11,
+        ..Default::default()
+    };
+    let operator_options = OperatorOptions {
+        spectral,
+        max_projection_entries: 4_000_000,
+        ..Default::default()
+    };
+    let emit = |s: f64, t: f64, result: cocycle::Result<PersistentEigenpairs>| match result {
+        Ok(r) => println!(
+            "{{\"degree\":{degree},\"s\":{s},\"t\":{t},\"n\":{},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?}}}",
+            r.basis.len(),
+            r.values,
+            r.vectors,
+            r.residuals
+        ),
+        Err(error) => {
+            println!("{{\"degree\":{degree},\"s\":{s},\"t\":{t},\"error\":true}}");
+            eprintln!("{error}");
+        }
+    };
+    if mode == "fixed" || mode == "fixed-cold" {
+        let starts: Vec<_> = starts
+            .iter()
+            .copied()
+            .filter(|stage| stage.simplices().iter().any(|s| s.dimension() == degree))
+            .collect();
+        let results = fixed_endpoint_eigenpairs(
+            &starts,
+            endpoint,
+            degree,
+            1,
+            PersistentSpectrumTarget::Largest,
+            operator_options,
+            &options,
+            mode == "fixed",
+            execution,
+        )?;
+        for (stage, result) in starts.iter().zip(results) {
+            emit(stage.scale(), endpoint.scale(), Ok(result));
+        }
+    } else if mode == "relevant" {
+        let requests: Vec<_> = (0..starts.len())
+            .flat_map(|t| (0..=t).map(move |s| (s, t)))
+            .filter(|&(s, _)| {
+                starts[s]
+                    .simplices()
+                    .iter()
+                    .any(|cell| cell.dimension() == degree)
+            })
+            .collect();
+        let results = relevant_pair_eigenpairs(
+            starts,
+            &requests,
+            degree,
+            1,
+            PersistentSpectrumTarget::Largest,
+            operator_options,
+            &options,
+            true,
+            execution,
+        )?;
+        for ((s, t), result) in requests.into_iter().zip(results) {
+            emit(starts[s].scale(), starts[t].scale(), Ok(result));
+        }
+    } else {
+        let target = match mode {
+            "smallest" => PersistentSpectrumTarget::Smallest,
+            "largest" | "compact" => PersistentSpectrumTarget::Largest,
+            "positive" => PersistentSpectrumTarget::SmallestPositive,
+            _ => return Err("unknown partial spectrum mode".into()),
+        };
+        for stage in starts {
+            let op = if mode == "compact" {
+                PersistentLaplacianOperator::new_non_branching(
+                    stage,
+                    endpoint,
+                    degree,
+                    operator_options,
+                    execution,
+                )
+            } else {
+                PersistentLaplacianOperator::new(
+                    stage,
+                    endpoint,
+                    degree,
+                    operator_options,
+                    execution,
+                )
+            };
+            let result = op.and_then(|op| {
+                op.eigenpairs(
+                    usize::from(!op.basis().is_empty()),
+                    target,
+                    None,
+                    &options,
+                    execution,
+                )
+            });
+            emit(stage.scale(), endpoint.scale(), result);
         }
     }
     Ok(())

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Compose fixed persistent actions with partial LOBPCG, supplied-vector starts,
+  bounded boundary-image positive spectra, incremental fixed-endpoint projection
+  and exact-event upper-factor reuse, preserving original residuals and metadata.
+- Add single-sided `gram_eigenpairs` and explicitly selected compact
+  non-branching kernel projections without dense transformation matrices.
+
 - Add explicitly selected `PersistentLaplacian::compute_non_branching` and
   `compute_up_non_branching` for pair-local signed unit outside rows with at
   most two nonzeros. Use the verified corrected weak reduction and induced

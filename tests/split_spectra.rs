@@ -36,6 +36,39 @@ fn rectangular_grams_preserve_original_zeros_and_repeated_values() {
 }
 
 #[test]
+fn one_sided_gram_lifts_modes_without_the_large_square() {
+    use cocycle::persistent_laplacian::gram_eigenpairs;
+    let e = Execution::default();
+    // A A^T = diag(1,4), while A^T A has 298 additional zero modes.
+    let mut wide = vec![0.; 600];
+    wide[0] = 1.;
+    wide[301] = 2.;
+    let options = SpectralOptions {
+        max_dense_entries: 600,
+        ..Default::default()
+    };
+    assert!(gram_spectrum(&wide, 2, 300, options, &e).is_err());
+    let g = gram_eigenpairs(&wide, 2, 300, options, &e).unwrap();
+    assert!(g.used_dual);
+    assert_eq!(g.numerical_rank, 2);
+    close(&g.eigenvalues[298..], &[1., 4.]);
+    assert!(g.eigenvalues[..298].iter().all(|v| *v == 0.));
+    assert_eq!(g.raw_spectrum, vec![1., 4.]);
+    assert!(g.residual < 1e-12 && g.orthogonality_error < 1e-12);
+    for (m, n) in [(0, 3), (3, 0), (0, 0), (2, 5)] {
+        let g = gram_eigenpairs(&vec![0.; m * n], m, n, options, &e).unwrap();
+        assert_eq!(g.eigenvalues, vec![0.; n]);
+        assert!(g.vectors.is_empty());
+    }
+    let tall = gram_eigenpairs(&[-1., 0., 1., -1., 0., 1., 0., 0.], 4, 2, options, &e).unwrap();
+    assert!(!tall.used_dual);
+    close(&tall.eigenvalues, &[1., 3.]);
+    assert!(gram_eigenpairs(&[f64::NAN], 1, 1, options, &e).is_err());
+    assert!(gram_eigenpairs(&[], usize::MAX, 2, options, &e).is_err());
+    assert!(gram_eigenpairs(&wide, 2, 300, options, &Execution::default().max_work(1)).is_err());
+}
+
+#[test]
 fn empty_shapes_and_zero_operators_are_explicit() {
     for (m, n) in [(0, 3), (3, 0), (0, 0), (2, 5)] {
         let g = gram_spectrum(

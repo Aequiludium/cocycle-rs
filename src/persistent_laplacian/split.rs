@@ -69,6 +69,126 @@ pub fn gram_spectrum(
     gram(a, rows, columns, &options, &mut budget)
 }
 
+/// Original-domain spectrum and positive vectors using only the smaller Gram.
+#[derive(Clone, Debug)]
+pub struct GramEigenpairs {
+    /// Original matrix row count.
+    pub rows: usize,
+    /// Original matrix column count and spectrum length.
+    pub columns: usize,
+    /// True when only A A^T was constructed; otherwise only A^T A.
+    pub used_dual: bool,
+    /// Complete raw smaller-Gram spectrum, including signed roundoff.
+    pub raw_spectrum: Vec<f64>,
+    /// Original-domain reconstruction: numerical zeros followed by positives.
+    pub eigenvalues: Vec<f64>,
+    /// Original columns by numerical_rank row-major positive vector columns.
+    pub vectors: Vec<f64>,
+    /// Numerical positive rank; not an exact real rank certificate.
+    pub numerical_rank: usize,
+    /// Relative tolerance times the largest absolute smaller-Gram value.
+    pub threshold: f64,
+    /// A positive raw value lies within ten cutoffs.
+    pub rank_ambiguous: bool,
+    /// Fresh ||A^T A V-V Lambda||F/max(1,||V Lambda||F), without A^T A storage.
+    pub residual: f64,
+    /// Frobenius norm of V^T V-I.
+    pub orthogonality_error: f64,
+}
+
+/// Compute a complete numerical Gram spectrum without constructing both Grams.
+///
+/// Only min(rows,columns)^2 Gram storage is used. Positive dual vectors are
+/// lifted through A^T; zeros are restored in the original column dimension.
+/// Unlike `gram_spectrum`, this API does not retain either matrix. Each buffer,
+/// including input-size transpose, lifted vectors and output spectrum, obeys
+/// max_dense_entries. Validation, solving and original residuals share a budget.
+/// # Errors
+/// Includes shape/options, nonfinite input/arithmetic, overflow, allocation/cap
+/// failure, negative Gram values, inaccurate lifts, nonconvergence and controls.
+pub fn gram_eigenpairs(
+    a: &[f64],
+    rows: usize,
+    columns: usize,
+    options: SpectralOptions,
+    execution: &Execution<'_>,
+) -> Result<GramEigenpairs> {
+    let mut b = WorkBudget::new(execution)?;
+    options.validate()?;
+    validate(a, rows, columns, &options, &mut b)?;
+    let dual = rows < columns;
+    let n = rows.min(columns);
+    let at = transpose(a, rows, columns, &options, &mut b)?;
+    let matrix = if dual {
+        product(a, &at, rows, columns, rows, &options, &mut b)?
+    } else {
+        product(&at, a, columns, rows, columns, &options, &mut b)?
+    };
+    let (raw, q) = solve(&matrix, n, &options, &mut b)?;
+    let threshold = options.relative_tolerance * raw.iter().fold(0_f64, |s, v| s.max(v.abs()));
+    if raw.iter().any(|v| *v < -threshold) {
+        return Err(numerical("negative one-sided Gram"));
+    }
+    let rank = raw.iter().filter(|v| **v > threshold).count();
+    let mut vectors = dense(columns, rank, &options, &mut b)?;
+    let mut values = dense(rank, 1, &options, &mut b)?;
+    let mut k = 0;
+    for (j, &value) in raw.iter().enumerate() {
+        if value <= threshold {
+            continue;
+        }
+        values[k] = value;
+        for i in 0..columns {
+            b.step_by(if dual { rows } else { 1 })?;
+            vectors[i * rank + k] = if dual {
+                finite(
+                    (0..rows)
+                        .map(|r| a[r * columns + i] * q[r * rows + j])
+                        .sum::<f64>()
+                        / value.sqrt(),
+                )?
+            } else {
+                q[i * columns + j]
+            };
+        }
+        k += 1;
+    }
+    let av = product(a, &vectors, rows, columns, rank, &options, &mut b)?;
+    let image = product(&at, &av, columns, rows, rank, &options, &mut b)?;
+    let (mut error, mut scale) = (0_f64, 0_f64);
+    for i in 0..columns {
+        for j in 0..rank {
+            b.step()?;
+            let expected = finite(vectors[i * rank + j] * values[j])?;
+            error = error.hypot(image[i * rank + j] - expected);
+            scale = scale.hypot(expected);
+        }
+    }
+    let residual = finite(error / scale.max(1.))?;
+    let orthogonality_error = orthogonality(&vectors, columns, rank, &options, &mut b)?;
+    if residual > options.residual_tolerance || orthogonality_error > options.residual_tolerance {
+        return Err(numerical("one-sided Gram eigensystem"));
+    }
+    let mut eigenvalues = dense(columns, 1, &options, &mut b)?;
+    b.step_by(columns)?;
+    eigenvalues[columns - rank..].copy_from_slice(&values);
+    let rank_ambiguous = raw.iter().any(|v| *v > 0. && *v <= 10. * threshold);
+    b.check()?;
+    Ok(GramEigenpairs {
+        rows,
+        columns,
+        used_dual: dual,
+        raw_spectrum: raw,
+        eigenvalues,
+        vectors,
+        numerical_rank: rank,
+        threshold,
+        rank_ambiguous,
+        residual,
+        orthogonality_error,
+    })
+}
+
 fn gram(
     a: &[f64],
     rows: usize,

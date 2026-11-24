@@ -25,13 +25,19 @@ mod relevant_pairs;
 mod schur;
 mod split;
 
+pub use crate::eigensolver::IterativeOptions;
 pub use lsmr::{LsmrOptions, LsmrProjection, project_boundary_kernel_lsmr};
-pub use operator::{OperatorOptions, PersistentLaplacianOperator};
+pub use operator::{
+    OperatorOptions, PersistentEigenpairs, PersistentLaplacianOperator, PersistentSpectrumTarget,
+    fixed_endpoint_eigenpairs,
+};
 
-pub use relevant_pairs::{RelevantPairLaplacian, relevant_pair_laplacians};
+pub use relevant_pairs::{
+    RelevantPairLaplacian, relevant_pair_eigenpairs, relevant_pair_laplacians,
+};
 pub use split::{
-    GramSpectrum, HarmonicRestriction, PositiveEigenpairs, SplitSpectrum, gram_spectrum,
-    split_spectrum,
+    GramEigenpairs, GramSpectrum, HarmonicRestriction, PositiveEigenpairs, SplitSpectrum,
+    gram_eigenpairs, gram_spectrum, split_spectrum,
 };
 
 use crate::complex::{Simplex, SimplexId};

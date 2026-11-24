@@ -1,8 +1,9 @@
 //! Bounded real event reduction and new-chain evaluation, Algorithms 1-2 of
 //! Kirchner--Vittorietti, arXiv:2611.09610v1, with checked rational pivots.
 use super::{
-    LaplacianComponent, PersistentLaplacian, SpectralOptions, allocation, basis_ids, finish,
-    numerical, schur, validate_pair,
+    IterativeOptions, LaplacianComponent, OperatorOptions, PersistentEigenpairs,
+    PersistentLaplacian, PersistentLaplacianOperator, PersistentSpectrumTarget, SpectralOptions,
+    allocation, basis_ids, finish, numerical, schur, validate_pair,
 };
 use crate::execution::{Execution, WorkBudget};
 use crate::filtration::SimplicialStage;
@@ -147,27 +148,7 @@ pub fn relevant_pair_laplacians(
     let square = p.checked_mul(p).ok_or_else(overflow)?;
     schur::check_entries(entries, &options)?;
     schur::check_entries(square, &options)?;
-    let mut boundary = Vec::new();
-    boundary
-        .try_reserve_exact(entries)
-        .map_err(|_| allocation())?;
-    boundary.resize(entries, Rational::ZERO);
-    for (j, &id) in upper_ids.iter().enumerate() {
-        for term in target.boundary(id).ok_or(Error::InternalInvariant {
-            reason: "stage boundary missing",
-        })? {
-            budget.step()?;
-            let i = ids
-                .binary_search(&term.face)
-                .map_err(|_| Error::InternalInvariant {
-                    reason: "q-face absent",
-                })?;
-            boundary[j * n + i] = Rational {
-                num: i128::from(term.coefficient),
-                den: 1,
-            };
-        }
-    }
+    let boundary = signed_boundary(target, &ids, &upper_ids, &options, &mut budget)?;
     let (reduced, transform) = reduce(&boundary, n, p, &mut budget)?;
     let mut events = Vec::new();
     events.try_reserve_exact(p).map_err(|_| allocation())?;
@@ -262,6 +243,246 @@ pub fn relevant_pair_laplacians(
     }
     budget.check()?;
     Ok(result)
+}
+
+/// Compute requested partial spectra using exact events and cached upper factors.
+///
+/// The same stage/request contract as `relevant_pair_laplacians` applies. Exact
+/// rational scheduling retains only the reduced boundary, not the dense p by p
+/// transformation. Each needed upper representative is prepared once. Requested
+/// full actions reuse its upper factor by zero extension and rebuild their own
+/// lower boundary. No persistent matrix or complete spectrum is constructed.
+/// Optional warm starts transfer only vectors in the common source's prefix
+/// coordinates; current Ritz values and original residuals are always fresh.
+///
+/// Rational boundary/grid buffers obey the spectral cap. Cumulative cached
+/// incidence/projection entries obey their corresponding operator caps; the sum
+/// of returned vector entries obeys max_basis_entries. Metadata and simultaneous
+/// temporary buffers are not an aggregate process RAM quota. One work budget
+/// covers the whole batch. Online endpoint insertion is outside this API.
+/// # Errors
+/// Includes grid/index/source errors, exact rational overflow, per-pair solver
+/// errors, ambiguity, storage/allocation limits, cancellation and work exhaustion.
+#[allow(clippy::too_many_arguments)]
+pub fn relevant_pair_eigenpairs(
+    stages: &[SimplicialStage<'_>],
+    requests: &[(usize, usize)],
+    degree: usize,
+    count: usize,
+    spectral_target: PersistentSpectrumTarget,
+    operator_options: OperatorOptions,
+    options: &IterativeOptions,
+    reuse_vectors: bool,
+    execution: &Execution<'_>,
+) -> Result<Vec<PersistentEigenpairs>> {
+    let mut budget = WorkBudget::new(execution)?;
+    operator_options.spectral.validate()?;
+    degree.checked_add(1).ok_or_else(overflow)?;
+    crate::eigensolver::lobpcg(0, 0, false, options, &mut budget, |_, _| {
+        Err(numerical("unexpected empty schedule action"))
+    })?;
+    for &(s, t) in requests {
+        budget.step()?;
+        if s > t || t >= stages.len() {
+            return Err(Error::InvalidParameter {
+                parameter: "spectral pair indices",
+                reason: "require start <= end < stage count",
+            });
+        }
+    }
+    let mut results: Vec<PersistentEigenpairs> = Vec::new();
+    results
+        .try_reserve_exact(requests.len())
+        .map_err(|_| allocation())?;
+    let Some(last) = stages.last() else {
+        return Ok(results);
+    };
+    for (i, stage) in stages.iter().enumerate() {
+        validate_pair(
+            stage,
+            last,
+            degree,
+            LaplacianComponent::Full,
+            &operator_options.spectral,
+            &mut budget,
+        )?;
+        if i > 0 && stages[i - 1].scale() > stage.scale() {
+            return Err(Error::InvalidParameter {
+                parameter: "spectral stage grid",
+                reason: "scales must be nondecreasing",
+            });
+        }
+    }
+    let grid = stages.len();
+    let capacity = grid
+        .checked_add(1)
+        .and_then(|v| grid.checked_mul(v))
+        .map(|v| v / 2)
+        .ok_or_else(overflow)?;
+    schur::check_entries(capacity, &operator_options.spectral)?;
+    if requests.is_empty() {
+        return Ok(results);
+    }
+    let ids = basis_ids(last, degree, &mut budget)?;
+    let upper = basis_ids(last, degree + 1, &mut budget)?;
+    let (n, p) = (ids.len(), upper.len());
+    let mut sizes = Vec::new();
+    sizes.try_reserve_exact(grid).map_err(|_| allocation())?;
+    for stage in stages {
+        budget.step_by(n)?;
+        sizes.push(ids.partition_point(|id| id.index() < stage.len()));
+    }
+    let mut total = 0usize;
+    for &(s, _) in requests {
+        if count > sizes[s] || count > options.block_size {
+            return Err(numerical("scheduled count exceeds dimension/block"));
+        }
+        total = sizes[s]
+            .checked_mul(count)
+            .and_then(|v| total.checked_add(v))
+            .ok_or_else(overflow)?;
+    }
+    if total > options.max_basis_entries {
+        return Err(Error::InvalidParameter {
+            parameter: "max_basis_entries",
+            reason: "cumulative scheduled vectors exceed limit",
+        });
+    }
+    let boundary = signed_boundary(last, &ids, &upper, &operator_options.spectral, &mut budget)?;
+    let (reduced, _) = reduce_with_transform(&boundary, n, p, false, &mut budget)?;
+    let mut events = Vec::new();
+    events.try_reserve_exact(p).map_err(|_| allocation())?;
+    for j in 0..p {
+        budget.step_by(n.checked_add(grid).ok_or_else(overflow)?)?;
+        let low = (0..n).rev().find(|&i| reduced[j * n + i].num != 0);
+        let start = low.map_or(0, |i| {
+            stages.partition_point(|stage| stage.len() <= ids[i].index()) + 1
+        });
+        let end = stages.partition_point(|stage| stage.len() <= upper[j].index()) + 1;
+        events.push((start, end));
+    }
+    drop(boundary);
+    drop(reduced);
+    let selected = select_pairs(&events, grid, capacity, &mut budget)?;
+    let mut cache: Vec<((usize, usize), PersistentLaplacianOperator)> = Vec::new();
+    cache
+        .try_reserve_exact(requests.len().min(selected.len()))
+        .map_err(|_| allocation())?;
+    let (mut incidence, mut projection) = (0usize, 0usize);
+    for &(s, t) in requests {
+        budget.step_by(selected.len())?;
+        let pair = selected
+            .iter()
+            .rev()
+            .copied()
+            .find(|&(a, b)| a <= s && b <= t);
+        budget.step_by(cache.len())?;
+        let index = if let Some(pair) = pair {
+            if let Some(i) = cache.iter().position(|(key, _)| *key == pair) {
+                Some(i)
+            } else {
+                let op = PersistentLaplacianOperator::new_with(
+                    &stages[pair.0],
+                    &stages[pair.1],
+                    degree,
+                    operator_options,
+                    &mut budget,
+                )?;
+                incidence = incidence
+                    .checked_add(op.incidence_entries())
+                    .ok_or_else(overflow)?;
+                projection = projection
+                    .checked_add(op.projection_entries())
+                    .ok_or_else(overflow)?;
+                if incidence > operator_options.max_incidence_entries
+                    || projection > operator_options.max_projection_entries
+                {
+                    return Err(Error::InvalidParameter {
+                        parameter: "scheduled upper factors",
+                        reason: "cumulative factor cache exceeds limits",
+                    });
+                }
+                cache.push((pair, op));
+                Some(cache.len() - 1)
+            }
+        } else {
+            None
+        };
+        let op = PersistentLaplacianOperator::reuse_upper(
+            &stages[s],
+            &stages[t],
+            degree,
+            index.map(|i| &cache[i].1),
+            operator_options,
+            &mut budget,
+        )?;
+        let mut initial = None;
+        if reuse_vectors && let Some(previous) = results.last() {
+            let block = options.block_size.min(sizes[s]);
+            let entries = sizes[s].checked_mul(block).ok_or_else(overflow)?;
+            if entries > options.max_basis_entries {
+                return Err(Error::InvalidParameter {
+                    parameter: "max_basis_entries",
+                    reason: "scheduled initial block exceeds limit",
+                });
+            }
+            let mut values = Vec::new();
+            values
+                .try_reserve_exact(entries)
+                .map_err(|_| allocation())?;
+            values.resize(entries, 0.);
+            for i in 0..sizes[s].min(previous.basis.len()) {
+                for j in 0..count.min(block) {
+                    budget.step()?;
+                    values[i * block + j] = previous.vectors[i * count + j];
+                }
+            }
+            initial = Some(values);
+        }
+        results.push(op.eigenpairs_with(
+            count,
+            spectral_target,
+            initial.as_deref(),
+            options,
+            &mut budget,
+        )?);
+    }
+    budget.check()?;
+    Ok(results)
+}
+
+fn signed_boundary(
+    stage: &SimplicialStage<'_>,
+    ids: &[crate::complex::SimplexId],
+    upper: &[crate::complex::SimplexId],
+    options: &SpectralOptions,
+    budget: &mut WorkBudget<'_>,
+) -> Result<Vec<Rational>> {
+    let n = ids.len();
+    let entries = n.checked_mul(upper.len()).ok_or_else(overflow)?;
+    schur::check_entries(entries, options)?;
+    let mut boundary = Vec::new();
+    boundary
+        .try_reserve_exact(entries)
+        .map_err(|_| allocation())?;
+    boundary.resize(entries, Rational::ZERO);
+    for (j, &id) in upper.iter().enumerate() {
+        for term in stage.boundary(id).ok_or(Error::InternalInvariant {
+            reason: "stage boundary missing",
+        })? {
+            budget.step()?;
+            let i = ids
+                .binary_search(&term.face)
+                .map_err(|_| Error::InternalInvariant {
+                    reason: "q-face absent",
+                })?;
+            boundary[j * n + i] = Rational {
+                num: i128::from(term.coefficient),
+                den: 1,
+            };
+        }
+    }
+    Ok(boundary)
 }
 
 fn select_pairs(
@@ -381,6 +602,16 @@ fn reduce(
     columns: usize,
     budget: &mut WorkBudget<'_>,
 ) -> Result<(Vec<Rational>, Vec<Rational>)> {
+    reduce_with_transform(boundary, rows, columns, true, budget)
+}
+
+fn reduce_with_transform(
+    boundary: &[Rational],
+    rows: usize,
+    columns: usize,
+    keep_transform: bool,
+    budget: &mut WorkBudget<'_>,
+) -> Result<(Vec<Rational>, Vec<Rational>)> {
     let mut reduced = Vec::new();
     budget.check()?;
     reduced
@@ -388,7 +619,8 @@ fn reduce(
         .map_err(|_| allocation())?;
     reduced.extend_from_slice(boundary);
     let mut transform = Vec::new();
-    let entries = columns.checked_mul(columns).ok_or_else(overflow)?;
+    let width = if keep_transform { columns } else { 0 };
+    let entries = columns.checked_mul(width).ok_or_else(overflow)?;
     transform
         .try_reserve_exact(entries)
         .map_err(|_| allocation())?;
@@ -398,7 +630,9 @@ fn reduce(
     owners.resize(rows, None);
     budget.check()?;
     for j in 0..columns {
-        transform[j * columns + j] = Rational { num: 1, den: 1 };
+        if keep_transform {
+            transform[j * columns + j] = Rational { num: 1, den: 1 };
+        }
         loop {
             budget.step_by(rows)?;
             let Some(low) = (0..rows).rev().find(|&i| reduced[j * rows + i].num != 0) else {
@@ -414,7 +648,7 @@ fn reduce(
                 reduced[j * rows + k] =
                     reduced[j * rows + k].subtract(factor.multiply(reduced[i * rows + k])?)?;
             }
-            for k in 0..columns {
+            for k in 0..width {
                 budget.step()?;
                 transform[j * columns + k] = transform[j * columns + k]
                     .subtract(factor.multiply(transform[i * columns + k])?)?;

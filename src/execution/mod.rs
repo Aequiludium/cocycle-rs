@@ -29,6 +29,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// Hodge `solve_hecs` shares one budget across topology checks, collapse trials,
 /// exact image coverage, dense factors, CGLS, original residuals and result copies.
 /// Its dense-entry limit is independent of work limits and bounds each buffer.
+/// Composed persistent partial-spectrum batches share one budget through exact
+/// scheduling, projection updates, supplied starts and fresh original residuals.
 /// Bounded Gram, split-spectrum and harmonic-restriction terminals share one
 /// budget across validation, dense arithmetic, rank preparation and verification.
 /// Positive iteration shares its fresh terminal budget through projection,
