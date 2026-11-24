@@ -1,5 +1,11 @@
 # Developer tools
 
+The optional [sequence-subspace reproduction](../docs/research/sequence-subspaces.md)
+checks corrected fixed-degree SCSF/ChFSI controls, frozen Rust filter parity,
+private supplied-block LOBPCG and tiny changing-basis experiments. It preserves
+printed-recursion discrepancies and adverse cases; it is not a public spectral
+API, full author-data reproduction or performance adoption result.
+
 The maintained resource snapshots for [persistent Laplacians](../benches/reports/persistent-laplacian-resources.md),
 [Dirac](../benches/reports/dirac-resources.md), [Hodge](../benches/reports/hodge-resources.md) and
 [spectral features](../benches/reports/spectral-feature-resources.md) record
