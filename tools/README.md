@@ -1,5 +1,25 @@
 # Developer tools
 
+The composed persistent partial-spectrum check runs the example's
+`--partial smallest|largest|positive|compact|fixed-cold|fixed|relevant` routes:
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python3 tools/compare_persistent_partial.py --worker target/release/examples/persistent_laplacian --output target/persistent-partial-check --gudhi
+```
+
+It freezes raw outputs and checks signed explicit complexes against Fraction
+real ranks, the independent kernel/SVD matrix oracle, NumPy eigenvalues and
+original-coordinate residuals. GUDHI F11 corroborates topology only. Unsupported
+compact rows and zero-rank positive requests are explicit expected rejections.
+The tiny complete-block controls do not certify general iterative index coverage.
+
+The optional [sequence-subspace reproduction](../docs/research/sequence-subspaces.md)
+checks corrected fixed-degree SCSF/ChFSI controls, frozen Rust Fourier/QR/Ritz/sequence parity,
+private supplied-block LOBPCG and tiny changing-basis experiments. It preserves
+printed-recursion discrepancies and adverse cases; it is not a public spectral
+API, full author-data reproduction or performance adoption result.
+
 The maintained resource snapshots for [persistent Laplacians](../benches/reports/persistent-laplacian-resources.md),
 [Dirac](../benches/reports/dirac-resources.md), [Hodge](../benches/reports/hodge-resources.md) and
 [spectral features](../benches/reports/spectral-feature-resources.md) record
@@ -19,13 +39,344 @@ snapshots do not establish native cross-library rankings or general speedups.
 These tools are outside the Rust library and crate package. See
 [contribution rules](../CONTRIBUTING.md) and [benchmark navigation](../benches/README.md).
 
+## Ordinary HeCS reproduction
+
+`reproduce_hecs.py` implements the bounded ordinary q=1 upper-Hodge experiment
+from [Issue #150](https://github.com/Aequiludium/cocycle-rs/issues/150).
+It is experiment infrastructure; the bounded library terminal is documented in
+the [Hodge guide](../docs/guides/hodge-laplacian.md#bounded-ordinary-triangular-hecs-solve).
+Persistent/eigensolver integration is separate. The mathematical source is Savostianov,
+Tudisco and Guglielmi, [arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1),
+PDF Algorithms 5.1/6.1 (physical pages 10/15), Sections 6.2, 7.1 and 7.3.
+The PDF SHA-256 is
+`20f7fa2ba91d308a97b1ad98f9d688a4a6ae00ce630bd457dd9e71f1e6c6d537`.
+
+Keep downloaded sources and generated evidence under ignored `target/`:
+
+```sh
+python3 -m venv target/hecs-venv
+target/hecs-venv/bin/python -m pip install numpy==2.2.6 scipy==1.15.3 gudhi==3.11.0
+git clone https://github.com/COMPiLELab/HeCS target/hecs-author
+git -C target/hecs-author checkout cd4d23e5d53900ece219fc0cdafc5c5e1eb81bf3
+curl -L https://arxiv.org/pdf/2401.15492v1 -o target/hecs-paper.pdf
+target/hecs-venv/bin/python tools/reproduce_hecs.py --output target/hecs-round1 --author-source target/hecs-author --paper target/hecs-paper.pdf --julia /path/to/julia
+```
+
+On Windows the venv interpreter is `Scripts/python.exe`; the tested author
+runtime is Julia 1.10.10. The adapter uses only its LinearAlgebra, SparseArrays
+and SHA standard libraries with one BLAS thread. It checks source hashes and
+includes the unchanged pinned files; it does not run the plotting/large loops
+or install their unrelated packages. No author source is redistributed; a
+top-level license was not verified. Rust and Python implement the mathematics
+independently. `--fixtures PATH` replays saved JSON and `--case NAME` restricts a
+diagnostic run. Every output directory must be new.
+
+Both direct heavy selection and Section 6.2's preliminary 2-core peeling are
+exercised. The complete original vertex/edge skeleton stays in each fixture.
+Weight-descending order uses original triangle ID to resolve ties. Python/Rust
+choose the smallest free edge, while Julia's Set may choose another valid one;
+each certificate is replayed independently from vertex containment. Save every
+trial, rejection, selected triangle, collapse, permutation and factor. With
+`B=boundary_2`, weights mean `U=B diag(w) B^T`, never `B diag(w^2) B^T`.
+
+The compact factor is `C=(B[:,T] diag(sqrt(w[T])))[edge_order,:]`, shape m by r,
+with a nonsingular lower triangular r by r leading minor. Its weighted Gram
+identity and selected rank are checked independently. For the weighted shell
+`w=[1,2,4,8]`, faces 1,2,3 (zero-based IDs) are retained; `B0=B1-B2+B3` also gives
+an independent analytic active-matrix check. The ambient m by m upper Hodge is
+singular: only the r by r matrix `C+ U_permuted C+^T` is solved. A dense SVD oracle
+checks both the original equation and the lifted minimum-norm HeCS solution.
+GUDHI corroborates supported topology and simplex counts, never real spectra.
+
+The real-projective-plane control has rational rank 10, but heavy selection has
+rank 9. It must return `rank_loss`, rather than solve an incomplete active space.
+The Rust worker certifies image coverage by checked i128 unit-triangular solves
+and exact reconstruction of every original boundary column in every edge row.
+Overflow rejects the certificate. Its dense active Gram solve rejects ambiguous
+pivots; it adds no ridge and performs no fallback to the ambient inverse.
+
+CGLS starts at zero. Identity, diagonal and HeCS use the same compatible original
+RHS and fresh `||Ux-b||2 / max(1,||b||2) <= 1e-9` stopping target, with at most 4000
+iterations. The diagonal scale is `1/sqrt(Uii)` for positive entries, identity
+for zero entries. It may produce a different kernel component; compare its
+solution modulo ker(U). HeCS uses the Moore-Penrose lift. Traces retain iterates,
+alpha/beta/gamma and original/normal/recursive residuals. Zero RHS, breakdown,
+iteration limit and nonfinite arithmetic have explicit outcomes. The author's
+zero-RHS nonfinite result and empty-collapse exception are retained as source
+limitations. The adapter separately records that the README's `Perm` orientation
+and acceptance-order triangle lookup need not yield a triangular factor; the
+paper's explicit row/column indexing is the parity target.
+
+After Round 1 passes, compile the independent Rust worker and replay those bytes:
+
+```sh
+rustc --edition 2024 -D warnings --test tools/reference/hecs.rs -o target/hecs-tests
+target/hecs-tests
+rustc --edition 2024 -D warnings -C opt-level=3 tools/reference/hecs.rs -o target/hecs
+target/hecs-venv/bin/python tools/reproduce_hecs.py --parity-from target/hecs-round1 --rust-worker target/hecs --output target/hecs-round2
+```
+
+For Round-2 library parity, build the public example and replay the SAME saved
+inputs with `--native-worker` (the standalone worker can also be supplied):
+
+```sh
+cargo build --locked --release --example hecs
+target/hecs-venv/bin/python tools/reproduce_hecs.py --parity-from target/hecs-round1 --native-worker target/release/examples/hecs --output target/hecs-native-parity
+target/hecs-venv/bin/python tools/reproduce_hecs.py --check-native --native-worker target/release/examples/hecs --output target/hecs-native-controls
+```
+
+`--check-native` regenerates the independent rational/analytic/SVD/GUDHI
+controls for CI and saves them with actual dependency/source identities. It
+does not execute Julia or claim a new author-program replay. Native rank loss
+is an explicit library error, while successful factors, active matrices,
+solutions and original residuals are compared with the independent oracle.
+
+Worker stdin is whitespace-separated: `n m t peel`, m increasing vertex pairs,
+t increasing vertex triples followed by positive finite weights, and m finite
+RHS entries. Vertex IDs are in `0..n`; duplicate simplices, missing lower edges,
+trailing input and limits n>256, m>512, t>1024 are rejected. `peel` is 0 or 1.
+The standalone reference does not expose library execution controls. The native
+terminal adds checked shared execution budgets and per-buffer entry caps;
+neither route provides an aggregate memory quota. Existing Hodge/Dirac spectral
+wrappers retain their behavior.
+
+The only Round-3 candidate is `--adjacency` on the worker: dynamic adjacency sets
+replace rescanning for free edges. Round-2 parity checks both paths against the
+same certificates/factors/active matrices/statuses and original residuals. For
+a measured comparison, commit the worker/controller first, then run:
+
+```sh
+target/hecs-venv/bin/python tools/reproduce_hecs.py --compare-from target/hecs-round1 --rust-worker target/hecs --samples 10 --output target/hecs-collapse-comparison
+```
+
+The paired serial experiment retains one warmup and ten fresh-process samples
+per route on nine regenerated enriched triangulations and both peeling modes.
+Seed 150 fixes points, deleted/added edges, triangle weights and sample order;
+all arrays are exported. These are smaller Section 7.3-style inputs, not the
+authors' original data. Incomplete Cholesky is not run, so the comparison is
+narrower than the paper. Phase timings, factor nnz and failures are retained;
+process startup, I/O and final JSON export are outside worker timings. Dense
+reference costs and diagnostic trace construction are included. Peak process
+memory, amortized reuse and persistent inner/outer adaptation are unmeasured.
+No general speedup, sparse-scaling, production adoption or persistent guarantee
+follows from this experiment. Run source/document checks, the Python tool tests,
+standalone rustfmt/rustc tests and Rust MSRV checks for changes to this path.
+
 The existing Hodge checker also accepts `--path-convergence`: it records
 independent SciPy identity, inverse-diagonal and shifted-tridiagonal-inverse
 controls on the 1024-node path against its complete analytic spectrum, using the
 same SplitMix64 starting span. Warnings and incomplete lookahead convergence
 remain explicit; these controls are numerical diagnosis, not native timing.
 
+## Ordinary-Hodge sparsification reproduction
+
+The optional [sampling/KID controller](reproduce_sparsification.py) and
+[bounded Rust worker](reference/sparsification.rs) implement the reproducible
+subroutines in [Issue #149](https://github.com/Aequiludium/cocycle-rs/issues/149).
+They leave the library's exact, unweighted operators unchanged. Sampling retains
+the complete lower skeleton and original coordinates; filtration values do not
+become weights. These tools are correctness experiments, outside the crate.
+
+The sources are Osting, Palande and Wang,
+[arXiv:1708.08436v3, Section 3/Theorem 3.1](https://arxiv.org/abs/1708.08436v3),
+and Savostianov, Schaub, Guglielmi and Tudisco,
+[arXiv:2502.07558v2](https://arxiv.org/abs/2502.07558v2), PDF Algorithm 3.1
+(physical page 8), Section 4.3 (pages 11-13) and Algorithm 4.1 (page 14).
+PDF versions and SHA-256 are enforced before a run. No author implementation
+was verified in these paper links; this is an independent mathematical rewrite.
+
+For an integer boundary B, an independent rational row-space projector supplies
+the exact rank/kernel and column leverage scores. A numerical pseudoinverse of
+G = B B^T supplies a separate comparison. Positive-rank probabilities are
+p_j = tau_j/rank. Sampling with replacement retains the seed, every draw,
+repeated counts and Gram weights count_j/(k p_j); factor columns use the square
+roots of these weights. Zero rank returns zero without probability normalization.
+Uniform sampling is a separate control. Every trial retains the complete
+generalized spectrum on the positive space of G and explicit kernel checks,
+including rank loss and failed PSD sandwiches. Epsilon targets 0.25/0.5 and delta
+target 0.05 are experiment metadata: no theorem-backed sample count or failure
+probability is asserted, individually or jointly across inputs.
+
+The four-face tetrahedron shell has B^T B = 4I - ss^T, s = [1,-1,1,-1], rank 3,
+scores 3/4 and probabilities 1/4. For H = B^T B/4, all 16 Rademacher probes
+recover odd moments 2 diag(T_m(H)) = 3/2 at degrees 1,3,5,7. A one-face draw
+loses rank and is retained as a failure. The printed Algorithm 4.1 is replayed
+separately: its upper-Gram/probe dimensions disagree on this rectangular input;
+even after substituting the dual Gram, its indexing, conditional recurrence
+update and factor differ from Section 4.3. These are observed discrepancies,
+not author-confirmed errata. The corrected branch updates every degree and
+collects only odd moments, checking scalar polynomials before sampling.
+
+Full paper KID probability reconstruction remains unresolved. Its
+`histogramIntegral` does not specify the executable bin/integration policy.
+The separate **project diagnostic** fixes 64 positive bins of width 1/64,
+undamped Chebyshev expansion, analytic bin integration and normalization by
+the raw score sum. Its bin averages are not asserted to reproduce the paper's
+convolution kernel. Raw scores, sums relative to exact rank, negative bins and
+negative probabilities are retained. Invalid sampling probabilities are rejected
+without clipping. This branch's probability errors and empirical sandwiches
+cannot establish the paper's probability theorem or full KID reproduction.
+
+The frozen project family contains eight points in two seeded Gaussian clusters,
+four inclusive Rips thresholds and q=0/1. It is not author data. The full sweep
+uses maximum polynomial degrees 8/16/32 (4/8/16 odd moments), probes 32/128/512
+and seeds 0 through 19; `--quick` uses seed 0 only. The same nested probes and
+draw seeds are retained across settings. GUDHI checks input simplices, while
+GUDHI and Ripser field-2 Betti0/1 corroborate exact rational ranks on these inputs;
+neither library is a real-spectrum oracle. Rust parity covers numerical scores,
+fixed-draw Gram assembly and corrected moments at all nine degree/probe settings
+with seed 0 on every fixture, plus shell, empty and zero controls. It does not
+claim native RNG parity, a Rust histogram implementation or a persistent extension.
+The worker reuses the existing checked Hodge eigensolver through a formal
+two-degree chain window; its numerical rank threshold is 1e-10 max(1,lambda_max).
+
+One tested environment uses Python 3.12.13, NumPy 2.4.6, SciPy 1.17.1,
+GUDHI 3.12.0 and Ripser 0.6.12. Create an isolated environment, save its complete
+dependency lock, and download both pinned PDFs to `target/sparsification-sources/`
+using their arXiv PDF URLs. Then run from the repository root:
+
+```sh
+python3 -m venv target/sparsification-venv
+target/sparsification-venv/bin/python -m pip install numpy==2.4.6 scipy==1.17.1 gudhi==3.12.0 ripser==0.6.12
+target/sparsification-venv/bin/python -m pip freeze > target/sparsification-lock.txt
+cargo build --locked --release
+rustfmt --edition 2024 --check tools/reference/sparsification.rs
+rustc --edition 2024 -O tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-worker
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --sources target/sparsification-sources --worker target/sparsification-worker --output target/sparsification-run-001
+target/sparsification-venv/bin/python -m unittest discover -s tools -p test_reproduce_sparsification.py
+```
+
+On Windows use `Scripts/python.exe`, append `.exe` to the worker and set the
+three thread environment variables in PowerShell before starting Python.
+The PDFs must hash to `373640de5a96c8fce16784aecc072ef240cdacb96476fffde7ef3263426fa8f8`
+(2502.07558v2) and `1470ef2d8785dc9872f525479253b00e6d7d84b6b5b08ef8804b981e0983305e`
+(1708.08436v3). An existing output directory is rejected. Sources, inputs, probes,
+moments, all trials, Rust requests/results/rejections and environment identities
+are retained under the new output. Phase durations and Python-allocation peaks
+are diagnostics; they are not formal benchmarks, process RSS or speedup evidence.
+Core integration, persistent Schur sampling and optimization remain deferred
+until the full probability/error contract and matched cost evidence are resolved.
+
+### Round 2: complete the scoped Rust rewrite
+
+The same worker now also accepts
+`native n p degree probes draws seed leverage|uniform`, followed by the
+row-major integer B and p-by-probes Rademacher Z. Rust computes the scores,
+probabilities and draws itself. Leverage probabilities divide the numerical
+scores by their measured sum; the raw sum and numerical rank are returned so
+the normalization and trace defect remain visible. Uniform sampling is a
+separate control. Zero rank returns zero probabilities and no draws.
+
+Native randomness uses SplitMix64 with explicit wrapping 64-bit arithmetic,
+its high 53 bits divided by 2^53, and the ordered half-open inverse CDF. The last
+positive bin absorbs floating-point endpoint roundoff. This is a declared finite
+random-number implementation, with independent golden-word and CDF controls;
+it does not claim the same draws as NumPy PCG64 or a probability certificate.
+Every result retains the route, seed, actual draws, scores, probabilities,
+weights and matrix. The original supplied-probability/draw protocol remains
+available for exact Round-1 replay. Negative input probabilities are rejected.
+
+After generating the complete Round-1 output above, use its saved input arrays,
+probes, moments, weights and draws for the Round-2 command:
+
+```sh
+rustc --edition 2024 -D warnings --test tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-tests
+target/sparsification-tests
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --replay-round1 target/sparsification-run-001 --worker target/sparsification-worker --output target/sparsification-round2-001
+```
+
+The frozen eight-fixture input SHA-256 is enforced. The full command checks all
+1,440 stored moment configurations against both frozen values and independent
+dense scalar-polynomial evaluation on the same probes. It replays all 7,036
+sampling trials, including the externally supplied project-diagnostic
+probabilities, checking the whole generalized spectrum, rank-loss and sandwich
+pass/fail states. It separately verifies Rust-generated leverage/uniform draws
+for 1,280 seed/count/route cases with an independent Python integer-RNG/CDF
+control and rational leverage expectations. The frozen invalid probability
+estimate is replayed as a rejection. Shell/empty/zero analytic controls and
+protocol rejections remain separate from these counts. `--quick` restricts the
+frozen and native sweeps to seed 0.
+
+`--batch` frames independent worker requests, one per line, with the original
+2 MB per-request cap and dimension/probe/degree/draw caps. Each request still
+reconstructs and solves the same simple dense reference; no factor cache or
+algorithm optimization is added. A bad request terminates with a nonzero status;
+earlier complete request outputs remain visible. The controller rejects partial
+batches and retains exact requests, stdout/stderr, comparisons, fingerprints,
+native trials and all failure diagnostics in a new output directory.
+
+This completes only the reproduced mathematical scope. Full paper KID
+histogram/probability reconstruction, persistent transfer, public weighted APIs
+and Round-3 optimization remain separate admission gates. Native draw outcomes
+are empirical evidence, not a replacement for a justified sample-count theorem.
+CI compiles and runs the standalone analytic/protocol tests; the optional full
+numerical replay additionally needs the declared Python reference environment
+and an existing complete Round-1 output.
+
+## Integrated spectral resource snapshots
+
+`benchmark_spectral_integration.py` compares explicit **unaccelerated algorithms**
+with alternative routes in the same integrated Windows build. A PR-head versus
+integrated-head comparison measures integration regression and is rejected here.
+The [maintained report](../benches/reports/spectral-integration.md) identifies
+which current APIs actually accelerate a workload and which remain reference or
+approximation experiments.
+
+First freeze independently validated inputs and expected results. Supply a JSON
+object with `cells`: each has `name`, `baseline_description`,
+`candidate_description`, `oracle_file`, `tolerance` and `routes`. The two route
+objects, `baseline` and `candidate`, each name a worker `source`, optional
+`args`/`cfg`, and `stdin_file` or `argument_file`. Oracles contain a `values` array
+for each route. Exact workflows use the same mathematical expectation; approximate
+ones retain separate expected sampled output and explicit quality diagnostics.
+
+```sh
+python tools/benchmark_spectral_integration.py --specification target/integration-plan.json --output target/benchmarks/commit-CANDIDATE/spectral-integration/run-001
+```
+
+The controller exports one immutable Git source tree and builds all workers with
+the same `rustc -C opt-level=3` flags. It runs one discarded warmup and ten serial
+fresh-process paired rounds, with balanced order per cell. A private generated
+wrapper times worker main through flushed output, including fixture I/O, parsing,
+computation, validation and export. Process wall time and absolute peak working
+set are separate. Every returned payload is checked against its independent
+oracle with the predeclared scaled Frobenius/Euclidean tolerance. Weighted-solve
+rows also require a freshly recomputed original-equation residual <= 1e-9.
+Mismatch, nonzero exit or timeout stops the run with retained diagnostics.
+
+`reference/spectral_comparison.rs` supplies dense-Schur/factorized actions,
+full-dense/current Gram or harmonic APIs, exhaustive/relevant-pair construction,
+and generic/non-branching construction with optional complete spectra. The
+subspace worker's `--summary` retains eigenvalues and original-coordinate
+projectors, with cold/warm/ordered routes selected by the frozen protocol.
+`reference/hecs.rs --identity-only` supplies unpreconditioned CGLS; the public
+HeCS example's `--stdin --solution-only` returns the same minimum-norm solution
+payload. The sparsification worker's `--benchmark exact|sampled` separates exact
+Gram cost from the complete current sampling prototype; its quality failures
+remain visible and are not exact-output speedups.
+
+Commit the controller and candidate before running, keep local builds/tests idle,
+and retain all inputs, source/binary hashes, raw samples and median/min/max under
+the fresh output directory. These are bounded resource snapshots, with uncontrolled
+host load and CPU frequency; they do not isolate kernel allocations, establish
+cross-library rankings or certify general speedups. Follow the
+[reporting rules](../benches/reporting.md) for interpretation and storage.
+
 ## Spectral reference CI
+
+The [Gram and harmonic-restriction reproduction](../docs/research/split-spectral-reproduction.md)
+uses `reproduce_split_spectra.py` for PETLS Sections 4.4/4.5 and basic LOBPCG
+Algorithms 1/2. The `Gram and positive-spectrum reproduction` CI job runs its
+focused numerical tests and controls with pinned NumPy/SciPy/SymPy/GUDHI.
+It retains raw spectra, iteration traces and the paper-basic clustered-search
+failure separately from the explicit project rank correction. It does not
+certify author-software execution, Rust parity or production optimization.
+The [bounded split-spectral Rust parity tool](../docs/research/split-spectral-rust.md)
+compares `examples/split_spectra.rs` with the hash-pinned first-round #145
+transcription. It supports immutable historical inputs with `--frozen` and a
+freshly frozen platform replay. The `Split-spectral Rust parity` CI job retains
+both ordinary results and expected basic-solver failures; it does not use the
+Python SVD correction as a Rust basic-solver expectation.
 
 The `Real Hodge reference comparisons` CI job requires `--iterative
 --toponetx PATH --perslap PATH --gudhi` on fresh Rust example output. It checks
@@ -73,6 +424,100 @@ external function subsets and bounded learning controls do not establish exact
 real topology, whole-package compatibility or performance rankings.
 
 ## Real persistent Laplacian reproduction
+
+The bounded [relevant-pair reproduction](reproduce_relevant_pairs.py) transcribes
+Kirchner--Vittorietti arXiv:2611.09610v1 Algorithms 1-2 over Q. It freezes the PDF
+SHA-256, input bytes, R/V columns, event buckets, selected pairs, predecessor
+embeddings and every exact upper/full matrix. Its independent row-RREF restricted
+kernel oracle comes from `compare_persistent_laplacians.py`, not the new column
+reducer. GUDHI 3.12.0 corroborates topology over F11; this is not a real-spectrum
+oracle. NumPy 2.2.6 supplies numerical cross-checks. These remain external tools.
+
+```sh
+cargo build --locked --release --example persistent_laplacian
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --paper-style --rust-worker target/release/examples/persistent_laplacian \
+  --output target/relevant-pair-reproduction
+```
+
+Obtain the exact PDF from [arXiv v1](https://arxiv.org/pdf/2611.09610v1); its
+required SHA-256 is `81731c460bbeb12a210fd5745fa862919d4f9992e30e23c07e08419c483009cc`.
+Output directories must be fresh. The tool fails on a different PDF or missing
+dependencies. No author implementation has been verified; this is a mathematical
+transcription. Controls include joint-bucket events, delayed vertices, ties,
+zero columns, RP2 and tetrahedral shells. Every tiny-grid pair, including internal
+empty stages, is checked. The optional paper-style inputs use 12 planar alpha
+points and 8 spatial Rips points at radius 0.3, project-selected seeds 0/1/2 and
+degrees 0-3. These are scaled instances, not author data or Figure 9 timings.
+The Rust worker checks every real-grid pair's full matrix, spectrum, ordered
+labels, scales, degree and evaluated representative against frozen rational
+results. Its `--relevant` mode accepts the existing whitespace fixture protocol,
+treating the start list as the entire grid and evaluating all legal pairs.
+
+Round 2 can replay an existing Round-1 directory directly, without regenerating
+expected R/V or matrices from the current Python algorithm:
+
+```sh
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --replay-frozen target/relevant-pair-reproduction \
+  --output target/relevant-pair-rust-replay
+```
+
+The controller builds and freezes the library test executable, then explicitly
+runs its ignored `replay_frozen_cases` test. Test-only capture hooks in the actual
+public constructor export exact rational R/V, events and selected pairs. They
+are absent from ordinary library builds. Frozen C intermediates, predecessors,
+embeddings, full matrices/spectra and owned coordinate metadata are compared;
+empty grids retain their empty output. Cancellation, work/storage exhaustion,
+invalid indices and degree overflow must return errors without partial output.
+Private arithmetic tests separately exercise checked i128 overflow.
+
+Add `--shared-baseline PATH` for package A's published R0 directory containing
+`manifest.json`, `inputs.json`, `index.json` and the indexed `pair-*.json` files.
+The tool verifies their original SHA-256 manifest and exact `exact_delta`
+matrices, then compares the same Rust batch outputs in matched coordinates.
+A's restricted-boundary Y/R are not the final-boundary C transforms, so only
+C's frozen transforms are compared directly; R=B V and upper-triangular V are
+checked independently for all exported traces. No A code or runtime API is
+imported. All read artifact hashes, the test binary, source fingerprints and
+raw input/output/logs are retained, and inputs are checked for concurrent edits.
+
+New Round-1 runs include raw-byte input hashes and an artifact manifest. Legacy
+Windows runs hashed UTF-8 LF logical input text before CRLF file writing; replay
+verifies precisely that legacy hash while also freezing the original raw bytes.
+Expected outputs from legacy runs without manifests receive current read-time
+hashes, not a claim of a historical signed manifest. Replay is correctness
+evidence only and is kept separate from reproduction/resource timing modes.
+
+Serial single-run Python timings compare exhaustive Schur, selective Schur and
+new-chain upper construction with identical returned matrices/spectra. They
+exclude input construction, oracle validation and export, and remain exploratory
+phase diagnostics. They do not establish an adopted optimization, formal timing
+acceptance, total process memory or complete-spectrum scalability.
+
+On Windows, add `--benchmark-baseline PATH --baseline-revision FULL_SHA` to
+compare a frozen unoptimized Rust worker with `--rust-worker`. Commit the
+implementation/harness first and run without concurrent builds/tests. The
+controller retains one warmup and ten fresh-process paired samples per cell,
+seeded alternating order, full-output equality, construction time, process wall
+time and absolute peak working set. All-pair alpha/Rips, shell/filling controls
+and an alpha single-pair case retain adverse/no-benefit outcomes. It is a bounded
+resource snapshot; process memory includes input/runtime/output and is not an
+allocation peak. The raw manifest records both commits, binary/source/input
+hashes and the uncontrolled host-load limitation.
+Add `--benchmark-direct` with the same current worker/revision as both inputs
+to compare exhaustive native Rust Schur against the unoptimized new-chain batch.
+That comparison checks full matrices/spectra numerically and matches ordered
+coordinates/scales exactly; representative indices and solve counts differ by
+design. It measures whether saved solves repay preparation for these inputs,
+without selecting an automatic default.
+The separate [SPSC-A construction and LSMR reproduction](../docs/research/persistent-constructions.md)
+freezes shared inputs, exact oracles and intermediate paper quantities for
+Issue #144. Run `reproduce_persistent_constructions.py` using that page's pinned
+sources and a new output directory. It does not replace the existing core suite.
+Its `--replay-lsmr-worker PATH --frozen DIRECTORY` mode performs Round-2 native
+LSMR parity using hash-verified original Python outputs. The opted-in worker
+also checks terminal-breakdown discrepancies under the explicitly scoped policy.
 
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
 release [example worker](../examples/persistent_laplacian.rs) with independently
@@ -403,6 +848,24 @@ outputs are not shipped. Current native tools include `benchmark_native.py`, `co
 `compare_sparse_rips.py` and `benchmark_rips_pipeline.py`, with separate
 correctness and timing responsibilities. Do not mix old wrapper samples into
 native rankings.
+
+## Non-branching weak reduction
+
+The [non-branching reproduction](../docs/research/nonbranching.md) separately
+checks Botnan-Dong Algorithms 1-3, induced kernel metrics, pinned author cubical
+code and standalone Rust baseline/compact parity. Its real signed algebraic
+controls and GUDHI topology checks do not add a general Rips solver. Use the
+documented fixed paper/source inputs and a new output directory; literal-paper
+failures and corrected implementations remain separately labeled.
+
+`reproduce_nonbranching.py --library --frozen-round1 PRIOR_REPLAY` additionally
+replays the actual production kernel source and budget against the prior
+R/E/V/Z, index maps, metric and upper matrices. The ordinary reference checker
+accepts `--non-branching --gudhi` to verify both public constructors, action,
+complete spectra and metadata against rational projection and generic reverse
+elimination. Its explicit exclusion manifest records branching outside rows;
+those pairs are not counted as successful comparisons. The example's
+`--non-branching` mode keeps the default 65,536-entry cap.
 
 ## Native sparse Rips checks
 

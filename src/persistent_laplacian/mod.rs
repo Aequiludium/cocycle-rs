@@ -4,12 +4,41 @@
 //! dense reproduction exposes full, upper and lower operators, Algorithm 2 and
 //! fixed-endpoint reverse
 //! elimination of Mémoli--Wan--Wang, arXiv:2012.02808v3, Sections 4 and 5.2.
+//! A separate fixed-projection operator applies sparse boundaries without that
+//! dense matrix. The undamped LSMR diagnostic exposes numerical rectangular
+//! least-squares residuals; it is not the fixed operator's projection policy.
 //! It does not implement weighted Grams, general maps or online endpoint updates.
 //! Signed incidence is assembled directly; no dense boundary matrix is required.
 //! Dense Gram/Schur buffers have explicit limits before allocation. A large
 //! source is rejected rather than silently densified beyond those limits.
+//! Explicit non-branching constructors additionally offer a corrected bounded
+//! weak-reduction baseline with dense incidence, transforms and kernel buffers.
+//! They check pair-local eligibility and never select a Schur fallback.
+//! Separate raw-coordinate operations provide bounded dual Grams, component
+//! spectral union and genuine harmonic restriction with paper-basic LOBPCG.
+//! They do not change stage-pair construction or complete `spectrum()` output.
 
+mod lsmr;
+mod nonbranching;
+mod operator;
+mod relevant_pairs;
 mod schur;
+mod split;
+
+pub use crate::eigensolver::IterativeOptions;
+pub use lsmr::{LsmrOptions, LsmrProjection, project_boundary_kernel_lsmr};
+pub use operator::{
+    OperatorOptions, PersistentEigenpairs, PersistentLaplacianOperator, PersistentSpectrumTarget,
+    fixed_endpoint_eigenpairs,
+};
+
+pub use relevant_pairs::{
+    RelevantPairLaplacian, relevant_pair_eigenpairs, relevant_pair_laplacians,
+};
+pub use split::{
+    GramEigenpairs, GramSpectrum, HarmonicRestriction, PositiveEigenpairs, SplitSpectrum,
+    gram_eigenpairs, gram_spectrum, split_spectrum,
+};
 
 use crate::complex::{Simplex, SimplexId};
 use crate::execution::{Execution, WorkBudget};
@@ -32,7 +61,10 @@ pub enum LaplacianComponent {
 #[derive(Clone, Copy, Debug)]
 pub struct SpectralOptions {
     /// Relative eigenvalue cutoff for the Schur pseudoinverse (default 1e-12).
-    /// Also controls Jacobi convergence and the stepwise zero-pivot test.
+    /// Also controls Jacobi convergence, the stepwise zero-pivot test and the
+    /// new-chain numerical independence guard (never exact event reduction).
+    /// Separate Gram/restriction operations use it for numerical rank; their
+    /// dense eigensolves use a fixed machine-level convergence tolerance.
     pub relative_tolerance: f64,
     /// Maximum relative eigensystem/range residual (default 1e-9).
     /// Also bounds the accumulated positive-mode discarded Schur correction,
@@ -42,7 +74,8 @@ pub struct SpectralOptions {
     /// Maximum cyclic Jacobi sweeps, excluding the initial convergence check.
     pub max_sweeps: usize,
     /// Maximum f64 entries in any one dense buffer (default 65,536).
-    /// The fixed-endpoint operation also caps the sum of returned matrix entries.
+    /// Batch operations also cap the sum of returned matrix entries. The
+    /// relevant-pair route additionally caps rational buffers and grid pairs.
     /// This is not a process memory quota: temporary buffers coexist.
     pub max_dense_entries: usize,
 }
@@ -133,6 +166,129 @@ impl PersistentLaplacian {
         execution: &Execution<'_>,
     ) -> Result<Self> {
         Self::compute_component(k, l, degree, LaplacianComponent::Up, options, execution)
+    }
+
+    /// Construct the full operator using explicitly selected non-branching weak
+    /// reduction for its upper term, then add the source-stage lower term.
+    ///
+    /// Uses the corrected identity-weight Botnan-Dong construction documented
+    /// in the non-branching reproduction. The eligibility check is pair-local:
+    /// outside q-rows of the target (q+1)-boundary must have at most two nonzeros,
+    /// all signed unit entries. Retained rows may branch. Singleton constraints
+    /// and inconsistent signed cycles have no real kernel direction; original
+    /// zero columns contribute once with their inherited metric.
+    ///
+    /// This is a bounded, unoptimized route with explicit dense incidence,
+    /// transforms and kernel buffers under `options.max_dense_entries`. It also
+    /// constructs the original target Gram for the existing reference-scale
+    /// contract. It does not select or fall back to the generic Schur route.
+    /// `solver_residual()` is zero because no Schur solve is performed; this is
+    /// not a floating forward-error or spectral rank certificate.
+    /// # Errors
+    /// Includes the same inclusion, skeleton, policy, numeric and execution
+    /// errors as `compute`, and `InvalidParameter` for ineligible outside rows
+    /// or any incidence/transform/kernel buffer exceeding the declared limit.
+    pub fn compute_non_branching(
+        k: &SimplicialStage<'_>,
+        l: &SimplicialStage<'_>,
+        degree: usize,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::compute_non_branching_component(
+            k,
+            l,
+            degree,
+            LaplacianComponent::Full,
+            options,
+            execution,
+        )
+    }
+
+    /// Construct only the upper term using explicitly selected non-branching
+    /// weak reduction, with the same owned pair metadata as `compute_up`.
+    ///
+    /// Has the eligibility, dense-storage and no-fallback contract of
+    /// [`Self::compute_non_branching`]. It does not assemble the lower term or
+    /// diagonalize the result. Matrix action and spectrum use the ordinary owned
+    /// result's existing methods and start their own execution budgets.
+    /// # Errors
+    /// Has the same errors as `compute_non_branching`.
+    pub fn compute_up_non_branching(
+        k: &SimplicialStage<'_>,
+        l: &SimplicialStage<'_>,
+        degree: usize,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        Self::compute_non_branching_component(
+            k,
+            l,
+            degree,
+            LaplacianComponent::Up,
+            options,
+            execution,
+        )
+    }
+
+    fn compute_non_branching_component(
+        k: &SimplicialStage<'_>,
+        l: &SimplicialStage<'_>,
+        degree: usize,
+        component: LaplacianComponent,
+        options: SpectralOptions,
+        execution: &Execution<'_>,
+    ) -> Result<Self> {
+        let mut budget = WorkBudget::new(execution)?;
+        validate_pair(k, l, degree, component, &options, &mut budget)?;
+        let target_ids = basis_ids(l, degree, &mut budget)?;
+        let count = target_ids
+            .iter()
+            .take_while(|id| id.index() < k.len())
+            .count();
+        // Keep the existing construction-scale and target-Gram cap contract.
+        // Avoid retaining this reference buffer alongside the dense transforms.
+        let gram = up_matrix(l, &target_ids, degree, &options, &mut budget)?;
+        let reference_scale = norm(&gram);
+        drop(gram);
+        let columns = basis_ids(l, degree + 1, &mut budget)?;
+        let p = columns.len();
+        let m = target_ids.len() - count;
+        let mut b1 = dense(count, p, &options, &mut budget)?;
+        let mut d = dense(m, p, &options, &mut budget)?;
+        for (col, &id) in columns.iter().enumerate() {
+            budget.step()?;
+            for term in l.boundary(id).ok_or(Error::InternalInvariant {
+                reason: "non-branching upper boundary missing",
+            })? {
+                budget.step()?;
+                let row =
+                    target_ids
+                        .binary_search(&term.face)
+                        .map_err(|_| Error::InternalInvariant {
+                            reason: "non-branching q-face absent",
+                        })?;
+                if row < count {
+                    b1[row * p + col] += f64::from(term.coefficient);
+                } else {
+                    d[(row - count) * p + col] += f64::from(term.coefficient);
+                }
+            }
+        }
+        let matrix = nonbranching::upper(&b1, &d, count, m, p, &options, &mut budget)?;
+        finish(
+            k,
+            l,
+            degree,
+            &target_ids[..count],
+            &target_ids,
+            matrix,
+            0.,
+            options,
+            component,
+            reference_scale,
+            &mut budget,
+        )
     }
 
     /// Construct only Bq(K)^T Bq(K), independently of any endpoint L.
@@ -242,8 +398,12 @@ impl PersistentLaplacian {
     /// the absolute error. Accepted discarded positive-direction correction
     /// bounds also enter this maximum. A fixed-endpoint result uses zero for
     /// exact-uncoupled elimination or the direct solver's residual after fallback.
-    /// For a lower-only operator this is zero because no Schur solve is used;
+    /// For a lower-only or explicitly non-branching operator this is zero
+    /// because no Schur solve is used;
     /// its eigensystem residual is checked separately by `spectrum`.
+    /// New-chain results instead report max pairwise Q-orthogonality error and
+    /// max(abs(B Q outside K))/max(1,max(abs(B Q inside K))). Scheduling uses
+    /// exact rational pivots independently of these numerical checks.
     pub fn solver_residual(&self) -> f64 {
         self.solver_residual
     }

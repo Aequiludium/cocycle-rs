@@ -26,6 +26,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// conversion, solving and error measurement. Passing the same Execution to
 /// preparation and solving does not combine their counters. Hodge `new` uses
 /// default unlimited preparation controls.
+/// Hodge `solve_hecs` shares one budget across topology checks, collapse trials,
+/// exact image coverage, dense factors, CGLS, original residuals and result copies.
+/// Its dense-entry limit is independent of work limits and bounds each buffer.
+/// Composed persistent partial-spectrum batches share one budget through exact
+/// scheduling, projection updates, supplied starts and fresh original residuals.
+/// Bounded Gram, split-spectrum and harmonic-restriction terminals share one
+/// budget across validation, dense arithmetic, rank preparation and verification.
+/// Positive iteration shares its fresh terminal budget through projection,
+/// Rayleigh-Ritz updates and original-coordinate residuals; preparation is separate.
 /// Cancellation is checked around sorting, allocation, heap construction and user
 /// callbacks, which cannot be interrupted internally. Previously validated input is outside the
 /// operation budget. Each terminal starts fresh; no partial result is returned.

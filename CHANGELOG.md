@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- Compose fixed persistent actions with partial LOBPCG, supplied-vector starts,
+  bounded boundary-image positive spectra, incremental fixed-endpoint projection
+  and exact-event upper-factor reuse, preserving original residuals and metadata.
+- Add single-sided `gram_eigenpairs` and explicitly selected compact
+  non-branching kernel projections without dense transformation matrices.
+
+- Add explicitly selected `PersistentLaplacian::compute_non_branching` and
+  `compute_up_non_branching` for pair-local signed unit outside rows with at
+  most two nonzeros. Use the verified corrected weak reduction and induced
+  kernel metric; preserve owned pair metadata and execution controls. This
+  bounded dense baseline checks incidence/transform/kernel storage under the
+  supplied cap, rejects ineligible pairs and never selects a Schur fallback.
+- Add bounded `persistent_laplacian::relevant_pair_laplacians`: checked rational
+  real-event scheduling, joint-bucket selection, new-chain orthogonalization and
+  owned full operators in every requested basis. Preserve duplicate requests,
+  zero extension and each start's lower term; reject overflow and resource limits.
+- Add a bounded undamped LSMR boundary-kernel diagnostic with owned numerical
+  solution/residual coordinates, fresh residuals, explicit iteration/input/vector
+  caps and cooperative execution controls. Preserve the fixed-projection action
+  API; right-hand-side-dependent solves do not certify a self-adjoint operator.
+
+- Add `PersistentLaplacianOperator` for fixed-projection real stage-pair actions
+  and explicitly bounded materialization, with owned basis/source metadata and
+  separate incidence, projection and vector limits. Preserve the existing dense
+  matrix and complete-spectrum API; numerical ranks remain uncertified.
+- Add bounded ordinary q=1 `HodgeLaplacian::solve_hecs` with explicit positive
+  face weights, checked simplicial topology and exact selected-image coverage.
+  Weighted factors, an active-space CGLS solution and fresh original residuals
+  share execution controls. Rank loss, incompatible RHS, numerical failure and
+  interrupted/nonconverged solves return errors. Existing Hodge/Dirac spectral
+  wrappers retain their behavior; persistent adaptation remains experimental work.
+- Add bounded real-coordinate Gram flips, spectral recombination and verified
+  harmonic-kernel restriction, with a separate paper-basic LOBPCG path. Complete
+  spectra, numerical rank ambiguity and original-coordinate residuals remain
+  explicit; existing Hodge, Dirac and persistent `spectrum()` behavior is unchanged.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

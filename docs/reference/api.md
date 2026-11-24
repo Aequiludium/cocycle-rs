@@ -41,10 +41,12 @@ specific to each operator, with no universal spectral result container.
 | `cocycle::hodge`; `&C` where `C: FilteredComplex<CellId = Id>` | `HodgeLaplacian::new(source, degree, selection)` or `new_with(..., execution)` | `Result<HodgeLaplacian<Id>>`; `HodgeSelection::{Full, Lower, Upper}` chooses summands |
 | Prepared `HodgeLaplacian<Id>` | `spectrum(range, &SpectrumOptions, execution)` | `Result<HodgeSpectrum<Id>>`; full dense decomposition before index selection |
 | Prepared `HodgeLaplacian<Id>` | `smallest_eigenpairs(count, &IterativeOptions, execution)` | `Result<HodgeEigenpairs<Id>>`; approximate ascending Ritz pairs, index coverage uncertified |
+| Degree-1 Upper `HodgeLaplacian<Id>` with simplicial edges/faces | `solve_hecs(weights, rhs, &HecsOptions, execution)` | `Result<HecsSolution<Id>>`; bounded weighted ordinary solve, exact selected-image coverage, factor/active matrix and fresh original residuals |
 | `cocycle::dirac`; `&C` where `C: FilteredComplex<CellId = I>` | `DiracOperator::new(source, degrees: RangeInclusive<usize>)` or `new_with(..., execution)` | `Result<DiracOperator<I>>` with graded basis and offsets |
 | Prepared `DiracOperator<I>` | `boundary_spectrum(degree, count, zero_threshold, &IterativeOptions, execution)` | `Result<DiracBoundarySpectrum<I>>`; descending selected singular modes and ascending signed Dirac pairs |
 | `cocycle::persistent_laplacian`; two `&SimplicialStage` values | `PersistentLaplacian::compute(k, l, degree, options, execution)` / `compute_up(...)` | `Result<PersistentLaplacian>`; owned pair matrix and Full/Up tag |
 | One `&SimplicialStage` | `PersistentLaplacian::compute_down(k, degree, options, execution)` | Same owned type with Down tag and source scales `(s,s)` |
+| Two `&SimplicialStage` values, explicitly selected pair-local structure | `PersistentLaplacian::compute_non_branching(...)` / `compute_up_non_branching(...)` | Same owned Full/Up result; bounded corrected weak reduction, explicit ineligibility and no fallback |
 | Ordered stage slice and one target | `fixed_endpoint_laplacians(starts, target, degree, options, execution)` / `fixed_endpoint_up_laplacians(...)` | `Result<Vec<PersistentLaplacian>>` in input order |
 | Prepared `PersistentLaplacian` | `spectrum(execution)` | `Result<LaplacianSpectrum>`; public component/eigenvalues/residual/zero-threshold fields, no eigenvectors |
 

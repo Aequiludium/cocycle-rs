@@ -1070,13 +1070,73 @@ no full coordinate matrix or full n-value spectrum is required. Residual
 convergence alone cannot certify extremal index coverage or missing multiplicity.
 It provides no harmonic-nullity claim. Both paths retain the same standard
 inner product and full/lower/upper operator, without weighted normalization.
+The private LOBPCG helper also accepts a finite starting block in the current
+orthonormal coordinates. Reorthogonalization and deterministic rank completion
+transfer vectors only; every Ritz value and final residual uses the current
+operator. A supplied invariant subspace can still miss extremal modes. Public
+callers retain cold starts. The separate
+[sequence controls](../research/sequence-subspaces.md) describe corrected
+Chebyshev-filter experiments and their limited reproduction scope.
 General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
 D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
 That extension, complex conjugate adjoints and persistent Laplacians are outside
 the initial API. See the [Hodge guide](../guides/hodge-laplacian.md) for callable
 operations, costs, exclusions and reproducible checks.
 
+### Ordinary q=1 HeCS solve
+
+The separate `solve_hecs` terminal accepts positive explicit face weights and
+uses `U=B W B^T`, `W=diag(w)`, for an ordinary triangular edge-face boundary.
+The inner product remains standard. It does not change the unit-incidence
+action or spectral terminals above. See Savostianov, Tudisco and Guglielmi,
+[arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1), PDF Algorithms 5.1/6.1,
+Sections 6.2 and 7.1; [DOI](https://doi.org/10.1137/23M1626396).
+
+Let S be the selected triangles, in collapse order, and let
+`F=B[:,S] diag(sqrt(w[S]))`. A free-edge collapse gives a lower triangular
+leading minor after row permutation, with signed nonzero pivots. The unweighted
+minor has unit pivots, so exact checked-integer reconstruction can certify
+`im(B[:,S])=im(B)`. This is required independently of maximal collapsibility;
+the RP2 control violates coverage (ranks 9 and 10). The retained factor C is F
+in collapse-edge row order, and `C C^T` is the permuted selected weighted Gram.
+
+When coverage holds, `im(F)=im(U)` and F has full column rank r. Write
+`F+=(F^T F)^(-1)F^T` and `H=F+ U F+^T`. H is positive definite on R^r:
+for nonzero y, `z=F+^T y` is nonzero in im(F)=im(B), and
+`y^T H y=||sqrt(W) B^T z||2^2>0`. For compatible b, solving
+`H y=F+ b` and lifting `x=F+^T y` gives `U x=b`, because
+`U=F H F^T`. The lift lies in im(U), hence is the unique minimum-norm solution.
+All displayed inverses are r-dimensional active Grams; the singular ambient
+edge operator is never ordinarily inverted.
+
+The bounded f64 reference verifies active pivots and the fresh original target
+`||Ux-b||2/max(1,||b||2) <= tolerance`. Forming `F^T F` squares conditioning;
+numerical ambiguity is rejected without regularization. A compatible-RHS check
+uses the same normalized target. Exact image coverage does not certify a
+floating-point RHS or universal forward accuracy. Resource/cancellation failures
+return errors under one terminal budget. Persistent eliminated blocks and outer
+eigensolvers require separate arguments and are not provided by this solve.
+
 ## 23. Real persistent Laplacians
+
+The factorized action uses all upper columns, with B=[B1;B2] split by K and
+L\K rows, and A=boundary_q(K). The persistent upper term is B1 P B1^T for
+P=projection onto ker(B2). Algorithm 1's arbitrary kernel basis Z requires
+P=Z (Z^T Z)^-1 Z^T. Equivalently an orthonormal row-space basis Q of B2 gives
+P=I-Q^T Q; `PersistentLaplacianOperator` fixes a numerical Q at construction.
+It applies B1 (I-Q^T Q) B1^T + A^T A without requiring the persistent matrix.
+Finite precision and numerical rank decisions limit this identity numerically;
+LSMR with right-hand-side-dependent stopping is not its public action policy.
+See the [construction reproduction](../research/persistent-constructions.md)
+for exact rational and independent SVD controls, including nonorthogonal Z.
+
+The separate undamped LSMR diagnostic solves min_w ||B2^T w-y|| from zero and
+returns z=y-B2^T w in the upper-column coordinates. Its fresh normal residual
+is B2 z. The relative stopping rule uses ||B2||_F*||y|| as scale; it is not a
+projection forward-error or exact rank bound. Near terminal bidiagonal
+breakdown, normalized continuation directions need not be reproducible even
+when fitted vectors and Golub--Kahan relations agree. Adaptive stopping is not
+the fixed projector used by the public factorized operator.
 
 For a same-source pair K included in L, use real ordinary chains with orthonormal
 increasing-vertex simplex bases. Let B denote the signed (q+1)-boundary of L,
@@ -1117,6 +1177,21 @@ and residual checks do not certify exact ranks or a forward-error bound.
 Independent rational projection and rank calculations cover finite fixtures;
 finite-field persistence only corroborates torsion-free examples.
 
+For signed unit outside incidence F with at most two nonzeros in every row,
+consistent unsigned-graph components give disjoint signed kernel indicators z.
+Singleton constraints or inconsistent signed cycles force the component to zero
+over the reals; each original zero column is an independent free direction.
+The induced Gram entry is z^T z = support size, so the upper factor uses
+R z / sqrt(support size). The bounded
+[non-branching reproduction](../research/nonbranching.md) documents Algorithms
+1-3 of Botnan-Dong, arXiv:2408.16741v2, their literal-pseudocode discrepancies
+and independent exact checks. The explicitly selected bounded constructors
+`compute_non_branching` and `compute_up_non_branching` use this corrected
+identity-metric construction. They reject ineligible outside rows, preserve
+the same source/coverage contracts and do not certify arbitrary Rips input.
+Their dense transforms and kernel have separate per-buffer storage checks;
+no compact or automatic backend selection is inferred.
+
 Source: Mémoli, Wan and Wang, [Persistent Laplacians: Properties, Algorithms
 and Implications](https://arxiv.org/html/2012.02808v3), arXiv:2012.02808v3
 (2022-06-08), Section 2.2, Theorem 2.7, Theorem 4.6, Algorithm 2 and Section 5.2,
@@ -1129,6 +1204,18 @@ setting, the nonzero spectral multiset of U+D is the union of those of U and D;
 its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
 z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
 exact ranks from arbitrary floating-point near-zero cutoffs.
+
+For any real rectangular A, the positive spectral multisets of A^T A and A A^T
+agree. A positive dual mode z lifts by A^T z/sqrt(lambda). For a verified complete
+harmonic kernel N and an orthonormal complement X, X^T Delta X retains exactly
+the nonzero spectrum. An arbitrary homology representative need not lie in that
+kernel: for the connected two-vertex edge, Delta*[1,0]^T=[1,-1]^T. The
+[bounded external reproduction](../research/split-spectral-reproduction.md)
+checks these facts and a separate basic LOBPCG transcription. The
+[bounded Rust rewrite](../research/split-spectral-rust.md) independently checks
+these operations and basic LOBPCG Algorithms 1/2 against the frozen first-round
+transcription. It retains numerical ambiguity and uncertified iterative index
+coverage; complete persistent spectra remain unchanged.
 
 The implementation exposes full/upper/lower results and separately tagged
 spectra. The lower term depends only on K and requires its q-skeleton; it does
@@ -1143,6 +1230,30 @@ spectral functions and generalize this decomposition. Their infinite-dimensional
 operator domains and stability hypotheses are not implemented here. The full
 operator does not inherit all component comparison properties; this does not
 rule out the fixed-K, increasing-L monotonicity, where D stays constant.
+
+### Relevant pairs and new-chain coordinates
+
+Kirchner and Vittorietti, [New persistent chain spaces](https://arxiv.org/abs/2611.09610v1),
+Algorithms 1-2 (physical PDF page 18) and Section 4.2, reduce the final signed
+boundary over R as R=B V with invertible upper-triangular V. For integer B,
+checked rational arithmetic preserves real pivot decisions exactly. Column j
+has end event t_j at its original simplex birth and start event s_j at the birth
+of low(R_j); a zero column uses an internal empty stage. Retain those zero
+columns, since they are part of the persistent chain space's metric.
+
+The columns V_j with s_j<=s and t_j<=t span the allowed chain domain. They must
+be orthonormalized together before forming B_s Q Q^T B_s^T; the individual new
+chain subspaces are not mutually orthogonal. Evaluate a legal pair (s,t) when
+both a bucket W(a,t) with a<=s and a bucket W(s,b) with b<=t are nonempty. The
+witnesses can be different buckets, so evaluation locations exceed the nonempty
+bucket coordinates in general.
+
+At every other pair choose the evaluated predecessor below it with maximal end,
+then maximal start. Extend its upper operator by zero rows/columns into the
+requested ordered q-basis; no predecessor means zero. The full result adds that
+start's own lower term. Matrix size, zero multiplicity and pair identity must be
+preserved even if nonzero upper spectra coincide. Checked integer overflow is a
+failure of this bounded implementation, not evidence for a zero real pivot.
 
 ## 24. Standard real discrete Dirac
 

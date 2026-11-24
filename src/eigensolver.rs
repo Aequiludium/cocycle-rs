@@ -55,6 +55,25 @@ pub(crate) fn lobpcg(
     largest: bool,
     options: &IterativeOptions,
     budget: &mut WorkBudget<'_>,
+    action: impl FnMut(&[f64], &mut WorkBudget<'_>) -> Result<Vec<f64>>,
+) -> Result<Eigenpairs> {
+    lobpcg_with_initial(n, count, largest, options, None, budget, action)
+}
+
+/// Optional row-major n-by-min(block_size,n) starting block in the current
+/// operator's orthonormal coordinates. Nonfinite or malformed input is rejected;
+/// two-pass orthogonalization drops dependent columns and fills from the same
+/// deterministic cold sequence, then coordinate directions. This transfers only
+/// vectors: all Ritz values and final residuals use the supplied current action.
+/// A supplied invariant subspace can miss extremal modes even at zero residual.
+/// Basis/source mapping and any range projection remain the caller's obligation.
+pub(crate) fn lobpcg_with_initial(
+    n: usize,
+    count: usize,
+    largest: bool,
+    options: &IterativeOptions,
+    initial: Option<&[f64]>,
+    budget: &mut WorkBudget<'_>,
     mut action: impl FnMut(&[f64], &mut WorkBudget<'_>) -> Result<Vec<f64>>,
 ) -> Result<Eigenpairs> {
     if options.block_size == 0 || count > n || count > options.block_size {
@@ -71,6 +90,20 @@ pub(crate) fn lobpcg(
             ));
         }
     }
+    let b = options.block_size.min(n);
+    if let Some(values) = initial {
+        let initial_entries = n.checked_mul(b).ok_or(overflow())?;
+        if values.len() != initial_entries || initial_entries > options.max_basis_entries {
+            return Err(invalid(
+                "iterative initial block",
+                "require row-major n-by-min(block_size,n) within the entry limit",
+            ));
+        }
+        budget.step_by(values.len())?;
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(invalid("iterative initial block", "must be finite"));
+        }
+    }
     if count == 0 {
         return Ok(Eigenpairs {
             values: Vec::new(),
@@ -82,7 +115,6 @@ pub(crate) fn lobpcg(
             peak_subspace: 0,
         });
     }
-    let b = options.block_size.min(n);
     let max_columns = b.checked_mul(3).ok_or(overflow())?.min(n);
     for entries in [
         n.checked_mul(max_columns),
@@ -97,7 +129,20 @@ pub(crate) fn lobpcg(
     }
     let mut seed = options.seed;
     let mut x = Vec::new();
+    if let Some(values) = initial {
+        for column in 0..b {
+            let mut v = zeros(n, budget)?;
+            budget.step_by(n)?;
+            for row in 0..n {
+                v[row] = values[row * b + column];
+            }
+            orthogonalize(v, &mut x, budget)?;
+        }
+    }
     for _ in 0..b {
+        if x.len() == b {
+            break;
+        }
         let mut v = zeros(n, budget)?;
         for value in &mut v {
             seed = seed.wrapping_add(0x9e3779b97f4a7c15);
@@ -487,6 +532,136 @@ mod tests {
     use super::*;
     use crate::execution::Execution;
     use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn supplied_block_uses_current_operator_and_fresh_residuals() {
+        let n = 16;
+        let options = IterativeOptions {
+            block_size: 3,
+            max_iterations: 0,
+            ..IterativeOptions::default()
+        };
+        let mut initial = vec![0.; n * 3];
+        // Nonorthogonal, differently scaled columns spanning e0,e1,e2.
+        initial[0] = 2.;
+        initial[1] = 1.;
+        initial[4] = 3.;
+        initial[8] = -4.;
+        let mut calls = 0;
+        let result = lobpcg_with_initial(
+            n,
+            2,
+            false,
+            &options,
+            Some(&initial),
+            &mut WorkBudget::new(&Execution::default()).unwrap(),
+            |x, _| {
+                calls += 1;
+                Ok(x.iter()
+                    .enumerate()
+                    .map(|(i, v)| v * (i + 5) as f64)
+                    .collect())
+            },
+        )
+        .unwrap();
+        assert!((result.values[0] - 5.).abs() < 1e-12);
+        assert!((result.values[1] - 6.).abs() < 1e-12);
+        assert!(result.residuals.iter().all(|&r| r < 1e-12));
+        assert_eq!(result.iterations, 0);
+        assert_eq!(calls, result.actions);
+        assert_eq!(calls, options.block_size + 2); // Includes fresh final actions.
+    }
+
+    #[test]
+    fn deficient_supplied_block_is_completed_and_zero_block_replays_cold() {
+        let n = 12;
+        let options = IterativeOptions {
+            block_size: 3,
+            ..IterativeOptions::default()
+        };
+        let zero = vec![0.; n * 3];
+        let solve = |initial: Option<&[f64]>| {
+            lobpcg_with_initial(
+                n,
+                2,
+                false,
+                &options,
+                initial,
+                &mut WorkBudget::new(&Execution::default()).unwrap(),
+                |x, _| {
+                    Ok(x.iter()
+                        .enumerate()
+                        .map(|(i, v)| (i + 1) as f64 * v)
+                        .collect())
+                },
+            )
+            .unwrap()
+        };
+        let cold = solve(None);
+        let empty_rank = solve(Some(&zero));
+        assert_eq!(cold.values, empty_rank.values);
+        assert_eq!(cold.vectors, empty_rank.vectors);
+        assert_eq!(cold.actions, empty_rank.actions);
+        let duplicate = vec![1.; n * 3];
+        let partial = solve(Some(&duplicate));
+        assert!((partial.values[0] - 1.).abs() < 1e-8);
+        assert!((partial.values[1] - 2.).abs() < 1e-8);
+    }
+
+    #[test]
+    fn supplied_block_rejects_shape_nonfinite_and_storage_before_action() {
+        let options = IterativeOptions {
+            block_size: 2,
+            ..IterativeOptions::default()
+        };
+        for initial in [vec![0.; 3], vec![f64::NAN; 8], vec![f64::INFINITY; 8]] {
+            let result = lobpcg_with_initial(
+                4,
+                1,
+                false,
+                &options,
+                Some(&initial),
+                &mut WorkBudget::new(&Execution::default()).unwrap(),
+                |_, _| panic!("invalid input must not reach the operator"),
+            );
+            assert!(matches!(result, Err(Error::InvalidParameter { .. })));
+        }
+        let limited = IterativeOptions {
+            max_basis_entries: 7,
+            ..options
+        };
+        let result = lobpcg_with_initial(
+            4,
+            1,
+            false,
+            &limited,
+            Some(&[0.; 8]),
+            &mut WorkBudget::new(&Execution::default()).unwrap(),
+            |_, _| panic!("entry limit must precede the operator"),
+        );
+        assert!(matches!(result, Err(Error::InvalidParameter { .. })));
+    }
+
+    #[test]
+    fn supplied_validation_shares_work_budget_and_checks_cancelled_input() {
+        let flag = AtomicBool::new(true);
+        let policy = Execution::default().cancellation(&flag);
+        assert!(matches!(WorkBudget::new(&policy), Err(Error::Cancelled)));
+        let policy = Execution::default().max_work(2);
+        let result = lobpcg_with_initial(
+            4,
+            1,
+            false,
+            &IterativeOptions {
+                block_size: 2,
+                ..IterativeOptions::default()
+            },
+            Some(&[1.; 8]),
+            &mut WorkBudget::new(&policy).unwrap(),
+            |_, _| panic!("input validation must exhaust the shared budget"),
+        );
+        assert!(matches!(result, Err(Error::WorkLimitExceeded { .. })));
+    }
 
     #[test]
     fn cancellation_after_an_operator_call_returns_no_pairs() {

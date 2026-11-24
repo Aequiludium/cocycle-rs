@@ -53,6 +53,11 @@ src/
   persistent_laplacian/
     mod.rs                       real stage-pair Schur operators and reverse elimination
     schur.rs                     bounded Jacobi eigensystem and generalized Schur solve
+    nonbranching.rs              bounded corrected weak reduction and induced kernel metric
+    relevant_pairs.rs            exact events, bounded matrices and cached-factor partial spectra
+    operator.rs                  fixed/compact projection, partial spectra and reverse workspace reuse
+    lsmr.rs                      bounded undamped rectangular least-squares diagnostic
+    split.rs                     bounded dual Grams, harmonic restriction and paper-basic LOBPCG
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/
@@ -112,6 +117,7 @@ src/
       expansion.rs               shared explicit clique construction
   hodge/
     mod.rs                       real signed chain windows and sparse Hodge action
+    hecs.rs                      bounded ordinary triangular upper-Hodge factors and CGLS
     spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
   eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/

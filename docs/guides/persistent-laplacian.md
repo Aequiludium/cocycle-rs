@@ -2,9 +2,235 @@
 
 [Documentation](../index.md) / Usage
 
+## Composed matrix-free partial spectra
+
+`PersistentLaplacianOperator::eigenpairs` connects fixed sparse action to shared
+block LOBPCG. `PersistentSpectrumTarget::Smallest` includes harmonic zeros;
+`Largest` returns descending modes. `SmallestPositive` streams `[B1 P, A^T]`
+columns into a numerical range basis, without a full persistent matrix,
+complete eigensolve or supplied harmonic representatives.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{IterativeOptions, OperatorOptions,
+    PersistentLaplacianOperator, PersistentSpectrumTarget};
+let source = SimplicialComplex::new(vec![Simplex::new(vec![0], 0.)?,
+    Simplex::new(vec![1], 0.)?, Simplex::new(vec![0, 1], 1.)?])?;
+let stage = source.stage(1.)?;
+let execution = Execution::default();
+let op = PersistentLaplacianOperator::new(&stage, &stage, 0,
+    OperatorOptions::default(), &execution)?;
+let result = op.eigenpairs(1, PersistentSpectrumTarget::SmallestPositive,
+    None, &IterativeOptions::default(), &execution)?;
+assert!((result.values[0] - 2.).abs() < 1e-10);
+assert_eq!(result.range_rank, Some(1));
+assert!(!result.is_index_coverage_certified());
+# Ok::<(), cocycle::Error>(())
+```
+
+Optional initial vectors are row-major `n * min(block_size,n)` in the current
+original basis. Only vectors transfer; current values and residuals are freshly
+computed. Positive requests project starts into the range. Dependent columns
+are completed by the shared solver. Outside batch functions, the caller maps
+bases and source identities.
+
+Two-pass range QR uses `relative_tolerance * max(1, largest generator norm)`;
+annihilated roundoff is not normalized into a direction. Ambiguous surviving
+pivots fail. The range costs O(n*r), obeys `max_basis_entries`, and can remain
+quadratic at high rank. Positive values must exceed the iterative absolute
+tolerance plus relative tolerance times the total squared generator norms,
+a trace bound for the exact PSD operator. Original residuals, range leakage
+and orthogonality are checked. Neither numerical rank nor residual convergence
+certifies exact real Betti numbers or extremal-index coverage.
+
+`new_non_branching` explicitly selects signed-component projection when outside
+rows have at most two signed unit entries. It needs O(p) factor storage and
+projection work, with no dense R/E/V/Z or Q. Zero columns, forced directions and
+inconsistent components are handled. Ineligible pairs fail without fallback.
+Its outside rank is exact for this signed structural model; positive range rank
+remains numerical. The dense weak-reduction constructor stays as a reference.
+
+`restrict_start` consumes a snapshot and moves its start backward at one fixed
+endpoint, appending outside constraints and truncating the lower boundary.
+Compact updates require continued eligibility. `fixed_endpoint_eigenpairs`
+combines reverse factor updates with optional warm vectors. The separate
+`relevant_pair_eigenpairs` caches each needed exact-event upper factor and
+zero-extends it, giving each request its own lower boundary. It never reuses
+a representative's full operator. Scheduling retains a capped rational boundary
+without a p-by-p transform. Cumulative cached-factor and returned-vector caps
+apply; each entire batch shares one work budget through output verification.
+Neither batch implements online endpoint insertion or promises speedups.
+
+`gram_eigenpairs` constructs only the smaller Gram, lifts its positive vectors
+and restores zeros in the original domain. It returns no matrix and measures
+residuals through rectangular actions. Its transpose, smaller Gram, vectors and
+output each obey the dense cap. The old `gram_spectrum` retains both Grams.
+Adaptive LSMR, research Chebyshev filters, sampling and ordinary HeCS are not
+silently substituted into these fixed persistent actions.
+
+## Bounded Gram and harmonic-restriction operations
+
+The Unreleased `gram_spectrum`, `split_spectrum` and `HarmonicRestriction` APIs
+provide the bounded Rust rewrite for Issue #145. Inputs are explicit row-major
+real-coordinate matrices with standard inner products. They own their results;
+no source inclusion, degree, pair or simplex labels are inferred from a matrix.
+Keep the originating `PersistentLaplacian` and its basis/source metadata when
+using its `matrix()` as input. Existing `spectrum()` still returns its complete
+unfiltered numerical spectrum.
+
+```rust
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{gram_spectrum, HarmonicRestriction, SpectralOptions};
+
+let options = SpectralOptions::default();
+let execution = Execution::default();
+// Signed vertex-edge boundary of a triangle, in explicit coordinate order.
+let a = [-1., -1., 0., 1., 0., -1., 0., 1., 1.];
+let grams = gram_spectrum(&a, 3, 3, options, &execution)?;
+assert_eq!(grams.numerical_rank, 2);
+assert_eq!(grams.reconstructed.len(), 3);
+
+// The connected edge has actual harmonic kernel span([1,1]), not [1,0].
+let h = [1., -1., -1., 1.];
+let positive = HarmonicRestriction::compute(&h, 2, &[1., 1.], 1, options, &execution)?;
+let pairs = positive.smallest_eigenpairs(&[1., -1.], 1, 1, 120, 1e-9, &execution)?;
+assert!((pairs.values[0] - 2.).abs() < 1e-10);
+assert!(pairs.residuals[0] < 1e-9);
+assert!(!pairs.is_index_coverage_certified());
+# Ok::<(), cocycle::Error>(())
+```
+
+`gram_spectrum(A,m,n,...)` constructs **both** complete Grams, their full raw
+spectra and lifted positive dual vectors. It reconstructs n values from the
+numerical positive rank, with multiplicity. `dual_is_smaller` is advisory shape
+metadata; it does not select a faster implementation. `split_spectrum(A,m,n,F,p,...)`
+checks the chain product and merges only positive component values, adding
+`n-rank(A)-rank(F)` numerical zeros. F must already include the correct kernel
+metric. It does not construct a persistent boundary from arbitrary factors.
+
+`HarmonicRestriction::compute(H,n,N,k,...)` verifies and normalizes the supplied
+kernel, constructs its orthonormal complement X and retains the complete
+`X^T H X` spectrum and original-coordinate vectors. Preparation deliberately
+uses complete dense decompositions. A tiny positive value is retained and marked
+ambiguous within ten times `relative_tolerance * ||H||2`. The separate partial
+iteration rejects an ambiguous positive domain or an excessive request.
+Numerical kernel/rank tests are not exact homology certificates.
+
+Initial iteration columns are **n by block_size in original coordinates** and
+are projected by X^T. The requested count must not exceed the block or reduced
+domain. Basic LOBPCG uses identity preconditioning, diagonal metric scaling and
+checked Cholesky. A dependent search, metric condition above 1e12 or iteration
+exhaustion returns an error. It does not use the first-round SVD search correction
+or robust Algorithm 8. Returned residuals are freshly measured against H and
+normalized by `max(1,||H||2)`; leakage and orthogonality are also checked. Residual
+success does not certify smallest indexes or multiplicity outside the block.
+
+Each terminal shares one `Execution` budget through preparation, projection,
+solves and final verification. Every dense buffer obeys `max_dense_entries`;
+buffers coexist, so the cap is not a process memory quota. Both Gram dimensions
+must fit the cap. These are unoptimized baselines: they add no automatic side
+selection, lower cache, range-only method or speedup claim. Run
+`cargo run --locked --example split_spectra` for the example, and see the
+[Round-2 parity protocol](../research/split-spectral-rust.md) for independent
+reference checks and failure records.
+
+## Pair construction and complete spectra
+
 The unreleased API belongs to `cocycle::persistent_laplacian`, independently of
 Dirac operators. Input/stage interfaces and `Execution` controls are preserved.
 Its private Jacobi solver retains its own convergence/error/resource policy.
+
+## Factorized action
+
+`PersistentLaplacianOperator` prepares a fixed numerical row-space basis Q of
+the outside boundary B2 and applies B1 (I-Q^T Q) B1^T + A^T A. Two-pass
+modified Gram--Schmidt determines Q once. Actions use no adaptive LSMR solve;
+the separate [paper reproduction](../research/persistent-constructions.md)
+records LSMR composition as an experiment. Partial spectra use the composed
+interface above; complete dense spectra remain the separate
+`PersistentLaplacian::spectrum` contract.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{OperatorOptions, PersistentLaplacianOperator};
+let cells = [(vec![0], 0.), (vec![2], 0.), (vec![1], 1.),
+             (vec![0, 1], 2.), (vec![1, 2], 2.)];
+let source = SimplicialComplex::new(cells.into_iter()
+    .map(|(v, t)| Simplex::new(v, t)).collect::<cocycle::Result<_>>()?)?;
+let execution = Execution::default();
+let op = PersistentLaplacianOperator::new(&source.stage(0.)?, &source.stage(2.)?,
+    0, OperatorOptions::default(), &execution)?;
+let y = op.action(&[1., -1.], &execution)?;
+assert!((y[0] - 1.).abs() < 1e-12 && (y[1] + 1.).abs() < 1e-12);
+assert_eq!(op.materialize(4, &execution)?.len(), 4);
+assert_eq!(op.projection_rank(), 1);
+# Ok::<(), cocycle::Error>(())
+```
+
+The result owns degree, scales, ordered simplex labels, source coverage/context
+and the construction certificate. Inclusion/skeleton validation is identical to
+the dense full constructor. Each constructor/action/materialization starts a
+fresh terminal budget. Within materialization, all basis actions share the same
+budget. Cancellation, work/storage exhaustion and numerical failures return
+errors; no partial output or dense fallback is returned.
+
+`OperatorOptions` separates incidence entries, cumulative dense Q entries,
+per-vector entries and the spectral policy's per-buffer dense limit.
+Boundaries are sparse signed columns. Preparation/action never allocates a
+target N-by-N, persistent n-by-n or upper-column p-by-p matrix. Action costs
+O(nnz + p*rank(B2) + coordinate counts), including actual transpose traversals.
+`materialize(max_entries, execution)` applies both its explicit limit and the
+configured dense limit. These caps do not bound aggregate RAM. Projection setup
+can fill in, costing O(p*rank(B2)) retained f64 entries. Relative tolerance must
+be at least 128 machine epsilons. A discarded row residual between 64 eps and
+the relative rank cutoff is rejected as ambiguous; smaller residuals are
+numerically dependent. Orthogonality and discarded-row diagnostics are bounded
+by the residual tolerance. They do not certify exact rank, positivity at arbitrary
+scales or forward error for ill-conditioned projections. Existing dense
+`PersistentLaplacian::matrix()` and `spectrum()` retain their contracts.
+
+## LSMR boundary-kernel diagnostic
+
+`project_boundary_kernel_lsmr` transcribes the undamped rectangular least-squares
+recurrence verified in the [paper reproduction](../research/persistent-constructions.md).
+Pass row-major B2, its outside-row and upper-column counts, and y in the same
+upper-column order. The result owns w and the fresh residual z=y-B2^T w, together
+with residual norms and the number of completed updates. Retain the originating
+source, ordered bases and boundary separately: this raw numerical subroutine
+does not authenticate a stage inclusion or revalidate a chain complex.
+
+```rust
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{LsmrOptions, project_boundary_kernel_lsmr};
+let result = project_boundary_kernel_lsmr(
+    &[1., -1.], 1, 2, &[1., 0.], LsmrOptions::default(), &Execution::default())?;
+assert!((result.solution[0] - 0.5).abs() < 1e-12);
+assert!(result.projected.iter().all(|z| (z - 0.5).abs() < 1e-12));
+assert!(result.normal_residual_norm < 1e-12);
+# Ok::<(), cocycle::Error>(())
+```
+
+This first Rust rewrite borrows a dense rectangular boundary and uses
+O(outside_rows+upper_columns) vector storage, with no damping, sparse
+factorization or reorthogonalization. `LsmrOptions` caps input entries, each
+vector and iterations. Its default iteration limit is 4*min(rows,columns)+4.
+One terminal budget covers input validation, every update and fresh residual
+evaluation. Exhaustion, interruption, zero rotations before convergence and
+nonfinite arithmetic return an error without a partial successful result.
+The unscaled reference recurrence also rejects normal/rotation scale underflow
+and overflowing rotation products. It does not silently rescale or regularize
+such inputs; a stable scaled solver is a separate development step.
+
+The project stopping rule is norm(B2*z) <= tolerance*norm(B2,Fro)*norm(y), with
+default tolerance 1e-13. Zero/stationary or empty systems return zero w and y
+with zero updates. A small normal residual does not bound forward projection
+error near singularity. Right-hand-side-dependent iteration stopping does not
+establish a fixed linear/self-adjoint action. The existing fixed-projector
+operator remains the action API; this diagnostic adds no partial eigensolver.
+
+## Dense reference
 
 Reverse elimination skips a near-zero pivot only if its retained coupling is
 exactly zero. Small coupling alone cannot bound the Schur correction: the PSD
@@ -84,6 +310,65 @@ authenticate a pair: consumers must retain the operator's degree, ordered bases
 and source metadata. Spectra of equally sized or numerically equal matrices
 from different requests are not implicitly identified.
 
+## Explicit non-branching construction
+
+`compute_non_branching(k, l, degree, options, execution)` constructs the full
+operator through the corrected identity-weight weak reduction;
+`compute_up_non_branching(...)` constructs its upper term alone. Both return
+the same owned `PersistentLaplacian`, component tags, ordered original bases,
+scales and source certificates as the ordinary constructors. Action and complete
+spectrum use the existing result methods. The default Schur constructors are
+unchanged; this route is explicitly requested by the caller.
+
+```rust
+# use cocycle::complex::{Simplex, SimplicialComplex};
+# use cocycle::execution::Execution;
+# use cocycle::persistent_laplacian::{PersistentLaplacian, SpectralOptions};
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![2], 0.)?,
+    Simplex::new(vec![1], 1.)?, Simplex::new(vec![0, 1], 2.)?,
+    Simplex::new(vec![1, 2], 2.)?,
+])?;
+let operator = PersistentLaplacian::compute_up_non_branching(
+    &source.stage(0.)?, &source.stage(2.)?, 0,
+    SpectralOptions::default(), &Execution::default(),
+)?;
+for (actual, expected) in operator.matrix().iter().zip([0.5, -0.5, -0.5, 0.5]) {
+    assert!((actual - expected).abs() < 1e-12);
+}
+# Ok::<(), cocycle::Error>(())
+```
+
+Eligibility is **pair-local**: only outside q-rows of the target signed
+(q+1)-boundary must have at most two nonzeros, each in {-1,1}. Retained rows
+may branch. A source label, degree or Rips origin is not an eligibility test.
+Singleton constraints and inconsistent signed cycles force their component to
+zero over R; original zero columns are free directions included once. The
+induced norm divides each boundary factor by the square root of its support
+size. See the [reproduction](../research/nonbranching.md) for the disclosed
+corrections to the printed pseudocode and the frozen intermediate matrices.
+
+Ineligible inputs return `InvalidParameter` with parameter
+`"non-branching boundary"`; no generic fallback is attempted. Inclusion,
+coverage/skeleton, degree overflow and numerical policy checks are the same as
+the ordinary full/upper constructors. One `Execution` budget covers source
+validation, incidence, traversal, dense transforms, kernel verification, matrix
+construction, the lower term and owned output. Cancellation or exhaustion
+returns no partial result. Subsequent action and spectrum start fresh budgets.
+
+This second-round implementation deliberately retains dense B1, outside D,
+reduction R, V, kernel Z and normalized factor. Every f64 buffer is limited by
+`max_dense_entries`. It also builds and releases the original target Gram to
+preserve the existing reference-scale contract. Thus a pair may fit the Schur
+route but exceed this route's incidence/transform/kernel cap. Neither the cap
+nor the default is raised automatically; this is not the compact experiment or
+a sparse scalability claim. `solver_residual()` is zero because no Schur solve
+is performed, while the kernel constraint is checked on signed unit data.
+Floating factor assembly and subsequent eigensystems retain numerical error;
+zero solve residual does not certify an exact matrix or spectral rank.
+
+## Schur and spectral semantics
+
 In this finite-dimensional standard-inner-product setting, write U for the
 persistent upper term and D for the lower term. The chain identity gives
 UD=DU=0. The nonzero spectrum of U+D is the multiset union of the two nonzero
@@ -129,6 +414,60 @@ The algorithm is caller-selected. Performance evidence does not automatically
 adopt it as the default or establish online endpoint-update support.
 `fixed_endpoint_up_laplacians` performs the same elimination while returning
 only the tagged upper results, without constructing any source lower terms.
+
+## Relevant pairs and new chains
+
+`relevant_pair_laplacians` is an explicit bounded batch alternative for a
+nondecreasing same-source stage grid and a list of `(start_index,end_index)`
+requests. It preserves request order, duplicates and each request's full basis,
+scales and certificates. Equal births enter together; repeated grid scales use
+the earliest event index. A grid can skip birth scales. Each returned
+`RelevantPairLaplacian::operator()` is a full owned operator, while
+`representative()` identifies the evaluated upper term, or `None` for zero.
+
+```rust
+use cocycle::complex::{Simplex, SimplicialComplex};
+use cocycle::execution::Execution;
+use cocycle::persistent_laplacian::{SpectralOptions, relevant_pair_laplacians};
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![2], 0.)?,
+    Simplex::new(vec![1], 1.)?, Simplex::new(vec![0,1], 2.)?,
+    Simplex::new(vec![1,2], 2.)?,
+])?;
+let stages = [source.stage(0.)?, source.stage(1.)?, source.stage(2.)?];
+let results = relevant_pair_laplacians(&stages, &[(0,2), (0,0), (0,2)], 0,
+    SpectralOptions::default(), &Execution::default())?;
+assert_eq!(results[0].representative(), Some((0,2)));
+assert!((results[0].operator().matrix()[0] - 0.5).abs() < 1e-10);
+assert_eq!(results[1].representative(), None);
+assert_eq!(results[0].operator().matrix(), results[2].operator().matrix());
+# Ok::<(), cocycle::Error>(())
+```
+
+The implementation follows Kirchner--Vittorietti [Algorithms 1-2](https://arxiv.org/pdf/2611.09610v1#page=18).
+It retains signed R=B V over checked i128 rationals, including zero columns.
+Integer incidence has the same rank over Q and R. Overflow returns `SizeOverflow`;
+finite-field or uncertain floating pivots never prune the schedule. A pair can be
+selected by two different event buckets. Reconstruction chooses maximal endpoint
+then maximal start, embeds the upper matrix with zero rows/columns and adds the
+requested start's own lower term. Reusing the representative's full matrix would
+lose that lower term and the new domain's zero multiplicity.
+
+At an evaluated pair, all eligible V columns are orthonormalized together in final
+chain coordinates with twice-reorthogonalized Gram--Schmidt. Nearly dependent
+numerical columns fail rather than being discarded. `solver_residual()` reports
+Q-orthogonality and outside-K boundary error, as normalized in its rustdoc;
+these are numerical checks, not forward-error bounds. The event schedule alone
+is exact. Spectra remain complete numerical spectra, computed separately.
+
+Preparation retains dense rational boundary and transformation buffers; every
+rational entry uses 32 bytes. The existing entry cap also bounds those buffers,
+floating buffers, grid pair count and cumulative returned matrix entries.
+Buffers and owned metadata coexist, so this is not a total RAM quota. There is
+one cumulative execution budget and no automatic exhaustive fallback. This
+first implementation rebuilds the orthogonal basis at every needed selected
+pair; incremental bases and sparse scheduling are separate experiments. Fewer
+evaluated pairs alone do not establish end-to-end speedup or scalable full spectra.
 
 The default cap is 65,536 f64 entries per dense buffer, limiting the target
 q-basis to 256 entries. Fixed-endpoint results additionally cap their cumulative

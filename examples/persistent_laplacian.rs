@@ -2,13 +2,21 @@
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
-    PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    IterativeOptions, LsmrOptions, OperatorOptions, PersistentLaplacian,
+    PersistentLaplacianOperator, PersistentSpectrumTarget, SpectralOptions,
+    fixed_endpoint_laplacians, fixed_endpoint_up_laplacians, project_boundary_kernel_lsmr,
+    relevant_pair_laplacians,
 };
 use std::io::{self, Read};
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [command, n, actions] = args.as_slice()
+        && command == "--operator-benchmark"
+    {
+        return operator_benchmark(n.parse()?, actions.parse()?);
+    }
     if args.is_empty() {
         let source = SimplicialComplex::new(vec![
             Simplex::new(vec![0], 0.)?,
@@ -43,17 +51,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "action on [1,-1]: {:?}",
             result.action(&[1., -1.], &Execution::default())?
         );
+        let least_squares = project_boundary_kernel_lsmr(
+            &[1., -1.],
+            1,
+            2,
+            &[1., 0.],
+            LsmrOptions::default(),
+            &Execution::default(),
+        )?;
+        println!(
+            "LSMR boundary-kernel residual: {:?}",
+            least_squares.projected
+        );
         return Ok(());
     }
-    let (benchmark, components) = match args.as_slice() {
-        [a] if a == "--oracle" => (None, false),
-        [a] if a == "--components" => (None, true),
+    let partial = match args.as_slice() {
+        [a, b] if a == "--partial" => Some(b.as_str()),
+        _ => None,
+    };
+    let relevant = args.as_slice() == ["--relevant"] || args.as_slice() == ["--relevant-direct"];
+    let (benchmark, components, non_branching, operator) = match args.as_slice() {
+        [a] if a == "--relevant" || a == "--relevant-direct" => (None, false, false, false),
+        [a] if a == "--oracle" => (None, false, false, false),
+        [a] if a == "--components" => (None, true, false, false),
+        [a] if a == "--non-branching" => (None, true, true, false),
+        [a] if a == "--operator" => (None, false, false, true),
+        [a, _] if a == "--partial" => (None, false, false, false),
         [a, b] if a == "--benchmark" && (b == "direct" || b == "stepwise") => {
-            (Some(b.as_str()), false)
+            (Some(b.as_str()), false, false, false)
         }
         _ => {
             return Err(
-                "usage: persistent_laplacian [--oracle | --components | --benchmark direct|stepwise]".into(),
+                "usage: persistent_laplacian [--oracle | --components | --non-branching | --operator | --relevant | --relevant-direct | --benchmark direct|stepwise | --operator-benchmark n actions]".into(),
             );
         }
     };
@@ -84,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|s| source.stage(*s))
             .collect::<cocycle::Result<Vec<_>>>()?;
         let options = SpectralOptions {
-            max_dense_entries: if benchmark.is_some() {
+            max_dense_entries: if benchmark.is_some() || non_branching {
                 65_536
             } else {
                 4_000_000
@@ -92,6 +121,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         };
         let execution = Execution::default();
+        if let Some(mode) = partial {
+            partial_spectra(mode, &starts, &target, degree, options, &execution)?;
+            continue;
+        }
+        if relevant {
+            let requests: Vec<_> = (0..starts.len())
+                .flat_map(|t| (0..=t).map(move |s| (s, t)))
+                .collect();
+            let begin = Instant::now();
+            if args.as_slice() == ["--relevant-direct"] {
+                let results = requests
+                    .iter()
+                    .map(|&(s, t)| {
+                        PersistentLaplacian::compute(
+                            &starts[s], &starts[t], degree, options, &execution,
+                        )
+                    })
+                    .collect::<cocycle::Result<Vec<_>>>()?;
+                println!(
+                    "BATCH {} {} {:.17e}",
+                    requests.len(),
+                    requests.len(),
+                    begin.elapsed().as_secs_f64()
+                );
+                for (&(s, t), operator) in requests.iter().zip(&results) {
+                    print_relevant(s, t, operator, None, 0, &execution)?;
+                }
+                continue;
+            }
+            let results =
+                relevant_pair_laplacians(&starts, &requests, degree, options, &execution)?;
+            let elapsed = begin.elapsed().as_secs_f64();
+            println!(
+                "BATCH {} {} {:.17e}",
+                requests.len(),
+                results
+                    .iter()
+                    .filter_map(|r| r.representative())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                elapsed
+            );
+            for (&(s, t), result) in requests.iter().zip(&results) {
+                print_relevant(
+                    s,
+                    t,
+                    result.operator(),
+                    result.representative(),
+                    result.upper_embedding().len(),
+                    &execution,
+                )?;
+            }
+            continue;
+        }
         if let Some(route) = benchmark {
             let begin = Instant::now();
             let results = if route == "direct" {
@@ -118,7 +201,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None
         };
         for (index, (k, step)) in starts.iter().zip(steps).enumerate() {
-            let r = PersistentLaplacian::compute(k, &target, degree, options, &execution)?;
+            let r = if non_branching {
+                PersistentLaplacian::compute_non_branching(k, &target, degree, options, &execution)?
+            } else {
+                PersistentLaplacian::compute(k, &target, degree, options, &execution)?
+            };
             let spectrum = r.spectrum(&execution)?;
             println!(
                 "PAIR {} {} {} {}",
@@ -146,8 +233,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 spectrum.residual,
                 step.solver_residual()
             );
+            if operator {
+                let factorized = PersistentLaplacianOperator::new(
+                    k,
+                    &target,
+                    degree,
+                    OperatorOptions {
+                        spectral: options,
+                        ..Default::default()
+                    },
+                    &execution,
+                )?;
+                print_values(
+                    "FACTORIZED_MATRIX",
+                    &factorized.materialize(4_000_000, &execution)?,
+                );
+                print_values("FACTORIZED_ACTION", &factorized.action(&x, &execution)?);
+                println!("FACTORIZED_RESIDUAL {}", factorized.projection_residual());
+            }
             if let Some(upper_steps) = &upper_steps {
-                let up = PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?;
+                let up = if non_branching {
+                    PersistentLaplacian::compute_up_non_branching(
+                        k, &target, degree, options, &execution,
+                    )?
+                } else {
+                    PersistentLaplacian::compute_up(k, &target, degree, options, &execution)?
+                };
                 let down = PersistentLaplacian::compute_down(k, degree, options, &execution)?;
                 let upper_spectrum = up.spectrum(&execution)?;
                 let lower_spectrum = down.spectrum(&execution)?;
@@ -175,6 +286,206 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+    Ok(())
+}
+
+fn partial_spectra(
+    mode: &str,
+    starts: &[cocycle::filtration::SimplicialStage<'_>],
+    endpoint: &cocycle::filtration::SimplicialStage<'_>,
+    degree: usize,
+    spectral: SpectralOptions,
+    execution: &Execution<'_>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use cocycle::persistent_laplacian::{
+        PersistentEigenpairs, fixed_endpoint_eigenpairs, relevant_pair_eigenpairs,
+    };
+    let options = IterativeOptions {
+        block_size: 64,
+        max_basis_entries: 4_000_000,
+        absolute_tolerance: 1e-11,
+        relative_tolerance: 1e-11,
+        ..Default::default()
+    };
+    let operator_options = OperatorOptions {
+        spectral,
+        max_projection_entries: 4_000_000,
+        ..Default::default()
+    };
+    let emit = |s: f64, t: f64, result: cocycle::Result<PersistentEigenpairs>| match result {
+        Ok(r) => println!(
+            "{{\"degree\":{degree},\"s\":{s},\"t\":{t},\"n\":{},\"values\":{:?},\"vectors\":{:?},\"residuals\":{:?}}}",
+            r.basis.len(),
+            r.values,
+            r.vectors,
+            r.residuals
+        ),
+        Err(error) => {
+            println!("{{\"degree\":{degree},\"s\":{s},\"t\":{t},\"error\":true}}");
+            eprintln!("{error}");
+        }
+    };
+    if mode == "fixed" || mode == "fixed-cold" {
+        let starts: Vec<_> = starts
+            .iter()
+            .copied()
+            .filter(|stage| stage.simplices().iter().any(|s| s.dimension() == degree))
+            .collect();
+        let results = fixed_endpoint_eigenpairs(
+            &starts,
+            endpoint,
+            degree,
+            1,
+            PersistentSpectrumTarget::Largest,
+            operator_options,
+            &options,
+            mode == "fixed",
+            execution,
+        )?;
+        for (stage, result) in starts.iter().zip(results) {
+            emit(stage.scale(), endpoint.scale(), Ok(result));
+        }
+    } else if mode == "relevant" {
+        let requests: Vec<_> = (0..starts.len())
+            .flat_map(|t| (0..=t).map(move |s| (s, t)))
+            .filter(|&(s, _)| {
+                starts[s]
+                    .simplices()
+                    .iter()
+                    .any(|cell| cell.dimension() == degree)
+            })
+            .collect();
+        let results = relevant_pair_eigenpairs(
+            starts,
+            &requests,
+            degree,
+            1,
+            PersistentSpectrumTarget::Largest,
+            operator_options,
+            &options,
+            true,
+            execution,
+        )?;
+        for ((s, t), result) in requests.into_iter().zip(results) {
+            emit(starts[s].scale(), starts[t].scale(), Ok(result));
+        }
+    } else {
+        let target = match mode {
+            "smallest" => PersistentSpectrumTarget::Smallest,
+            "largest" | "compact" => PersistentSpectrumTarget::Largest,
+            "positive" => PersistentSpectrumTarget::SmallestPositive,
+            _ => return Err("unknown partial spectrum mode".into()),
+        };
+        for stage in starts {
+            let op = if mode == "compact" {
+                PersistentLaplacianOperator::new_non_branching(
+                    stage,
+                    endpoint,
+                    degree,
+                    operator_options,
+                    execution,
+                )
+            } else {
+                PersistentLaplacianOperator::new(
+                    stage,
+                    endpoint,
+                    degree,
+                    operator_options,
+                    execution,
+                )
+            };
+            let result = op.and_then(|op| {
+                op.eigenpairs(
+                    usize::from(!op.basis().is_empty()),
+                    target,
+                    None,
+                    &options,
+                    execution,
+                )
+            });
+            emit(stage.scale(), endpoint.scale(), result);
+        }
+    }
+    Ok(())
+}
+fn print_relevant(
+    s: usize,
+    t: usize,
+    operator: &PersistentLaplacian,
+    representative: Option<(usize, usize)>,
+    embedding: usize,
+    execution: &Execution<'_>,
+) -> cocycle::Result<()> {
+    println!(
+        "RELEVANT {} {} {} {:?}",
+        s,
+        t,
+        operator.basis().len(),
+        representative
+    );
+    print_values("MATRIX", operator.matrix());
+    print_values("SPECTRUM", &operator.spectrum(execution)?.eigenvalues);
+    println!("RESIDUAL {}", operator.solver_residual());
+    println!("EMBEDDING {}", embedding);
+    println!(
+        "BASIS {:?}",
+        operator
+            .basis()
+            .iter()
+            .map(Simplex::vertices)
+            .collect::<Vec<_>>()
+    );
+    println!(
+        "CONTEXT {} {} {}",
+        operator.degree(),
+        operator.scales().0,
+        operator.scales().1
+    );
+    Ok(())
+}
+
+fn operator_benchmark(n: usize, actions: usize) -> Result<(), Box<dyn std::error::Error>> {
+    // Project control: n retained leaves and one late center. U=I-11^T/n.
+    // Source creation is separate from operator preparation and action timing.
+    if n == 0 || n > 4096 || actions == 0 || actions > 100_000 {
+        return Err("benchmark requires 1 <= n <= 4096 and 1 <= actions <= 100000".into());
+    }
+    let begin = Instant::now();
+    let mut cells: Vec<_> = (0..n)
+        .map(|v| Simplex::new(vec![v], 0.))
+        .collect::<cocycle::Result<_>>()?;
+    cells.push(Simplex::new(vec![n], 1.)?);
+    cells.extend((0..n).map(|v| Simplex::new(vec![v, n], 2.).unwrap()));
+    let source = SimplicialComplex::new(cells)?;
+    let k = source.stage(0.)?;
+    let l = source.stage(2.)?;
+    let source_seconds = begin.elapsed().as_secs_f64();
+    let execution = Execution::default();
+    let begin = Instant::now();
+    let operator =
+        PersistentLaplacianOperator::new(&k, &l, 0, OperatorOptions::default(), &execution)?;
+    let setup_seconds = begin.elapsed().as_secs_f64();
+    let x: Vec<_> = (0..n).map(|i| (i % 17) as f64 / 17.).collect();
+    let mean = x.iter().sum::<f64>() / n as f64;
+    let begin = Instant::now();
+    let mut checksum = 0.;
+    for _ in 0..actions {
+        let result = operator.action(&x, &execution)?;
+        if result
+            .iter()
+            .zip(&x)
+            .any(|(y, x)| (y - (x - mean)).abs() > 1e-10)
+        {
+            return Err("star action disagrees with analytic I-11^T/n".into());
+        }
+        checksum += result.iter().map(|v| v * v).sum::<f64>();
+    }
+    let actions_seconds = begin.elapsed().as_secs_f64();
+    println!(
+        "{{\"n\":{n},\"actions\":{actions},\"source_seconds\":{source_seconds},\"setup_seconds\":{setup_seconds},\"actions_seconds\":{actions_seconds},\"incidence_entries\":{},\"projection_entries\":{},\"checksum\":{checksum}}}",
+        operator.incidence_entries(),
+        operator.projection_entries()
+    );
     Ok(())
 }
 fn next<T: std::str::FromStr>(
