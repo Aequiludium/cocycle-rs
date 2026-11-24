@@ -1083,6 +1083,40 @@ That extension, complex conjugate adjoints and persistent Laplacians are outside
 the initial API. See the [Hodge guide](../guides/hodge-laplacian.md) for callable
 operations, costs, exclusions and reproducible checks.
 
+### Ordinary q=1 HeCS solve
+
+The separate `solve_hecs` terminal accepts positive explicit face weights and
+uses `U=B W B^T`, `W=diag(w)`, for an ordinary triangular edge-face boundary.
+The inner product remains standard. It does not change the unit-incidence
+action or spectral terminals above. See Savostianov, Tudisco and Guglielmi,
+[arXiv:2401.15492v1](https://arxiv.org/abs/2401.15492v1), PDF Algorithms 5.1/6.1,
+Sections 6.2 and 7.1; [DOI](https://doi.org/10.1137/23M1626396).
+
+Let S be the selected triangles, in collapse order, and let
+`F=B[:,S] diag(sqrt(w[S]))`. A free-edge collapse gives a lower triangular
+leading minor after row permutation, with signed nonzero pivots. The unweighted
+minor has unit pivots, so exact checked-integer reconstruction can certify
+`im(B[:,S])=im(B)`. This is required independently of maximal collapsibility;
+the RP2 control violates coverage (ranks 9 and 10). The retained factor C is F
+in collapse-edge row order, and `C C^T` is the permuted selected weighted Gram.
+
+When coverage holds, `im(F)=im(U)` and F has full column rank r. Write
+`F+=(F^T F)^(-1)F^T` and `H=F+ U F+^T`. H is positive definite on R^r:
+for nonzero y, `z=F+^T y` is nonzero in im(F)=im(B), and
+`y^T H y=||sqrt(W) B^T z||2^2>0`. For compatible b, solving
+`H y=F+ b` and lifting `x=F+^T y` gives `U x=b`, because
+`U=F H F^T`. The lift lies in im(U), hence is the unique minimum-norm solution.
+All displayed inverses are r-dimensional active Grams; the singular ambient
+edge operator is never ordinarily inverted.
+
+The bounded f64 reference verifies active pivots and the fresh original target
+`||Ux-b||2/max(1,||b||2) <= tolerance`. Forming `F^T F` squares conditioning;
+numerical ambiguity is rejected without regularization. A compatible-RHS check
+uses the same normalized target. Exact image coverage does not certify a
+floating-point RHS or universal forward accuracy. Resource/cancellation failures
+return errors under one terminal budget. Persistent eliminated blocks and outer
+eigensolvers require separate arguments and are not provided by this solve.
+
 ## 23. Real persistent Laplacians
 
 The factorized action uses all upper columns, with B=[B1;B2] split by K and

@@ -21,6 +21,12 @@
   and explicitly bounded materialization, with owned basis/source metadata and
   separate incidence, projection and vector limits. Preserve the existing dense
   matrix and complete-spectrum API; numerical ranks remain uncertified.
+- Add bounded ordinary q=1 `HodgeLaplacian::solve_hecs` with explicit positive
+  face weights, checked simplicial topology and exact selected-image coverage.
+  Weighted factors, an active-space CGLS solution and fresh original residuals
+  share execution controls. Rank loss, incompatible RHS, numerical failure and
+  interrupted/nonconverged solves return errors. Existing Hodge/Dirac spectral
+  wrappers retain their behavior; persistent adaptation remains experimental work.
 
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document

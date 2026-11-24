@@ -18,6 +18,13 @@ def exhaustive_collapsible(edges, faces, remaining):
 
 
 class CollapseTests(unittest.TestCase):
+    def test_native_protocol_cannot_hide_missing_solve_or_rank_loss(self):
+        expected = {"solves": {"hecs": {"status": "converged"}}}
+        with self.assertRaises(AssertionError):
+            hecs.verify_native({"status": "rank_loss"}, expected, {})
+        with self.assertRaises(AssertionError):
+            hecs.verify_native({"solves": {}}, expected, {})
+
     def setUp(self):
         self.edges = list(itertools.combinations(range(4), 2))
         self.faces = list(itertools.combinations(range(4), 3))
