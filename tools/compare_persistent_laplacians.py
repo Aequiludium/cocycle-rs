@@ -368,7 +368,13 @@ def main():
     parser.add_argument("--benchmark", action="store_true")
     parser.add_argument("--components", action="store_true",
                         help="Also verify independent up/down operators, actions and spectra")
+    parser.add_argument("--non-branching", action="store_true",
+                        help="Verify the explicit weak-reduction API on qualifying pairs; retain exclusions")
     args = parser.parse_args()
+    if args.non_branching:
+        if args.benchmark or args.reference_matlab:
+            parser.error("non-branching mode is a bounded correctness comparison, not a timing/author benchmark")
+        args.components = True
     args.output.mkdir(parents=True, exist_ok=False)
     source_worker = args.worker.resolve()
     # Freeze the executable used for this run. In addition to reproducibility,
@@ -384,9 +390,32 @@ def main():
         for q in range(top + 2):
             for t in scales:
                 groups.append((label, cells, q, [s for s in scales if s <= t], t))
+    exclusions = []
+    if args.non_branching:
+        eligible = []
+        for label, cells, q, starts, t in groups:
+            target_basis = ordered(cells, t, q)
+            up = boundary(target_basis, ordered(cells, t, q + 1))
+            supported = []
+            for s in starts:
+                source_basis = set(ordered(cells, s, q))
+                outside = [i for i, simplex in enumerate(target_basis) if simplex not in source_basis]
+                occupancy = np.count_nonzero(up[outside], axis=1)
+                if np.any(occupancy > 2):
+                    exclusions.append(dict(fixture=label, degree=q, s=s, t=t,
+                                           reason="outside row has more than two nonzeros",
+                                           maximum_row_occupancy=int(occupancy.max())))
+                else:
+                    supported.append(s)
+            if supported:
+                eligible.append((label, cells, q, supported, t))
+        groups = eligible
+        (args.output / "nonbranching-exclusions.json").write_text(
+            json.dumps(exclusions, indent=2) + "\n", encoding="utf-8")
     data = "".join(protocol(cells, q, starts, t) for _, cells, q, starts, t in groups)
     (args.output / "fixtures.txt").write_text(data, encoding="utf-8")
-    run = subprocess.run([str(worker), "--components" if args.components else "--oracle"],
+    worker_mode = "--non-branching" if args.non_branching else "--components" if args.components else "--oracle"
+    run = subprocess.run([str(worker), worker_mode],
                          input=data, capture_output=True, text=True)
     (args.output / "worker-stdout.txt").write_text(run.stdout, encoding="utf-8")
     (args.output / "worker-stderr.txt").write_text(run.stderr, encoding="utf-8")
@@ -462,6 +491,9 @@ def main():
                     "spectral_union_error": float(np.max(np.abs(union-record["SPECTRUM"]), initial=0)),
                     "exact_up_rank": up_rank, "exact_down_rank": down_rank,
                     "residuals": record["COMPONENT_RESIDUAL"].tolist()}
+            if args.non_branching:
+                assert record["RESIDUAL"][0] == 0
+                assert record["COMPONENT_RESIDUAL"][0] == 0
             checks.append({"fixture": label, "degree": q, "s": s, "t": t,
                            "basis": basis, "matrix": record["MATRIX"].tolist(),
                            "spectrum": eigenvalues.tolist(), "real_persistent_rank": beta,
@@ -513,7 +545,11 @@ def main():
               "matlab_author_sample": author_sample,
               "limitations": ["Numerical evidence is not an exact Betti certificate.",
                   "Peak working set includes process baseline, not allocation peak.",
-                  "Bounded dense reproduction; no sparse scalability or production fast-path adoption."]}
+                  "Bounded dense construction; no sparse scalability or automatic backend adoption."]}
+    if args.non_branching:
+        result["construction"] = "explicit corrected non-branching weak reduction"
+        result["nonbranching_excluded_pairs"] = len(exclusions)
+        result["fallback_scope"] = "generic reverse-elimination comparator only; specialized constructors never fall back"
     if args.components:
         components = [c["components"] for c in checks]
         result["direct_fallback_pairs"] = sum(c["direct_fallback"] for c in components)

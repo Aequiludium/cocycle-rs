@@ -128,6 +128,7 @@ research/data-modeling
 research/filtration-stages
 research/analysis-learning
 research/persistent-spectral-features
+research/nonbranching
 research/gudhi-cpp
 research/h1-fast-to-generic
 research/big-steps
