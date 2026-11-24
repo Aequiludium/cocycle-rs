@@ -11,6 +11,7 @@ use std::io::{self, Read};
 #[allow(dead_code)]
 #[path = "../../src/execution/mod.rs"]
 mod execution;
+#[allow(dead_code)]
 #[path = "../../src/persistent_laplacian/nonbranching.rs"]
 mod nonbranching;
 #[allow(dead_code)]

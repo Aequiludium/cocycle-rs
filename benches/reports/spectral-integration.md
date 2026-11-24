@@ -2,6 +2,99 @@
 
 [Benchmarks](../README.md) / [Reporting rules](../reporting.md)
 
+## Composed partial-spectrum increment
+
+Measured clean source: `aaf4db38aaaabb51d8ca985307d12e8476510410`.
+This increment connects fixed persistent actions to partial LOBPCG, adds bounded
+boundary-image positive modes, single-sided Grams, compact non-branching
+projection, reverse projection updates and exact-event upper-factor reuse.
+All routes are explicit; existing dense constructors and complete spectra remain
+available. The historical 30-cell results below retain their original revision.
+
+Independent correctness checks cover 6,264 route/pair cases with 108 declared
+rejections, Fraction real ranks, exact-kernel/SVD matrices, NumPy eigenvalues,
+original-coordinate vector residuals and GUDHI 3.11.0 F11 topology corroboration.
+Maximum normalized eigenvalue error is 8.172e-15; residual is 3.095e-15.
+GUDHI is not a real-spectrum oracle. Debug/release/Rust 1.91 each pass 360 tests
+and doctests with five explicit ignores. Strict rustdoc, seven guide doctests,
+Clippy and source/docs checks pass. One numerical regression prevents
+normalizing an annihilated upper column's roundoff into a range direction.
+
+The new performance matrix compares **unaccelerated dense algorithms against
+composed routes in the same committed build**. It has 13 cells, ten measured
+fresh processes per route and one discarded warmup: 260 measurements and 26
+warmups. All outputs pass independently frozen expectations under the declared
+1e-8 normalized error contract. No previous-PR timings enter these comparisons.
+Baseline and candidate have identical inputs and requested exported values;
+native preparation, numerical verification and export are included. Some
+iterative routes calculate tighter internal residuals than the external contract.
+
+| Fixture / requested output | Dense worker median (ms) | Composed median (ms) | Paired worker ratio | Paired process ratio |
+| --- | ---: | ---: | ---: | ---: |
+| 64 vertices, rank-3 positive spectrum | 0.382 | 0.182 | 2.20x | 1.08x |
+| 256 vertices, rank-3 positive spectrum | 15.368 | 0.301 | 49.95x | 3.31x |
+| 64-target path, compact projection + positive mode | 4.315 | 0.236 | 18.61x | 1.68x |
+| 256-target path, compact projection + positive mode | 473.423 | 0.564 | 830.78x | 64.61x |
+| 64-leaf star, three largest modes | 0.797 | 0.256 | 3.09x | 1.05x |
+| 128-leaf star, three largest modes | 13.461 | 0.390 | 34.31x | 3.10x |
+| 64-leaf star, three smallest positive modes | 0.828 | 0.652 | 1.18x | 1.06x |
+| 128-leaf star, three smallest positive modes | 13.333 | 2.670 | 4.99x | 2.14x |
+| 3-by-64 Gram, positive modes/projector | 3.104 | 0.558 | 5.50x | 1.41x |
+| 3-by-128 Gram, positive modes/projector | 49.974 | 2.803 | 17.16x | 5.72x |
+| H1, 31 fixed-endpoint largest modes, cold vectors | 4.386 | 8.628 | 0.53x | 0.72x |
+| Same fixed-endpoint requests, warm vectors | 4.529 | 8.150 | 0.55x | 0.76x |
+| H1, 496 requested largest modes, relevant factors | 26.293 | 37.186 | 0.71x | 0.75x |
+
+Ratios are medians of paired baseline/candidate times, not ratios of these
+rounded medians; values below one mean slower. Worker timing starts at main
+entry and includes I/O and checks; process timing also includes Windows startup
+and transport. Small worker gains therefore shrink at process level.
+
+The rank-3 graph has three disjoint edges and isolated vertices; its three
+positive values are 2. Path controls retain only two vertices while the target
+has 64/256 vertices. Their large gains replace dense target Schur elimination
+with forced signed components, rather than demonstrating a generic 256-variable
+positive solver. Star operators are I-11^T/n on retained leaves. High-rank
+positive setup still retains n-by-(n-1) range storage. Gram controls use the
+previous analytical Hadamard rows and return the same three values plus their
+complete positive-space projector; projector export is included on both sides.
+Batch controls reuse the original 53-simplex, 32-scale H1 fixture. Empty q-bases
+are excluded from one-mode requests. The direct baseline computes each full
+matrix and spectrum, then selects its largest value. Batch routes use eight
+lookahead columns and preserve the fixed declared solver policy.
+
+The small batch regressions remain visible: factor/vector reuse is functional,
+but does not overcome setup/iteration costs here. No faster default or automatic
+adoption follows. The 256-vertex rank-3 process peak decreases from 6.09 to
+4.63 MiB; the compact path decreases from 6.13 to 4.65 MiB. Relevant partial
+batching increases peak from 4.68 to 5.82 MiB. These are absolute process peaks,
+not allocation counts, and small differences include runtime overhead.
+
+Environment: Intel Core Ultra 7 155H, Windows 11 build 26100, rustc 1.98.1,
+edition 2024 and `-C opt-level=3`, serial measurements after all builds, thread
+environment one, balanced pair order and seed 160. Affinity, frequency and host
+load are uncontrolled. Recorded interval: 2026-11-24T22:59:32.105894+08:00 to
+2026-11-24T22:59:42.227793+08:00. This remains a local bounded resource snapshot.
+
+Raw evidence is local-only under
+`target/benchmarks/commit-aaf4db38aaaa/composed-unaccelerated/run-001/`.
+Manifest SHA-256:
+`abba60a6283e08ca10f94c5de2e80a67b89d5b99c83ec6787806f4901c20f622`.
+Controller SHA-256:
+`93b8d8da2e5e101564b69993202b02006283ddb5717dc63b480133c0ef95fa1c`.
+The bundle retains every sample/range, process peak, input/oracle, source and
+binary hash and compiler invocation. Frozen preflight inputs are in
+`target/composed-performance-inputs-001/`; clean committed correctness evidence
+is in `target/composed-partial-oracle-003/`. The report commit is later than the
+measured source. Its standalone dead-code annotation fix does not change the
+measured library or performance adapter. Hosted status belongs to the exact PR
+head, separately from these local measurements.
+
+General sparse QR, O(n*r) range fill, exact public Betti certification, online
+endpoint insertion, production Chebyshev filters and persistent HeCS/sampling
+remain outside this increment. Adaptive LSMR was not substituted for a fixed
+self-adjoint projection.
+
 ## Corrected question and conclusions
 
 This [PR #160](https://github.com/Aequiludium/cocycle-rs/pull/160) experiment
@@ -42,9 +135,9 @@ default is inferred.
 
 Sources, generated timing wrappers, compiler invocations, binaries and inputs are
 hashed in the raw member manifest. The report commit is distinct from the
-measured source. The Rust library `src/` is unchanged from the independently
-replayed `eacf0c752914619e9f3eaaab830473aa854b35dd` integration source; changes here
-are comparison adapters, benchmark-only output modes, checks and documentation.
+measured source. At that historical revision, library `src/` was unchanged from
+the independently replayed `eacf0c752914619e9f3eaaab830473aa854b35dd` source;
+the composition increment above has its own later implementation and evidence.
 
 ## Baselines and requested work
 
