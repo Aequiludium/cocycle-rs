@@ -76,7 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "usage: persistent_laplacian [--oracle | --components | --non-branching | --relevant | --relevant-direct | --benchmark direct|stepwise]".into(),
+                "usage: persistent_laplacian [--oracle | --components | --non-branching | --operator | --relevant | --relevant-direct | --benchmark direct|stepwise | --operator-benchmark n actions]".into(),
             );
         }
     };

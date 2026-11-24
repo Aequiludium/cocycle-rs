@@ -1211,8 +1211,11 @@ harmonic kernel N and an orthonormal complement X, X^T Delta X retains exactly
 the nonzero spectrum. An arbitrary homology representative need not lie in that
 kernel: for the connected two-vertex edge, Delta*[1,0]^T=[1,-1]^T. The
 [bounded external reproduction](../research/split-spectral-reproduction.md)
-checks these facts and a separate basic LOBPCG transcription; it changes no
-production spectral route or certification guarantee.
+checks these facts and a separate basic LOBPCG transcription. The
+[bounded Rust rewrite](../research/split-spectral-rust.md) independently checks
+these operations and basic LOBPCG Algorithms 1/2 against the frozen first-round
+transcription. It retains numerical ambiguity and uncertified iterative index
+coverage; complete persistent spectra remain unchanged.
 
 The implementation exposes full/upper/lower results and separately tagged
 spectra. The lower term depends only on K and requires its q-skeleton; it does

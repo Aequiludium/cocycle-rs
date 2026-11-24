@@ -14,16 +14,25 @@
 //! Explicit non-branching constructors additionally offer a corrected bounded
 //! weak-reduction baseline with dense incidence, transforms and kernel buffers.
 //! They check pair-local eligibility and never select a Schur fallback.
+//! Separate raw-coordinate operations provide bounded dual Grams, component
+//! spectral union and genuine harmonic restriction with paper-basic LOBPCG.
+//! They do not change stage-pair construction or complete `spectrum()` output.
 
 mod lsmr;
 mod nonbranching;
 mod operator;
 mod relevant_pairs;
 mod schur;
+mod split;
+
 pub use lsmr::{LsmrOptions, LsmrProjection, project_boundary_kernel_lsmr};
 pub use operator::{OperatorOptions, PersistentLaplacianOperator};
 
 pub use relevant_pairs::{RelevantPairLaplacian, relevant_pair_laplacians};
+pub use split::{
+    GramSpectrum, HarmonicRestriction, PositiveEigenpairs, SplitSpectrum, gram_spectrum,
+    split_spectrum,
+};
 
 use crate::complex::{Simplex, SimplexId};
 use crate::execution::{Execution, WorkBudget};
@@ -48,6 +57,8 @@ pub struct SpectralOptions {
     /// Relative eigenvalue cutoff for the Schur pseudoinverse (default 1e-12).
     /// Also controls Jacobi convergence, the stepwise zero-pivot test and the
     /// new-chain numerical independence guard (never exact event reduction).
+    /// Separate Gram/restriction operations use it for numerical rank; their
+    /// dense eigensolves use a fixed machine-level convergence tolerance.
     pub relative_tolerance: f64,
     /// Maximum relative eigensystem/range residual (default 1e-9).
     /// Also bounds the accumulated positive-mode discarded Schur correction,

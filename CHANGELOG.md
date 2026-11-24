@@ -27,6 +27,10 @@
   share execution controls. Rank loss, incompatible RHS, numerical failure and
   interrupted/nonconverged solves return errors. Existing Hodge/Dirac spectral
   wrappers retain their behavior; persistent adaptation remains experimental work.
+- Add bounded real-coordinate Gram flips, spectral recombination and verified
+  harmonic-kernel restriction, with a separate paper-basic LOBPCG path. Complete
+  spectra, numerical rank ambiguity and original-coordinate residuals remain
+  explicit; existing Hodge, Dirac and persistent `spectrum()` behavior is unchanged.
 
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document

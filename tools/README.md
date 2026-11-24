@@ -308,6 +308,12 @@ focused numerical tests and controls with pinned NumPy/SciPy/SymPy/GUDHI.
 It retains raw spectra, iteration traces and the paper-basic clustered-search
 failure separately from the explicit project rank correction. It does not
 certify author-software execution, Rust parity or production optimization.
+The [bounded split-spectral Rust parity tool](../docs/research/split-spectral-rust.md)
+compares `examples/split_spectra.rs` with the hash-pinned first-round #145
+transcription. It supports immutable historical inputs with `--frozen` and a
+freshly frozen platform replay. The `Split-spectral Rust parity` CI job retains
+both ordinary results and expected basic-solver failures; it does not use the
+Python SVD correction as a Rust basic-solver expectation.
 
 The `Real Hodge reference comparisons` CI job requires `--iterative
 --toponetx PATH --perslap PATH --gudhi` on fresh Rust example output. It checks

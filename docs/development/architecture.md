@@ -56,6 +56,7 @@ src/
     nonbranching.rs              bounded corrected weak reduction and induced kernel metric
     operator.rs                  factorized persistent action and fixed row-space projection
     lsmr.rs                      bounded undamped rectangular least-squares diagnostic
+    split.rs                     bounded dual Grams, harmonic restriction and paper-basic LOBPCG
   execution/
     mod.rs                       shared controls and private per-operation budget
   optimization/

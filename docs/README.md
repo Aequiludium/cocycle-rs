@@ -146,6 +146,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Sequence-subspace reproduction](research/sequence-subspaces.md) | Corrected fixed-degree SCSF/ChFSI controls, selected Rust parity and bounded basis-transfer evidence |
 | [Non-branching weak reduction](research/nonbranching.md) | Algorithms 1-3 audit, disclosed corrections, exact induced metrics and explicit bounded Rust constructors |
 | [Persistent constructions and LSMR](research/persistent-constructions.md) | SPSC-A paper algorithms, shared exact oracles, rectangular recurrence and bounded evidence |
+| [Split-spectral Rust parity](research/split-spectral-rust.md) | Bounded Gram, true-kernel restriction and basic LOBPCG rewrite against hash-pinned first-round inputs and failures |
 | [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
 | [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); standard real Dirac action is in the guide above; global spectral solvers remain future work |
