@@ -325,7 +325,7 @@ def time_routes(boundary, transform, labels, sizes, selected,
     return results
 
 
-def benchmark_workers(baseline, candidate, cases, output, baseline_revision):
+def benchmark_workers(baseline, candidate, cases, output, baseline_revision, direct=False):
     """Ten serial fresh-process paired samples plus one retained warmup.
 
     Full serialized matrices/spectra/metadata must match, not just a checksum.
@@ -342,6 +342,9 @@ def benchmark_workers(baseline, candidate, cases, output, baseline_revision):
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     manifest = {"evidence_class": "resource_snapshot", "candidate_revision": revision,
                 "baseline_revision": baseline_revision, "samples": 10, "warmups": 1,
+                "baseline_mode": "--relevant-direct" if direct else "--relevant",
+                "candidate_mode": "--relevant",
+                "rustc": subprocess.check_output(["rustc", "--version", "--verbose"], text=True),
                 "order_seed": 146, "platform": platform.platform(), "python": sys.version,
                 "memory": "absolute process peak working set, including input/runtime/retained output",
                 "controls": "serial processes; affinity/frequency/host load uncontrolled",
@@ -372,8 +375,9 @@ def benchmark_workers(baseline, candidate, cases, output, baseline_revision):
             labels = ["baseline", "candidate"] if (repeat + first) % 2 else ["candidate", "baseline"]
             for label in labels:
                 executable = baseline if label == "baseline" else candidate
+                mode = "--relevant-direct" if direct and label == "baseline" else "--relevant"
                 begin = time.perf_counter()
-                process = subprocess.Popen([str(executable), "--relevant"], stdin=subprocess.PIPE,
+                process = subprocess.Popen([str(executable), mode], stdin=subprocess.PIPE,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 stdout, stderr = process.communicate(data)
                 wall = time.perf_counter() - begin
@@ -390,7 +394,11 @@ def benchmark_workers(baseline, candidate, cases, output, baseline_revision):
                 actual = (fields[:3], body)
                 if expected is None:
                     expected = actual
-                assert actual == expected, (name, degree, repeat, label)
+                if direct:
+                    compare_full_outputs(expected[1], body)
+                    assert fields[1] == expected[0][1]
+                else:
+                    assert actual == expected, (name, degree, repeat, label)
                 samples.append({"name": name, "degree": degree, "repeat": repeat, "route": label,
                                 "warmup": repeat == -1, "construction_seconds": float(fields[3]),
                                 "process_seconds": wall, "peak_working_set_bytes": peak,
@@ -413,6 +421,21 @@ def benchmark_workers(baseline, candidate, cases, output, baseline_revision):
         print(name, degree, "paired resource snapshot passed", flush=True)
 
 
+def compare_full_outputs(expected, actual):
+    """Match full output coordinates and numerical values across construction routes."""
+    import numpy as np
+    assert len(expected) == len(actual) and len(actual) % 7 == 0
+    for index in range(0, len(actual), 7):
+        assert expected[index].split()[:4] == actual[index].split()[:4]
+        for offset in [1, 2]:  # full matrix and full spectrum, preserving multiplicity
+            a = np.array([float(x) for x in expected[index + offset].split()[1:]])
+            b = np.array([float(x) for x in actual[index + offset].split()[1:]])
+            assert a.shape == b.shape and np.linalg.norm(a - b) <= 1e-10 * max(1.0, np.linalg.norm(a))
+        for lines in [expected, actual]:
+            assert 0 <= float(lines[index + 3].split()[1]) <= 1e-9
+        assert expected[index + 5:index + 7] == actual[index + 5:index + 7]
+
+
 def main():
     if not __debug__:
         raise RuntimeError("correctness reproduction requires Python without -O")
@@ -423,9 +446,13 @@ def main():
     parser.add_argument("--rust-worker", type=Path)
     parser.add_argument("--benchmark-baseline", type=Path)
     parser.add_argument("--baseline-revision")
+    parser.add_argument("--benchmark-direct", action="store_true",
+                        help="Compare exhaustive native Schur with new chains, using the baseline worker's --relevant-direct mode")
     args = parser.parse_args()
     if args.benchmark_baseline and (not args.rust_worker or not args.baseline_revision):
         parser.error("benchmark requires --rust-worker and --baseline-revision")
+    if args.benchmark_direct and not args.benchmark_baseline:
+        parser.error("--benchmark-direct requires --benchmark-baseline")
     if hashlib.sha256(args.paper.read_bytes()).hexdigest() != PAPER_SHA256:
         raise ValueError("paper does not match the frozen arXiv v1 bytes")
     args.output.mkdir(parents=True, exist_ok=False)
@@ -461,7 +488,7 @@ def main():
     if args.benchmark_baseline:
         baseline = (args.output / ("baseline-" + args.benchmark_baseline.name)).resolve()
         shutil.copy2(args.benchmark_baseline, baseline)
-        benchmark_workers(baseline, worker, cases, args.output, args.baseline_revision)
+        benchmark_workers(baseline, worker, cases, args.output, args.baseline_revision, args.benchmark_direct)
 
 
 if __name__ == "__main__":

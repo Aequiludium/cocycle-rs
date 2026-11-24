@@ -30,6 +30,18 @@ class EventTests(unittest.TestCase):
         self.assertEqual(v[2], [Fraction(-1), Fraction(-1, 2), Fraction(1)])
         self.assertEqual(r[2], [0, 0])
 
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "optional NumPy dependency")
+    def test_route_comparison_rejects_equal_checksum_wrong_matrices_and_domains(self):
+        output = ["RELEVANT 0 1 2 None", "MATRIX 1 -1 -1 1", "SPECTRUM 0 2",
+                  "RESIDUAL 0", "EMBEDDING 0", "BASIS [[0], [1]]", "CONTEXT 0 0 1"]
+        reproduction.compare_full_outputs(output, output)
+        for index, wrong in [(1, "MATRIX 1 1 -1 -1"), (2, "SPECTRUM 2"),
+                             (5, "BASIS [[1], [0]]"), (6, "CONTEXT 0 0 2")]:
+            changed = output.copy()
+            changed[index] = wrong
+            with self.assertRaises(AssertionError):
+                reproduction.compare_full_outputs(output, changed)
+
     @unittest.skipUnless(importlib.util.find_spec("numpy") and importlib.util.find_spec("gudhi"),
                          "optional NumPy/GUDHI dependencies")
     def test_all_pairs_include_joint_trigger_and_larger_requested_domain(self):

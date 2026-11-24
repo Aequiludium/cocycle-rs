@@ -119,6 +119,12 @@ and an alpha single-pair case retain adverse/no-benefit outcomes. It is a bounde
 resource snapshot; process memory includes input/runtime/output and is not an
 allocation peak. The raw manifest records both commits, binary/source/input
 hashes and the uncontrolled host-load limitation.
+Add `--benchmark-direct` with the same current worker/revision as both inputs
+to compare exhaustive native Rust Schur against the unoptimized new-chain batch.
+That comparison checks full matrices/spectra numerically and matches ordered
+coordinates/scales exactly; representative indices and solve counts differ by
+design. It measures whether saved solves repay preparation for these inputs,
+without selecting an automatic default.
 
 [compare_persistent_laplacians.py](compare_persistent_laplacians.py) compares the
 release [example worker](../examples/persistent_laplacian.rs) with independently
