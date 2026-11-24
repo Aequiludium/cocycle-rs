@@ -167,7 +167,7 @@ surrounds sorting/reservations and cannot interrupt those operations internally.
 No caching, persistent eliminated-block adaptation or outer eigensolver
 preconditioning is exposed. Existing Hodge/Dirac solver wrappers are unchanged.
 The runnable `cargo run --locked --example hecs` uses a weighted tetrahedron shell;
-its `--stdin` mode replays the frozen [HeCS protocol](../../tools/README.md#ordinary-hecs-reproduction).
+its `--stdin` mode replays the frozen [HeCS source protocol](https://github.com/Aequiludium/cocycle-rs/blob/main/tools/README.md#ordinary-hecs-reproduction).
 
 ## Matrix-free partial eigenpairs
 
