@@ -84,6 +84,65 @@ authenticate a pair: consumers must retain the operator's degree, ordered bases
 and source metadata. Spectra of equally sized or numerically equal matrices
 from different requests are not implicitly identified.
 
+## Explicit non-branching construction
+
+`compute_non_branching(k, l, degree, options, execution)` constructs the full
+operator through the corrected identity-weight weak reduction;
+`compute_up_non_branching(...)` constructs its upper term alone. Both return
+the same owned `PersistentLaplacian`, component tags, ordered original bases,
+scales and source certificates as the ordinary constructors. Action and complete
+spectrum use the existing result methods. The default Schur constructors are
+unchanged; this route is explicitly requested by the caller.
+
+```rust
+# use cocycle::complex::{Simplex, SimplicialComplex};
+# use cocycle::execution::Execution;
+# use cocycle::persistent_laplacian::{PersistentLaplacian, SpectralOptions};
+let source = SimplicialComplex::new(vec![
+    Simplex::new(vec![0], 0.)?, Simplex::new(vec![2], 0.)?,
+    Simplex::new(vec![1], 1.)?, Simplex::new(vec![0, 1], 2.)?,
+    Simplex::new(vec![1, 2], 2.)?,
+])?;
+let operator = PersistentLaplacian::compute_up_non_branching(
+    &source.stage(0.)?, &source.stage(2.)?, 0,
+    SpectralOptions::default(), &Execution::default(),
+)?;
+for (actual, expected) in operator.matrix().iter().zip([0.5, -0.5, -0.5, 0.5]) {
+    assert!((actual - expected).abs() < 1e-12);
+}
+# Ok::<(), cocycle::Error>(())
+```
+
+Eligibility is **pair-local**: only outside q-rows of the target signed
+(q+1)-boundary must have at most two nonzeros, each in {-1,1}. Retained rows
+may branch. A source label, degree or Rips origin is not an eligibility test.
+Singleton constraints and inconsistent signed cycles force their component to
+zero over R; original zero columns are free directions included once. The
+induced norm divides each boundary factor by the square root of its support
+size. See the [reproduction](../research/nonbranching.md) for the disclosed
+corrections to the printed pseudocode and the frozen intermediate matrices.
+
+Ineligible inputs return `InvalidParameter` with parameter
+`"non-branching boundary"`; no generic fallback is attempted. Inclusion,
+coverage/skeleton, degree overflow and numerical policy checks are the same as
+the ordinary full/upper constructors. One `Execution` budget covers source
+validation, incidence, traversal, dense transforms, kernel verification, matrix
+construction, the lower term and owned output. Cancellation or exhaustion
+returns no partial result. Subsequent action and spectrum start fresh budgets.
+
+This second-round implementation deliberately retains dense B1, outside D,
+reduction R, V, kernel Z and normalized factor. Every f64 buffer is limited by
+`max_dense_entries`. It also builds and releases the original target Gram to
+preserve the existing reference-scale contract. Thus a pair may fit the Schur
+route but exceed this route's incidence/transform/kernel cap. Neither the cap
+nor the default is raised automatically; this is not the compact experiment or
+a sparse scalability claim. `solver_residual()` is zero because no Schur solve
+is performed, while the kernel constraint is checked on signed unit data.
+Floating factor assembly and subsequent eigensystems retain numerical error;
+zero solve residual does not certify an exact matrix or spectral rank.
+
+## Schur and spectral semantics
+
 In this finite-dimensional standard-inner-product setting, write U for the
 persistent upper term and D for the lower term. The chain identity gives
 UD=DU=0. The nonzero spectrum of U+D is the multiset union of the two nonzero

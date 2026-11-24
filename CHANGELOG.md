@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add explicitly selected `PersistentLaplacian::compute_non_branching` and
+  `compute_up_non_branching` for pair-local signed unit outside rows with at
+  most two nonzeros. Use the verified corrected weak reduction and induced
+  kernel metric; preserve owned pair metadata and execution controls. This
+  bounded dense baseline checks incidence/transform/kernel storage under the
+  supplied cap, rejects ineligible pairs and never selects a Schur fallback.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

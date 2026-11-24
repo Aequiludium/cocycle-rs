@@ -418,6 +418,24 @@ outputs are not shipped. Current native tools include `benchmark_native.py`, `co
 correctness and timing responsibilities. Do not mix old wrapper samples into
 native rankings.
 
+## Non-branching weak reduction
+
+The [non-branching reproduction](../docs/research/nonbranching.md) separately
+checks Botnan-Dong Algorithms 1-3, induced kernel metrics, pinned author cubical
+code and standalone Rust baseline/compact parity. Its real signed algebraic
+controls and GUDHI topology checks do not add a general Rips solver. Use the
+documented fixed paper/source inputs and a new output directory; literal-paper
+failures and corrected implementations remain separately labeled.
+
+`reproduce_nonbranching.py --library --frozen-round1 PRIOR_REPLAY` additionally
+replays the actual production kernel source and budget against the prior
+R/E/V/Z, index maps, metric and upper matrices. The ordinary reference checker
+accepts `--non-branching --gudhi` to verify both public constructors, action,
+complete spectra and metadata against rational projection and generic reverse
+elimination. Its explicit exclusion manifest records branching outside rows;
+those pairs are not counted as successful comparisons. The example's
+`--non-branching` mode keeps the default 65,536-entry cap.
+
 ## Native sparse Rips checks
 
 ```sh
