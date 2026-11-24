@@ -2,8 +2,9 @@
 use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
-    OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator, SpectralOptions,
-    fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    LsmrOptions, OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator,
+    SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    project_boundary_kernel_lsmr,
 };
 use std::io::{self, Read};
 use std::time::Instant;
@@ -48,6 +49,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "action on [1,-1]: {:?}",
             result.action(&[1., -1.], &Execution::default())?
+        );
+        let least_squares = project_boundary_kernel_lsmr(
+            &[1., -1.],
+            1,
+            2,
+            &[1., 0.],
+            LsmrOptions::default(),
+            &Execution::default(),
+        )?;
+        println!(
+            "LSMR boundary-kernel residual: {:?}",
+            least_squares.projected
         );
         return Ok(());
     }

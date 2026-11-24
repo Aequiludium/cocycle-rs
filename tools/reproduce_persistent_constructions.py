@@ -226,6 +226,8 @@ def write_json(path, value):
 
 def check_close(candidate, expected, label):
     import numpy as np
+    if candidate.shape != expected.shape or not np.isfinite(candidate).all() or not np.isfinite(expected).all():
+        raise AssertionError(f"{label}: shape mismatch or nonfinite comparison")
     error = float(np.linalg.norm(candidate - expected))
     if error > MATRIX_TOLERANCE * max(1., float(np.linalg.norm(expected))):
         raise AssertionError(f"{label}: Frobenius error {error}")
@@ -519,14 +521,257 @@ def run(output, sources, worker, gudhi, operator=False):
         raise AssertionError(f"{len(failures)} retained failures")
 
 
+def parse_lsmr_replay(text):
+    """Parse the explicitly opted-in Rust worker's complete case records."""
+    lines = iter(text.splitlines())
+    records = []
+    for line in lines:
+        header = line.split()
+        if len(header) != 2 or header[0] != "CASE":
+            raise ValueError("invalid LSMR CASE header")
+        record = {"label": header[1], "trace": []}
+        for line in lines:
+            words = line.split()
+            if words[0] == "STEP":
+                if len(words) != 7:
+                    raise ValueError("invalid LSMR STEP")
+                step = {"iteration": int(words[1]), **dict(zip(
+                    ["alpha", "beta", "rho", "rhobar", "zetabar"], map(float, words[2:])))}
+                for tag, name in [("U", "u"), ("V", "v"), ("X", "x"),
+                                  ("R", "residual"), ("NORMAL", "normal_residual")]:
+                    values = next(lines).split()
+                    if values[0] != tag:
+                        raise ValueError(f"expected {tag}")
+                    step[name] = list(map(float, values[1:]))
+                record["trace"].append(step)
+            elif words[0] == "RESULT":
+                record.update(iterations=int(words[1]), residual_norm=float(words[2]),
+                              normal_residual_norm=float(words[3]))
+                for tag, name in [("SOLUTION", "solution"), ("PROJECTED", "projected")]:
+                    values = next(lines).split()
+                    if values[0] != tag:
+                        raise ValueError(f"expected {tag}")
+                    record[name] = list(map(float, values[1:]))
+            elif words[0] == "ERROR":
+                record["error"] = " ".join(words[1:])
+            elif words == ["END"]:
+                records.append(record)
+                break
+            else:
+                raise ValueError("unexpected LSMR record")
+        else:
+            raise ValueError("unterminated LSMR case")
+    return records
+
+
+def read_frozen_lsmr(frozen):
+    """Verify the original manifest before reading any expected value."""
+    manifest = json.loads((frozen / "manifest.json").read_text(encoding="utf-8"))
+    def read(name):
+        path = frozen / name
+        if path.resolve().parent != frozen.resolve():
+            raise ValueError("frozen artifact path must be a direct child")
+        raw = path.read_bytes()
+        if manifest.get(name) != hashlib.sha256(raw).hexdigest():
+            raise ValueError(f"frozen artifact hash mismatch: {name}")
+        return json.loads(raw)
+    index = read("index.json")
+    controls = read("solver-controls.json")
+    pairs = [(row, read(row["artifact"])) for row in index]
+    return manifest, controls, pairs
+
+
+def replay_frozen_lsmr(frozen, worker, output):
+    """Round 2: use frozen Python values, never Rust-generated expectations."""
+    import numpy as np
+    import scipy
+    output.mkdir(parents=True, exist_ok=False)
+    manifest, controls, pairs = read_frozen_lsmr(frozen)
+    write_json(output / "policy.json", {
+        "round": "Rust equivalence rewrite; no representation or solver optimization",
+        "matrix_vector_gate": "norm(actual-expected) <= 1e-10*max(1,norm(expected))",
+        "direction_floor": "sqrt(machine epsilon)*max(1,norm(M,Fro))",
+        "near_breakdown": "terminal beta below direction floor: compare beta*u, beta*alpha*v, rotations, x/r/normal; alpha and downstream v are unresolved",
+        "stopping": "frozen 1e-13 fresh normal-residual rule; identical update counts required",
+        "failure": "iteration exhaustion/invalid input returns an error, not partial success"})
+    cases = []
+    for i, control in enumerate(controls):
+        matrix = np.asarray(control["M"], dtype=float).reshape(len(control["y"]), len(control["x"]))
+        cases.append({"label": f"control-{i}", "B2": matrix.T, "y": control["y"],
+                      "solution": control["x"], "projected": np.asarray(control["y"])-matrix@control["x"],
+                      "trace": control["trace"], "tolerance": 1e-13, "limit": -1})
+    for i, (identity, pair) in enumerate(pairs):
+        b2 = np.asarray(pair["B2"], dtype=float).reshape(len(pair["outside_rows"]), len(pair["upper_basis"]))
+        b1 = np.asarray(pair["B1"], dtype=float).reshape(len(pair["K_basis"]), len(pair["upper_basis"]))
+        cases.append({"label": f"pair-{i}", "B2": b2, "y": b1.T@pair["frozen_x"],
+                      "solution": pair["lsmr_solution"], "projected": pair["lsmr_projection"],
+                      "trace": pair["lsmr_trace"], "tolerance": 1e-13, "limit": -1,
+                      "pair": pair, "identity": identity})
+    # These failure controls are fixed analytically before invoking Rust. The
+    # existing first-round test already requires this three-root case to fail
+    # with one update; zero updates cannot solve its nonstationary initial state.
+    for limit in [0, 1]:
+        cases.append({"label": f"exhaustion-{limit}", "B2": np.diag([1., 2., 4.]),
+                      "y": np.ones(3), "tolerance": 1e-13, "limit": limit,
+                      "expected_error": "LSMR iteration limit"})
+    for label, boundary, y, tolerance, error in [
+            ("invalid-tolerance", [[1.]], [1.], 0., "InvalidParameter"),
+            ("nonfinite-boundary", [[float("nan")]], [1.], 1e-13, "NonFiniteValue"),
+            ("nonfinite-rhs", [[1.]], [float("inf")], 1e-13, "NonFiniteValue")]:
+        cases.append({"label": label, "B2": np.asarray(boundary), "y": y,
+                      "tolerance": tolerance, "limit": -1, "expected_error": error})
+    protocol = []
+    for case in cases:
+        b2 = case["B2"]
+        words = [case["label"], str(b2.shape[0]), str(b2.shape[1]), str(case["tolerance"]), str(case["limit"])]
+        words += [str(x) for x in b2.ravel()] + [str(x) for x in case["y"]]
+        protocol.append(" ".join(words))
+    data = "\n".join(protocol)+"\n"
+    (output / "input.txt").write_text(data, encoding="utf-8")
+    frozen_worker = output / ("worker.exe" if sys.platform == "win32" else "worker")
+    shutil.copy2(worker, frozen_worker)
+    source_root = Path(__file__).resolve().parents[1]
+    for path in [Path(__file__), source_root / "src/persistent_laplacian/lsmr.rs",
+                 source_root / "src/execution/mod.rs", source_root / "tools/reference/persistent_lsmr.rs"]:
+        shutil.copyfile(path, output / ("budget.rs" if path.name == "mod.rs" else path.name))
+    write_json(output / "environment.json", {"python": sys.version, "numpy": np.__version__,
+        "scipy": scipy.__version__, "platform": platform.platform(), "command": sys.argv,
+        "frozen_manifest_sha256": hashlib.sha256((frozen / "manifest.json").read_bytes()).hexdigest(),
+        "frozen_input_sha256": manifest["inputs.json"],
+        "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "git_status": subprocess.check_output(["git", "status", "--short"], text=True)})
+    run = subprocess.run([str(frozen_worker.resolve())], input=data, capture_output=True, text=True)
+    (output / "worker-stdout.txt").write_text(run.stdout, encoding="utf-8")
+    (output / "worker-stderr.txt").write_text(run.stderr, encoding="utf-8")
+    run.check_returncode()
+    actual = parse_lsmr_replay(run.stdout)
+    if [row["label"] for row in actual] != [case["label"] for case in cases]:
+        raise AssertionError("LSMR worker case order/count mismatch")
+    failures, comparisons = [], []
+    maximum_error, maximum_relation, maximum_action = 0., 0., 0.
+    steps, breakdown_directions = 0, 0
+    terminal_differences = []
+    for case, result in zip(cases, actual):
+        try:
+            if "expected_error" in case:
+                assert case["expected_error"] in result.get("error", "")
+                assert "solution" not in result
+                comparisons.append({"label": case["label"], "expected_error": result["error"]})
+                continue
+            assert "error" not in result, result.get("error")
+            assert result["iterations"] == len(case["trace"]) == len(result["trace"])
+            m = case["B2"].T
+            y = np.asarray(case["y"])
+            errors = [check_close(np.asarray(result[field]), np.asarray(case[field]), field)
+                      for field in ["solution", "projected"]]
+            errors.append(check_close(np.asarray(result["solution"]), np.linalg.lstsq(m, y, rcond=1e-12)[0], "dense minimum norm"))
+            beta0 = np.linalg.norm(y)
+            previous_u = y/beta0 if beta0 else np.zeros_like(y)
+            previous_v = m.T@previous_u
+            previous_alpha = np.linalg.norm(previous_v)
+            previous_v = previous_v/previous_alpha if previous_alpha else np.zeros_like(previous_v)
+            floor = np.sqrt(np.finfo(float).eps)*max(1., np.linalg.norm(m, "fro"))
+            for reference_step, step in zip(case["trace"], result["trace"]):
+                steps += 1
+                assert reference_step["iteration"] == step["iteration"]
+                terminal_breakdown = max(step["beta"], reference_step["beta"]) <= floor
+                if terminal_breakdown:
+                    assert step["iteration"] == len(result["trace"]), "unresolved nonterminal breakdown"
+                    difference = {"label": case["label"], "iteration": step["iteration"],
+                        "beta_rust": step["beta"], "beta_frozen": reference_step["beta"], "direction_floor": floor,
+                        "alpha_rust": step["alpha"], "alpha_frozen": reference_step["alpha"],
+                        "alpha_v_difference": float(np.linalg.norm(step["alpha"]*np.asarray(step["v"])
+                                                        -reference_step["alpha"]*np.asarray(reference_step["v"])))}
+                    terminal_differences.append(difference)
+                    errors.append(check_close(step["beta"]*step["alpha"]*np.asarray(step["v"]),
+                        reference_step["beta"]*reference_step["alpha"]*np.asarray(reference_step["v"]),
+                        "coupled terminal bidiagonal direction"))
+                else:
+                    errors.append(check_close(np.asarray(step["alpha"]), np.asarray(reference_step["alpha"]), "alpha"))
+                for field in ["x", "residual", "normal_residual", "beta", "rho", "rhobar", "zetabar"]:
+                    errors.append(check_close(np.asarray(step[field]), np.asarray(reference_step[field]), field))
+                for vector, scale in [("u", "beta"), ("v", "alpha")]:
+                    if vector == "v" and terminal_breakdown:
+                        breakdown_directions += 1
+                        continue
+                    errors.append(check_close(step[scale]*np.asarray(step[vector]),
+                                              reference_step[scale]*np.asarray(reference_step[vector]), "scaled bidiagonal direction"))
+                    if min(step[scale], reference_step[scale]) > floor:
+                        errors.append(check_close(np.asarray(step[vector]), np.asarray(reference_step[vector]), "normalized direction"))
+                    else:
+                        breakdown_directions += 1
+                u, v = np.asarray(step["u"]), np.asarray(step["v"])
+                forward = m@previous_v-previous_alpha*previous_u-step["beta"]*u
+                transpose = m.T@u-step["beta"]*previous_v-step["alpha"]*v
+                for relation in [forward, transpose]:
+                    relation_error = check_close(relation, np.zeros_like(relation), "Golub-Kahan relation")
+                    maximum_relation = max(maximum_relation, relation_error)
+                for field in ["bidiagonal_forward_error", "bidiagonal_transpose_error"]:
+                    errors.append(check_close(np.asarray(reference_step[field]), np.asarray(0.), "frozen Golub-Kahan relation"))
+                errors.append(check_close(y-m@step["x"], np.asarray(step["residual"]), "fresh iterate residual"))
+                errors.append(check_close(m.T@step["residual"], np.asarray(step["normal_residual"]), "fresh iterate normal residual"))
+                previous_u, previous_v, previous_alpha = u, v, step["alpha"]
+            projected = np.asarray(result["projected"])
+            errors.append(check_close(np.asarray(result["residual_norm"]), np.asarray(np.linalg.norm(projected)), "reported residual norm"))
+            errors.append(check_close(np.asarray(result["normal_residual_norm"]), np.asarray(np.linalg.norm(m.T@projected)), "reported normal norm"))
+            action_error = None
+            if "pair" in case:
+                pair = case["pair"]
+                n = len(pair["K_basis"])
+                b1 = np.asarray(pair["B1"]).reshape(n, len(pair["upper_basis"]))
+                lower = np.asarray(pair["A"]).reshape(len(pair["lower_basis"]), n)
+                x = np.asarray(pair["frozen_x"])
+                exact = np.array([[float(Fraction(x)) for x in row] for row in pair["exact_delta"]]).reshape(n, n)
+                action_error = check_close(b1@projected+lower.T@(lower@x), exact@x, "experimental outer action")
+                maximum_action = max(maximum_action, action_error)
+            maximum_error = max(maximum_error, *errors)
+            comparisons.append({"label": case["label"], "iterations": result["iterations"],
+                                "maximum_error": max(errors), "composition_action_error": action_error})
+        except Exception as error:
+            failures.append({"label": case["label"], "error": repr(error)})
+            write_json(output / "failures.json", failures)
+    write_json(output / "comparisons.json", comparisons)
+    write_json(output / "terminal-breakdown-differences.json", terminal_differences)
+    summary = {"frozen_pairs": len(pairs), "solver_controls": len(controls), "failure_controls": 5,
+        "compared_updates": steps, "near_breakdown_directions": breakdown_directions,
+        "terminal_breakdown_steps": len(terminal_differences),
+        "raw_terminal_variables_not_reproduced": sum(
+            abs(row["alpha_rust"]-row["alpha_frozen"]) > 1e-10*max(1., abs(row["alpha_frozen"]))
+            or row["alpha_v_difference"] > 1e-10*max(1., abs(row["alpha_frozen"]))
+            for row in terminal_differences),
+        "maximum_iterate_error": maximum_error, "maximum_bidiagonal_relation_error": maximum_relation,
+        "maximum_experimental_action_error": maximum_action, "failures": failures,
+        "limits": ["unit-scale frozen reproduction scope", "no new optimization or performance claim",
+                   "LSMR residual is not a certified fixed self-adjoint projection", "no partial-spectrum integration"]}
+    write_json(output / "summary.json", summary)
+    write_json(output / "manifest.json", {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+               for path in sorted(output.iterdir()) if path.is_file()})
+    print(json.dumps(summary, indent=2))
+    if failures:
+        raise AssertionError(f"{len(failures)} retained LSMR parity failures")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--sources", type=Path, required=True)
+    parser.add_argument("--sources", type=Path)
     parser.add_argument("--worker", type=Path)
     parser.add_argument("--gudhi", action="store_true")
     parser.add_argument("--operator", action="store_true", help="also compare the Rust factorized operator")
+    parser.add_argument("--replay-lsmr-worker", type=Path, help="Round-2 Rust recurrence worker")
+    parser.add_argument("--frozen", type=Path, help="immutable original Round-1 output directory")
     args = parser.parse_args()
+    if args.replay_lsmr_worker:
+        if not args.frozen:
+            parser.error("--replay-lsmr-worker requires --frozen")
+        if args.sources or args.worker or args.operator or args.gudhi:
+            parser.error("paper-reproduction flags cannot be combined with --replay-lsmr-worker")
+        replay_frozen_lsmr(args.frozen, args.replay_lsmr_worker, args.output)
+        return
+    if args.frozen:
+        parser.error("--frozen requires --replay-lsmr-worker")
+    if not args.sources:
+        parser.error("--sources is required for the paper reproduction")
     if args.operator and not args.worker:
         parser.error("--operator requires --worker")
     run(args.output, args.sources, args.worker, args.gudhi, args.operator)

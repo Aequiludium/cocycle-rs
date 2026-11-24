@@ -1089,6 +1089,14 @@ LSMR with right-hand-side-dependent stopping is not its public action policy.
 See the [construction reproduction](../research/persistent-constructions.md)
 for exact rational and independent SVD controls, including nonorthogonal Z.
 
+The separate undamped LSMR diagnostic solves min_w ||B2^T w-y|| from zero and
+returns z=y-B2^T w in the upper-column coordinates. Its fresh normal residual
+is B2 z. The relative stopping rule uses ||B2||_F*||y|| as scale; it is not a
+projection forward-error or exact rank bound. Near terminal bidiagonal
+breakdown, normalized continuation directions need not be reproducible even
+when fitted vectors and Golub--Kahan relations agree. Adaptive stopping is not
+the fixed projector used by the public factorized operator.
+
 For a same-source pair K included in L, use real ordinary chains with orthonormal
 increasing-vertex simplex bases. Let B denote the signed (q+1)-boundary of L,
 with rows grouped into K and its complement: B = [R; F]. The allowed domain of

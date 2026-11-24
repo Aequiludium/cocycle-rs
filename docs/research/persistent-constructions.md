@@ -101,7 +101,8 @@ two-pass row-space reduction and a fixed I-Q^T Q action. Its 801-pair comparison
 uses the same frozen project inputs and exact-oracle matrices. A separate
 representation change replaces only dense incidence with sparse signed columns;
 the projection policy, coordinate metadata and mathematical output stay fixed.
-LSMR remains in reference tooling, with no adaptive inner solve in the public API.
+At that fixed-action increment LSMR remained in reference tooling. The separate
+Round-2 diagnostic below adds a native terminal without changing the fixed action.
 
 The nontrivial scale gate uses K containing 257 leaves and L adding one late
 center and all leaf-center edges, q=0, scales (0,2). Its hand-derived action is
@@ -121,3 +122,65 @@ separate. These project controls do not support a native cross-library ranking
 or a universal speed claim. Formal measurements follow the existing
 `spectral-resource-v1` controller; retain every sample/failure and compare paired
 samples, rather than dividing unrelated medians.
+
+## Round-2 Rust LSMR rewrite
+
+`project_boundary_kernel_lsmr` in the existing persistent-Laplacian owner is
+the unoptimized dense-boundary rewrite of Section 2.8. Its options preserve the
+frozen zero-start, zero-damping recurrence and fresh normal-residual stopping
+rule. The result retains numerical solution/residual coordinates and diagnostics;
+it does not certify exact rank, projection forward error or self-adjointness.
+All validation, multiplies, rotations and final residuals share one work budget.
+No partial successful result is returned on nonconvergence or interruption.
+
+The opted-in worker compiles the same production LSMR and budget source with
+`cocycle_lsmr_replay`. It records each update without adding trace allocation or
+observation callbacks to ordinary library debug/release builds. This is an
+equivalence round, with no sparse backend, changed recurrence or timing claim.
+
+After the earlier paper command has frozen its output, run:
+
+```sh
+cargo build --locked --release
+rustc --edition 2024 --cfg cocycle_lsmr_replay -C opt-level=3 tools/reference/persistent_lsmr.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/persistent-lsmr-replay
+python3 tools/reproduce_persistent_constructions.py --replay-lsmr-worker target/persistent-lsmr-replay --frozen target/spsc-a-round1 --output target/spsc-a-lsmr-rust
+```
+
+The original manifest is verified before reading frozen expected values. The
+controller never calls Rust to generate them. It retains input/worker/source
+hashes, complete stdout/stderr, update comparisons and failures in a fresh output
+directory. Windows adds `.exe` to executable paths. Dedicated Rust tests cover
+minimum-norm rank-deficient fits, inconsistent residuals, empty/stationary inputs,
+caps, input errors, numerical overflow, iteration exhaustion, cancellation after
+an actual update and cumulative final-residual charging.
+The simple unscaled recurrence explicitly rejects overflowing rotation products
+and underflowed required scales; no rescaling optimization is included.
+
+On 2026-11-24, the original 801 frozen pairs and 12 solver controls preserve
+update counts and solutions. Five explicit failure controls reject iteration
+exhaustion or invalid/nonfinite input. All 208 updates satisfy independently
+evaluated Golub--Kahan relations (maximum error 1.021e-15), fresh x/residual/
+normal-residual checks and dense least-squares comparisons. Maximum accepted
+iterate/rotation comparison error is 1.302e-13; the separately labeled outer
+composition's maximum action error is 3.471e-15 against the original rational
+matrices. The original 1e-10 comparison tolerance is unchanged.
+
+### Retained terminal-breakdown discrepancy
+
+An initial strict comparison failed on 25 cases' terminal alpha or alpha*v.
+Their terminal beta is at rounding scale. Normalizing an almost-zero
+M*v-alpha*u can produce unrelated u directions; alpha and v subsequently
+depend on that unresolved direction. The mathematical recurrence is identical,
+but these raw continuation variables are not reproduced across the NumPy BLAS
+and Rust scalar evaluation orders. The failed attempt remains retained.
+
+The accepted scope is explicitly narrower: normal steps compare raw variables;
+terminal steps with both beta values below sqrt(machine epsilon)*max(1,norm(M,Fro))
+compare beta*u, beta*alpha*v, rotations, solutions and fresh residuals, and check
+each implementation's own Golub--Kahan relations. Such a step must be the final
+update under the unchanged stopping rule. No nonterminal breakdown is exempted.
+There are 46 such terminal steps in the local replay, of which the 25 raw-variable
+discrepancies are retained in `terminal-breakdown-differences.json`. This is a
+scoped numerical reproduction, not bitwise recurrence-state equivalence or an
+exact breakdown/rank certificate. A caller needing a fixed action continues to
+use the prepared row-space operator.

@@ -4,8 +4,9 @@ use cocycle::execution::Execution;
 use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
 use cocycle::persistent_laplacian::{
-    LaplacianComponent, OperatorOptions, PersistentLaplacian, PersistentLaplacianOperator,
-    SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    LaplacianComponent, LsmrOptions, OperatorOptions, PersistentLaplacian,
+    PersistentLaplacianOperator, SpectralOptions, fixed_endpoint_laplacians,
+    fixed_endpoint_up_laplacians, project_boundary_kernel_lsmr,
 };
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -24,6 +25,200 @@ fn close(a: &[f64], b: &[f64]) {
     for (x, y) in a.iter().zip(b) {
         assert!((x - y).abs() < 1e-9, "{a:?} != {b:?}");
     }
+}
+
+#[test]
+fn lsmr_returns_minimum_norm_fit_and_inconsistent_residual() {
+    // M=B2^T has dependent columns [1,2,0] and [2,4,0].
+    // Its minimum-norm fit of [3,6,7] is [3/5,6/5], residual [0,0,7].
+    let b2 = [1., 2., 0., 2., 4., 0.];
+    let result = project_boundary_kernel_lsmr(
+        &b2,
+        2,
+        3,
+        &[3., 6., 7.],
+        LsmrOptions::default(),
+        &Execution::default(),
+    )
+    .unwrap();
+    close(&result.solution, &[0.6, 1.2]);
+    close(&result.projected, &[0., 0., 7.]);
+    assert!((result.residual_norm - 7.).abs() < 1e-10);
+    assert!(result.normal_residual_norm < 1e-10);
+    assert!(result.iterations > 0);
+}
+
+#[test]
+fn lsmr_empty_zero_and_stationary_inputs_have_explicit_shapes() {
+    for (b2, rows, columns, y, expected_x, expected_z) in [
+        (vec![], 0, 2, vec![1., 2.], vec![], vec![1., 2.]),
+        (vec![], 2, 0, vec![], vec![0., 0.], vec![]),
+        (
+            vec![0.; 6],
+            2,
+            3,
+            vec![1., 2., 3.],
+            vec![0., 0.],
+            vec![1., 2., 3.],
+        ),
+        (vec![1., 0.], 1, 2, vec![0., 3.], vec![0.], vec![0., 3.]),
+    ] {
+        let result = project_boundary_kernel_lsmr(
+            &b2,
+            rows,
+            columns,
+            &y,
+            LsmrOptions {
+                max_iterations: Some(0),
+                ..Default::default()
+            },
+            &Execution::default(),
+        )
+        .unwrap();
+        close(&result.solution, &expected_x);
+        close(&result.projected, &expected_z);
+        assert_eq!(result.iterations, 0);
+        assert_eq!(result.normal_residual_norm, 0.);
+    }
+}
+
+#[test]
+fn lsmr_rejects_invalid_inputs_caps_and_unconverged_output() {
+    let matrix = [1., 0., 0., 0., 2., 0., 0., 0., 4.];
+    for limit in [0, 1] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(
+                &matrix,
+                3,
+                3,
+                &[1.; 3],
+                LsmrOptions {
+                    max_iterations: Some(limit),
+                    ..Default::default()
+                },
+                &Execution::default()
+            ),
+            Err(Error::NumericalFailure {
+                context: "LSMR iteration limit"
+            })
+        ));
+    }
+    for options in [
+        LsmrOptions {
+            max_matrix_entries: 8,
+            ..Default::default()
+        },
+        LsmrOptions {
+            max_vector_entries: 2,
+            ..Default::default()
+        },
+        LsmrOptions {
+            relative_tolerance: f64::NAN,
+            ..Default::default()
+        },
+        LsmrOptions {
+            relative_tolerance: 0.,
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(&matrix, 3, 3, &[1.; 3], options, &Execution::default()),
+            Err(Error::InvalidParameter { .. })
+        ));
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[],
+            usize::MAX,
+            2,
+            &[],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::SizeOverflow { .. })
+    ));
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[],
+            1,
+            1,
+            &[1.],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[1.],
+            1,
+            1,
+            &[],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::ShapeMismatch { .. })
+    ));
+    for (matrix, y) in [([f64::INFINITY], [1.]), ([1.], [f64::NAN])] {
+        assert!(matches!(
+            project_boundary_kernel_lsmr(
+                &matrix,
+                1,
+                1,
+                &y,
+                LsmrOptions::default(),
+                &Execution::default()
+            ),
+            Err(Error::NonFiniteValue { .. })
+        ));
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &[f64::MAX],
+            1,
+            1,
+            &[f64::MAX],
+            LsmrOptions::default(),
+            &Execution::default()
+        ),
+        Err(Error::NumericalFailure { .. })
+    ));
+    // The raw paper recurrence forms products of rotation scales. This simple
+    // rewrite rejects overflow/underflow, rather than silently losing an update.
+    for (boundary, rhs, context) in [
+        (1e200, 1e-100, "LSMR nonfinite arithmetic"),
+        (1e-200, 1e100, "LSMR rotation scale underflow"),
+        (1e-200, 1e-200, "LSMR normal scale underflow"),
+    ] {
+        assert!(
+            matches!(project_boundary_kernel_lsmr(&[boundary], 1, 1, &[rhs],
+            LsmrOptions::default(), &Execution::default()),
+            Err(Error::NumericalFailure { context: actual }) if actual == context)
+        );
+    }
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &matrix,
+            3,
+            3,
+            &[1.; 3],
+            LsmrOptions::default(),
+            &Execution::default().max_work(0)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        project_boundary_kernel_lsmr(
+            &matrix,
+            3,
+            3,
+            &[1.; 3],
+            LsmrOptions::default(),
+            &Execution::default().cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
 }
 #[test]
 fn long_thin_filtrations_keep_direct_and_reverse_operators_consistent() {

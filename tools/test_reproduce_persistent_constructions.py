@@ -1,8 +1,35 @@
 """Independent controls for the SPSC-A reproduction and failure semantics."""
 import importlib.util
 import unittest
+import hashlib
+import json
+from pathlib import Path
+import tempfile
 
 import reproduce_persistent_constructions as paper
+
+
+class FrozenReplayTests(unittest.TestCase):
+    def test_frozen_expected_values_cannot_be_silently_replaced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = {}
+            for name in ["index.json", "solver-controls.json"]:
+                raw = b"[]\n"
+                (root/name).write_bytes(raw)
+                manifest[name] = hashlib.sha256(raw).hexdigest()
+            (root/"manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertEqual(paper.read_frozen_lsmr(root)[1:], ([], []))
+            (root/"solver-controls.json").write_text("[1]\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                paper.read_frozen_lsmr(root)
+
+    def test_worker_failure_is_retained_and_truncation_is_rejected(self):
+        result = paper.parse_lsmr_replay('CASE limited\nERROR NumericalFailure { context: "LSMR iteration limit" }\nEND\n')
+        self.assertIn("iteration limit", result[0]["error"])
+        self.assertNotIn("solution", result[0])
+        with self.assertRaisesRegex(ValueError, "unterminated"):
+            paper.parse_lsmr_replay("CASE truncated\n")
 
 
 @unittest.skipUnless(importlib.util.find_spec("numpy") and importlib.util.find_spec("scipy"),
@@ -48,6 +75,13 @@ class ConstructionTests(unittest.TestCase):
         import numpy as np
         with self.assertRaisesRegex(ArithmeticError, "ambiguous"):
             paper.row_projector(np.array([[1., 0.], [1., 1e-13]]))
+
+    def test_nonfinite_and_broadcast_comparisons_are_rejected(self):
+        import numpy as np
+        for actual, expected in [(np.array([float("nan")]), np.array([0.])),
+                                 (np.array([1.]), np.array([1.,1.]))]:
+            with self.assertRaisesRegex(AssertionError, "shape mismatch or nonfinite"):
+                paper.check_close(actual, expected, "worker output")
 
 
 if __name__ == "__main__":
