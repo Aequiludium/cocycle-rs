@@ -191,6 +191,25 @@ against the Python prototype as well as Rust. Standalone Rust tests cover the
 rank threshold, Householder orthogonality, analytic repeated spectra, original
 residual accounting, large integer identities and projected rank loss.
 
+The admitted rewrite was measured on clean implementation
+`44a4c640e2f64e00c5a3460f3d2d1f41dc4e924b`, with Rust 1.98.1, Python 3.10.11,
+NumPy 2.2.6 and GUDHI 3.12.0 on Windows. Rust 1.91 separately compiled and ran
+the complete numerical rewrite and all 11 standalone tests. The historical input
+hash above and the hashes of all 29 saved preceding-vector outputs were retained.
+
+| Rewrite control | Checked scope | Largest observed error |
+| --- | --- | --- |
+| Frozen QR/Ritz replay | 328 active/locked steps | Active projector `2.32e-13`; normalized lifted quotient `4.72e-14` |
+| Complete Rust sequences | 48 solves across cold, original-warm and Fourier-ordered routes | Final projector `3.94e-12`; normalized residual `3.68e-13` |
+| Oriented mapping and new range projection | 36 transfers | Projector `1.03e-14`; new-operator residual `2.16e-15` |
+| Sequence and basis edge controls | 15 success/rejection cases | Expected behavior, including rank loss, empty order and integer labels above `2^53` |
+
+Seven Python numerical tests, 158 tool tests on WSL (40 optional skips), stable
+Clippy, source/link checks and strict Sphinx passed locally. This admits the
+selected corrected fixed-degree mathematical scope for the later optimization
+round. It does not establish author-data parity, a scalable positive-spectrum
+product integration or a faster default.
+
 ## Retained numerical run
 
 The local Windows run used clean implementation commit
