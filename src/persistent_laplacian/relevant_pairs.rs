@@ -298,9 +298,9 @@ fn select_pairs(
             starts.push((s, *end));
         }
     }
-    for t in 1..=grid {
+    for (t, &start) in first_start.iter().enumerate().skip(1) {
         budget.step()?;
-        let Some(start) = first_start[t] else {
+        let Some(start) = start else {
             continue;
         };
         for &(s, end) in &starts {
