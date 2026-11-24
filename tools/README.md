@@ -114,6 +114,62 @@ are diagnostics; they are not formal benchmarks, process RSS or speedup evidence
 Core integration, persistent Schur sampling and optimization remain deferred
 until the full probability/error contract and matched cost evidence are resolved.
 
+### Round 2: complete the scoped Rust rewrite
+
+The same worker now also accepts
+`native n p degree probes draws seed leverage|uniform`, followed by the
+row-major integer B and p-by-probes Rademacher Z. Rust computes the scores,
+probabilities and draws itself. Leverage probabilities divide the numerical
+scores by their measured sum; the raw sum and numerical rank are returned so
+the normalization and trace defect remain visible. Uniform sampling is a
+separate control. Zero rank returns zero probabilities and no draws.
+
+Native randomness uses SplitMix64 with explicit wrapping 64-bit arithmetic,
+its high 53 bits divided by 2^53, and the ordered half-open inverse CDF. The last
+positive bin absorbs floating-point endpoint roundoff. This is a declared finite
+random-number implementation, with independent golden-word and CDF controls;
+it does not claim the same draws as NumPy PCG64 or a probability certificate.
+Every result retains the route, seed, actual draws, scores, probabilities,
+weights and matrix. The original supplied-probability/draw protocol remains
+available for exact Round-1 replay. Negative input probabilities are rejected.
+
+After generating the complete Round-1 output above, use its saved input arrays,
+probes, moments, weights and draws for the Round-2 command:
+
+```sh
+rustc --edition 2024 -D warnings --test tools/reference/sparsification.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/sparsification-tests
+target/sparsification-tests
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 target/sparsification-venv/bin/python tools/reproduce_sparsification.py --replay-round1 target/sparsification-run-001 --worker target/sparsification-worker --output target/sparsification-round2-001
+```
+
+The frozen eight-fixture input SHA-256 is enforced. The full command checks all
+1,440 stored moment configurations against both frozen values and independent
+dense scalar-polynomial evaluation on the same probes. It replays all 7,036
+sampling trials, including the externally supplied project-diagnostic
+probabilities, checking the whole generalized spectrum, rank-loss and sandwich
+pass/fail states. It separately verifies Rust-generated leverage/uniform draws
+for 1,280 seed/count/route cases with an independent Python integer-RNG/CDF
+control and rational leverage expectations. The frozen invalid probability
+estimate is replayed as a rejection. Shell/empty/zero analytic controls and
+protocol rejections remain separate from these counts. `--quick` restricts the
+frozen and native sweeps to seed 0.
+
+`--batch` frames independent worker requests, one per line, with the original
+2 MB per-request cap and dimension/probe/degree/draw caps. Each request still
+reconstructs and solves the same simple dense reference; no factor cache or
+algorithm optimization is added. A bad request terminates with a nonzero status;
+earlier complete request outputs remain visible. The controller rejects partial
+batches and retains exact requests, stdout/stderr, comparisons, fingerprints,
+native trials and all failure diagnostics in a new output directory.
+
+This completes only the reproduced mathematical scope. Full paper KID
+histogram/probability reconstruction, persistent transfer, public weighted APIs
+and Round-3 optimization remain separate admission gates. Native draw outcomes
+are empirical evidence, not a replacement for a justified sample-count theorem.
+CI compiles and runs the standalone analytic/protocol tests; the optional full
+numerical replay additionally needs the declared Python reference environment
+and an existing complete Round-1 output.
+
 ## Spectral reference CI
 
 The `Real Hodge reference comparisons` CI job requires `--iterative

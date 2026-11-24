@@ -12,6 +12,11 @@ HAS_NUMPY = importlib.util.find_spec("numpy") is not None
 
 
 class RationalOracleTests(unittest.TestCase):
+    def test_native_sampler_golden_words_and_zero_support(self):
+        self.assertEqual(sampling.reference_native_draws([0.5, 0.5], 2, 0), [1, 0])
+        self.assertEqual(sampling.reference_native_draws([0, 1, 0], 8, 0), [1] * 8)
+        self.assertEqual(sampling.reference_native_draws([0, 0], 8, 0), [])
+
     def test_rank_and_nonorthogonal_kernel(self):
         rank, kernel = sampling.exact_kernel([[1, 2, 3], [2, 4, 6]], 3)
         self.assertEqual(rank, 1)

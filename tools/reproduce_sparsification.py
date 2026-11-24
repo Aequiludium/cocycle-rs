@@ -605,19 +605,276 @@ def run(output, sources, quick=False, worker=None):
     return dict(totals)
 
 
+def reference_native_draws(probabilities, count, seed):
+    """Independent integer SplitMix64 plus ordered floating inverse-CDF control."""
+    mask = (1 << 64) - 1
+    state = seed
+    mass = sum(probabilities)
+    positive = [index for index, probability in enumerate(probabilities) if probability > 0]
+    if not positive:
+        return []
+    draws = []
+    for _ in range(count):
+        state = (state + 0x9e3779b97f4a7c15) & mask
+        word = state
+        word = ((word ^ (word >> 30)) * 0xbf58476d1ce4e5b9) & mask
+        word = ((word ^ (word >> 27)) * 0x94d049bb133111eb) & mask
+        word ^= word >> 31
+        target = ((word >> 11) / (1 << 53)) * mass
+        cumulative = 0.0
+        selected = positive[-1]
+        for index, probability in enumerate(probabilities):
+            cumulative += probability
+            if target < cumulative:
+                selected = index
+                break
+        draws.append(selected)
+    return draws
+
+
+def replay_round1(output, round1, worker, quick=False):
+    """Round 2: frozen replay and native Rust sampling, no core adoption claim."""
+    np = numpy()
+    round1 = round1.resolve()
+    metadata = json.loads((round1 / "metadata.json").read_text(encoding="utf-8"))
+    summary = json.loads((round1 / "summary.json").read_text(encoding="utf-8"))
+    input_hash = digest(round1 / "inputs.json")
+    if (input_hash != "b3eac224bf09417c0e569c72c34d98aa25e72f0e9268847eb50ea36a6b9eccc0"
+            or summary["input_file_sha256"] != input_hash or metadata["papers"] != PAPERS):
+        raise ValueError("Round-1 frozen input or paper identity mismatch")
+    inputs = json.loads((round1 / "inputs.json").read_text(encoding="utf-8"))
+    output.mkdir(parents=True, exist_ok=False)
+    root = Path(__file__).resolve().parents[1]
+    started = time.perf_counter()
+    git = lambda *args: subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+    write_json(output / "metadata.json", {
+        "round": 2, "reference_commit": metadata["git_head"],
+        "reference_files": {name: digest(round1 / name) for name in
+                            ("inputs.json", "metadata.json", "controls.json", "moments.jsonl", "trials.jsonl")},
+        "git_head": git("rev-parse", "HEAD"), "git_status": git("status", "--porcelain"),
+        "script_sha256": digest(__file__), "worker_sha256": digest(worker),
+        "rust_source_sha256": digest(root / "tools/reference/sparsification.rs"),
+        "python": sys.version, "platform": platform.platform(),
+        "packages": {name: importlib.metadata.version(name) for name in ("numpy", "scipy", "gudhi", "ripser")},
+        "command": sys.argv, "quick": quick, "matrix_tolerance": TOLERANCE,
+        "native_rng": "SplitMix64, high 53 bits / 2^53, ordered half-open CDF; last positive endpoint fallback",
+        "native_probability_normalization": "numerical leverage scores / their measured sum; trace defect retained",
+        "bound_status": "full generalized spectrum and numerical kernel diagnostics; no probabilistic certificate",
+        "scope": "exact-score route, uniform control, corrected moments and fixed supplied-probability sampling",
+        "excluded": "full KID histogram/probability reconstruction, persistent transfer, optimization, public API",
+    })
+    control = json.loads((round1 / "controls.json").read_text(encoding="utf-8"))
+    analytic = [worker_parity(worker, output, "round2-shell", np.array(control["boundary"]),
+                             np.array(control["all_16_probes"]), 8, np.full(4, 0.25), 1, 0)]
+    for rows, columns in ((0, 0), (3, 0), (3, 2)):
+        analytic.append(worker_parity(worker, output, f"round2-zero-{rows}-{columns}",
+                                     np.zeros((rows, columns)), np.ones((columns, 1)),
+                                     3, np.zeros(columns), 1, 0))
+    write_json(output / "analytic-controls.json", analytic)
+    fixture_data = {}
+    for fixture in inputs:
+        b = np.array(fixture["boundary"], dtype=float).reshape(fixture["boundary_shape"])
+        scores, rank = exact_scores(b)
+        tau = np.array([float(x) for x in scores])
+        topology = topology_check(fixture)
+        gram, whitening, kernel = comparison_setup(b, rank)
+        dual = b.T @ b
+        scale = float(np.linalg.eigvalsh(dual)[-1]) if rank else 0.
+        h = dual / scale if rank else dual
+        values, vectors = np.linalg.eigh(h)
+        angles = np.arccos(np.maximum(0, np.minimum(1, values)))
+        fixture_data[fixture["name"]] = (b, tau, rank, gram, whitening, kernel, angles, vectors)
+        write_json(output / (fixture["name"] + "-topology.json"), topology)
+
+    counts = Counter()
+    max_errors = Counter()
+    with (round1 / "moments.jsonl").open(encoding="utf-8") as stream:
+        for index, line in enumerate(stream):
+            row = json.loads(line)
+            if row["valid_for_sampling"] or (quick and row["seed"] != 0):
+                continue
+            b = fixture_data[row["fixture"]][0]
+            request = " ".join(map(str, [*b.shape, 1, 1, 1, *b.astype(int).ravel().tolist(),
+                                         *np.ones(b.shape[1]).tolist(), *row["probabilities"], 0]))
+            process = subprocess.run([str(worker)], input=request, capture_output=True, text=True, timeout=60)
+            write_json(output / f"frozen-rejection-{index}.json", {"stdin": request, "returncode": process.returncode,
+                                                                 "stdout": process.stdout, "stderr": process.stderr})
+            if not process.returncode or process.stdout:
+                raise ArithmeticError("Rust accepted a frozen invalid probability estimate")
+            counts["frozen_probability_rejections"] += 1
+    with (output / "comparisons.jsonl").open("w", encoding="utf-8") as comparisons, \
+            (output / "native-trials.jsonl").open("w", encoding="utf-8") as native_file:
+
+        def close_array(key, actual, expected):
+            actual, expected = np.asarray(actual, dtype=float), np.asarray(expected, dtype=float)
+            if actual.shape != expected.shape or not np.isfinite(actual).all():
+                raise ArithmeticError(f"Round-2 {key} shape or finiteness mismatch")
+            error = float(np.linalg.norm(actual - expected))
+            max_errors[key] = max(max_errors[key], error)
+            if error > TOLERANCE * max(1, float(np.linalg.norm(expected))):
+                raise ArithmeticError(f"Round-2 {key} mismatch: {error}")
+            return error
+
+        def submit(cases, batch_index):
+            request = "\n".join(case["request"] for case in cases) + "\n"
+            stem = output / f"batch-{batch_index:04d}"
+            stem.with_suffix(".stdin").write_text(request, encoding="utf-8")
+            process = subprocess.run([str(worker), "--batch"], input=request,
+                                     capture_output=True, text=True, timeout=60)
+            stem.with_suffix(".stdout").write_text(process.stdout, encoding="utf-8")
+            stem.with_suffix(".stderr").write_text(process.stderr, encoding="utf-8")
+            if process.returncode:
+                raise ArithmeticError(f"Round-2 batch {batch_index} failed: {process.stderr}")
+            lines = process.stdout.splitlines()
+            if len(lines) != len(cases):
+                raise ArithmeticError("Round-2 worker returned a partial or extra batch")
+            for case, line in zip(cases, lines):
+                actual = json.loads(line)
+                b, tau, rank, gram, whitening, kernel, _, _ = fixture_data[case["fixture"]]
+                if type(actual["rank"]) is not int or actual["rank"] != rank:
+                    raise ArithmeticError("Round-2 numerical rank disagrees with rational rank")
+                errors = {"scores": close_array("scores", actual["scores"], tau)}
+                if case["kind"] == "moments":
+                    errors["moments"] = close_array("frozen_moments", actual["moments"], case["expected"])
+                    errors["direct_polynomial"] = close_array("direct_polynomial", actual["moments"], case["direct"])
+                else:
+                    count = case["count"]
+                    p = np.array(actual["probabilities"])
+                    errors["probabilities"] = close_array("probabilities", p, case["probabilities"])
+                    if case["kind"] == "native":
+                        expected_draws = reference_native_draws(p.tolist(), count, case["seed"])
+                    else:
+                        expected_draws = case["draws"]
+                    if (actual["draws"] != expected_draws
+                            or any(type(x) is not int or x < 0 or x >= b.shape[1] for x in actual["draws"])):
+                        raise ArithmeticError("Round-2 draw sequence mismatch")
+                    draw_counts = np.bincount(actual["draws"], minlength=b.shape[1])
+                    expected_weights = np.zeros(b.shape[1])
+                    selected = draw_counts > 0
+                    expected_weights[selected] = draw_counts[selected] / (count * p[selected])
+                    errors["weights"] = close_array("weights", actual["weights"], expected_weights)
+                    expected_matrix = (b * expected_weights) @ b.T
+                    errors["sampled"] = close_array("sampled", actual["sampled"], expected_matrix.ravel())
+                    sampled = np.array(actual["sampled"]).reshape(gram.shape)
+                    diagnostic = assess(gram, sampled, whitening, kernel, rank)
+                    if case["kind"] == "frozen_trial":
+                        frozen = case["frozen"]
+                        if (diagnostic["rank_loss"] != frozen["rank_loss"]
+                                or diagnostic["psd_sandwich_pass"] != frozen["psd_sandwich_pass"]):
+                            raise ArithmeticError("Round-2 frozen failure status changed")
+                        errors["generalized_spectrum"] = close_array("generalized_spectrum", diagnostic["generalized_eigenvalues"],
+                                                                     frozen["generalized_eigenvalues"])
+                    else:
+                        counts["native_rank_loss"] += diagnostic["rank_loss"]
+                        counts["native_sandwich_failures_eps0.5"] += not diagnostic["psd_sandwich_pass"]["0.5"]
+                        native_file.write(json.dumps({"fixture": case["fixture"], "seed": case["seed"],
+                                                      "route": actual["route"], "k": count, "raw_score_sum": actual["score_sum"],
+                                                      "probabilities": actual["probabilities"], "draws": actual["draws"],
+                                                      "weights": actual["weights"], **diagnostic}, allow_nan=False) + "\n")
+                counts[case["kind"]] += 1
+                comparisons.write(json.dumps({"fixture": case["fixture"], "kind": case["kind"],
+                                              "id": case["id"], "errors": errors}, allow_nan=False) + "\n")
+
+        def requests():
+            # Reuse the exact saved probes and moment values, not a regenerated RNG stream.
+            with (round1 / "moments.jsonl").open(encoding="utf-8") as stream:
+                for index, line in enumerate(stream):
+                    row = json.loads(line)
+                    if quick and row["seed"] != 0:
+                        continue
+                    b, tau, rank, _, _, _, angles, vectors = fixture_data[row["fixture"]]
+                    degree, probe_count = row["degree"], row["probes"]
+                    probes = np.load(round1 / f"{row['fixture']}-seed{row['seed']}-probes.npy", allow_pickle=False)[:, :probe_count]
+                    if probes.shape != (b.shape[1], probe_count) or not np.isin(probes, (-1, 1)).all():
+                        raise ValueError("invalid frozen probe matrix")
+                    direct = np.zeros((degree + 1, b.shape[1]))
+                    projected = vectors.T @ probes
+                    for m in range(1, degree + 1, 2):
+                        polynomial_action = vectors @ (np.cos(m * angles)[:, None] * projected)
+                        direct[m] = 2 * np.mean(probes * polynomial_action, axis=1)
+                    p = tau / rank
+                    tokens = [*b.shape, degree, probe_count, 1, *b.astype(int).ravel().tolist(),
+                              *probes.ravel().tolist(), *p.tolist(), int(np.flatnonzero(p)[0])]
+                    yield {"kind": "moments", "fixture": row["fixture"], "id": index,
+                           "request": " ".join(map(str, tokens)), "expected": np.array(row["moments"]).ravel(),
+                           "direct": direct.ravel()}
+            with (round1 / "trials.jsonl").open(encoding="utf-8") as stream:
+                for index, line in enumerate(stream):
+                    row = json.loads(line)
+                    if quick and row["seed"] != 0:
+                        continue
+                    b = fixture_data[row["fixture"]][0]
+                    tokens = [*b.shape, 1, 1, row["k"], *b.astype(int).ravel().tolist(),
+                              *np.ones(b.shape[1]).tolist(), *row["probabilities"], *row["draws"]]
+                    yield {"kind": "frozen_trial", "fixture": row["fixture"], "id": index,
+                           "count": row["k"], "probabilities": row["probabilities"],
+                           "draws": row["draws"], "frozen": row, "request": " ".join(map(str, tokens))}
+            for name, (b, tau, rank, *_) in fixture_data.items():
+                for seed in range(1 if quick else 20):
+                    for count in sorted(set((1, rank, 4 * rank, 16 * rank))):
+                        for route in ("leverage", "uniform"):
+                            p = tau / rank if route == "leverage" else np.full(b.shape[1], 1 / b.shape[1])
+                            tokens = ["native", *b.shape, 1, 1, count, seed, route,
+                                      *b.astype(int).ravel().tolist(), *np.ones(b.shape[1]).tolist()]
+                            yield {"kind": "native", "fixture": name, "id": f"{route}-{seed}-{count}",
+                                   "seed": seed, "count": count, "probabilities": p,
+                                   "request": " ".join(map(str, tokens))}
+
+        pending = []
+        batches = 0
+        for case in requests():
+            pending.append(case)
+            if len(pending) == 32:
+                submit(pending, batches)
+                pending = []
+                batches += 1
+        if pending:
+            submit(pending, batches)
+    expected_counts = {"moments": 72 if quick else 1440, "frozen_trial": 352 if quick else 7036,
+                       "native": 64 if quick else 1280,
+                       "frozen_probability_rejections": 0 if quick else summary["counts"]["kid_rejected_probability_cells"]}
+    if any(counts[key] != value for key, value in expected_counts.items()):
+        raise ArithmeticError(f"Round-2 frozen coverage mismatch: {dict(counts)}")
+    rejected = worker_rejections(worker, output)
+    # A failed second request must not turn the batch into a successful partial result.
+    process = subprocess.run([str(worker), "--batch"], input="1 1 1 1 1 1 1 1 0\ninvalid\n",
+                             capture_output=True, text=True, timeout=60)
+    write_json(output / "batch-rejection.json", {"returncode": process.returncode,
+                                               "stdout": process.stdout, "stderr": process.stderr})
+    if not process.returncode or len(process.stdout.splitlines()) != 1:
+        raise ArithmeticError("invalid batch did not retain explicit failure and its completed request")
+    rejected += 1
+    write_json(output / "summary.json", {"counts": dict(counts), "max_absolute_errors": dict(max_errors),
+                                        "protocol_rejections": rejected, "analytic_controls": len(analytic),
+                                        "total_seconds": time.perf_counter() - started,
+                                        "reference_input_sha256": input_hash,
+                                        "verdict": "scoped Rust rewrite passed; all frozen statuses retained",
+                                        "full_KID": "unresolved; no histogram rewrite or probability theorem claimed",
+                                        "optimization": "not performed; batching only frames independent requests"})
+    return dict(counts)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sources", required=True, type=Path, help="directory with both pinned PDFs")
+    parser.add_argument("--sources", type=Path, help="directory with both pinned PDFs (Round 1)")
     parser.add_argument("--output", required=True, type=Path, help="new artifact directory; never overwritten")
     parser.add_argument("--quick", action="store_true", help="seed 0 only; full default uses seeds 0..19")
     parser.add_argument("--worker", type=Path, help="optional compiled standalone Rust parity worker")
+    parser.add_argument("--replay-round1", type=Path, help="Round 2: replay saved Round-1 inputs/results using --worker")
     args = parser.parse_args()
     if args.output.exists():
         print("Output already exists; choose a new directory.", file=sys.stderr)
         return 1
     try:
         worker = args.worker.resolve() if args.worker else None
-        result = run(args.output, args.sources, args.quick, worker)
+        if args.replay_round1:
+            if not worker:
+                raise ValueError("--replay-round1 requires --worker")
+            result = replay_round1(args.output, args.replay_round1, worker, args.quick)
+        else:
+            if not args.sources:
+                raise ValueError("Round 1 requires --sources")
+            result = run(args.output, args.sources, args.quick, worker)
     except (ValueError, ArithmeticError, OSError, ImportError, subprocess.SubprocessError) as error:
         if args.output.is_dir():
             write_json(args.output / "failure.json", {"error": str(error), "type": type(error).__name__})
