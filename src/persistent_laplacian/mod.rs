@@ -13,7 +13,10 @@
 //! They check pair-local eligibility and never select a Schur fallback.
 
 mod nonbranching;
+mod relevant_pairs;
 mod schur;
+
+pub use relevant_pairs::{RelevantPairLaplacian, relevant_pair_laplacians};
 
 use crate::complex::{Simplex, SimplexId};
 use crate::execution::{Execution, WorkBudget};
@@ -36,7 +39,8 @@ pub enum LaplacianComponent {
 #[derive(Clone, Copy, Debug)]
 pub struct SpectralOptions {
     /// Relative eigenvalue cutoff for the Schur pseudoinverse (default 1e-12).
-    /// Also controls Jacobi convergence and the stepwise zero-pivot test.
+    /// Also controls Jacobi convergence, the stepwise zero-pivot test and the
+    /// new-chain numerical independence guard (never exact event reduction).
     pub relative_tolerance: f64,
     /// Maximum relative eigensystem/range residual (default 1e-9).
     /// Also bounds the accumulated positive-mode discarded Schur correction,
@@ -46,7 +50,8 @@ pub struct SpectralOptions {
     /// Maximum cyclic Jacobi sweeps, excluding the initial convergence check.
     pub max_sweeps: usize,
     /// Maximum f64 entries in any one dense buffer (default 65,536).
-    /// The fixed-endpoint operation also caps the sum of returned matrix entries.
+    /// Batch operations also cap the sum of returned matrix entries. The
+    /// relevant-pair route additionally caps rational buffers and grid pairs.
     /// This is not a process memory quota: temporary buffers coexist.
     pub max_dense_entries: usize,
 }
@@ -372,6 +377,9 @@ impl PersistentLaplacian {
     /// For a lower-only or explicitly non-branching operator this is zero
     /// because no Schur solve is used;
     /// its eigensystem residual is checked separately by `spectrum`.
+    /// New-chain results instead report max pairwise Q-orthogonality error and
+    /// max(abs(B Q outside K))/max(1,max(abs(B Q inside K))). Scheduling uses
+    /// exact rational pivots independently of these numerical checks.
     pub fn solver_residual(&self) -> f64 {
         self.solver_residual
     }

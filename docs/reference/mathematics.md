@@ -1175,6 +1175,30 @@ operator domains and stability hypotheses are not implemented here. The full
 operator does not inherit all component comparison properties; this does not
 rule out the fixed-K, increasing-L monotonicity, where D stays constant.
 
+### Relevant pairs and new-chain coordinates
+
+Kirchner and Vittorietti, [New persistent chain spaces](https://arxiv.org/abs/2611.09610v1),
+Algorithms 1-2 (physical PDF page 18) and Section 4.2, reduce the final signed
+boundary over R as R=B V with invertible upper-triangular V. For integer B,
+checked rational arithmetic preserves real pivot decisions exactly. Column j
+has end event t_j at its original simplex birth and start event s_j at the birth
+of low(R_j); a zero column uses an internal empty stage. Retain those zero
+columns, since they are part of the persistent chain space's metric.
+
+The columns V_j with s_j<=s and t_j<=t span the allowed chain domain. They must
+be orthonormalized together before forming B_s Q Q^T B_s^T; the individual new
+chain subspaces are not mutually orthogonal. Evaluate a legal pair (s,t) when
+both a bucket W(a,t) with a<=s and a bucket W(s,b) with b<=t are nonempty. The
+witnesses can be different buckets, so evaluation locations exceed the nonempty
+bucket coordinates in general.
+
+At every other pair choose the evaluated predecessor below it with maximal end,
+then maximal start. Extend its upper operator by zero rows/columns into the
+requested ordered q-basis; no predecessor means zero. The full result adds that
+start's own lower term. Matrix size, zero multiplicity and pair identity must be
+preserved even if nonzero upper spectra coincide. Checked integer overflow is a
+failure of this bounded implementation, not evidence for a zero real pivot.
+
 ## 24. Standard real discrete Dirac
 
 For a finite supplied chain complex with ordered bases, use ordinary,

@@ -5,7 +5,7 @@ use cocycle::filtration::RipsBuilder;
 use cocycle::geometry::PointCloudView;
 use cocycle::persistent_laplacian::{
     LaplacianComponent, PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians,
-    fixed_endpoint_up_laplacians,
+    fixed_endpoint_up_laplacians, relevant_pair_laplacians,
 };
 use cocycle::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -477,6 +477,199 @@ fn path_kron_and_owned_action() {
         cocycle::filtration::Coverage::Complete
     );
     assert_eq!(result.construction_dimension(), None);
+}
+
+#[test]
+fn relevant_pairs_combine_buckets_and_extend_the_requested_domain() {
+    let results = {
+        let source = complex(&[
+            (&[0], 0.),
+            (&[1], 1.),
+            (&[2], 0.),
+            (&[3], 0.),
+            (&[4], 4.),
+            (&[0, 1], 2.),
+            (&[2, 3], 3.),
+        ]);
+        let stages = [0., 1., 2., 3., 4.].map(|s| source.stage(s).unwrap());
+        let requests = [(4, 4), (0, 0), (4, 4), (1, 3)];
+        let results = relevant_pair_laplacians(
+            &stages,
+            &requests,
+            0,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        for (&(s, t), result) in requests.iter().zip(&results) {
+            close(
+                result.operator().matrix(),
+                pair(&source, stages[s].scale(), stages[t].scale(), 0).matrix(),
+            );
+        }
+        results
+    };
+    // No single bucket is at this pair: two independent edge events trigger it.
+    assert_eq!(results[0].representative(), Some((1, 3)));
+    assert_eq!(results[0].upper_embedding(), 0..4);
+    assert_eq!(results[0].operator().basis().len(), 5);
+    assert_eq!(results[0].operator().target_basis().len(), 5);
+    close(&results[0].operator().matrix()[20..], &[0.; 5]);
+    assert_eq!(results[0].operator().scales(), (4., 4.));
+    assert_eq!(results[1].representative(), None);
+    assert!(results[1].upper_embedding().is_empty());
+    close(results[1].operator().matrix(), &[0.; 9]);
+    close(
+        results[0].operator().matrix(),
+        results[2].operator().matrix(),
+    );
+}
+
+#[test]
+fn relevant_pairs_match_every_direct_pair_with_ties_cycles_and_lower_changes() {
+    let source = complex(&[
+        (&[0], 0.),
+        (&[1], 0.),
+        (&[2], 1.),
+        (&[3], 1.),
+        (&[0, 1], 2.),
+        (&[0, 2], 2.),
+        (&[1, 2], 2.),
+        (&[2, 3], 3.),
+        (&[0, 1, 2], 4.),
+    ]);
+    let stages = [-1., 0., 1., 2., 2., 3., 4.].map(|s| source.stage(s).unwrap());
+    let requests: Vec<_> = (0..stages.len())
+        .flat_map(|t| (0..=t).map(move |s| (s, t)))
+        .collect();
+    for q in 0..=3 {
+        let results = relevant_pair_laplacians(
+            &stages,
+            &requests,
+            q,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        for (&(s, t), result) in requests.iter().zip(&results) {
+            let operator = result.operator();
+            close(
+                operator.matrix(),
+                pair(&source, stages[s].scale(), stages[t].scale(), q).matrix(),
+            );
+            assert_eq!(operator.scales(), (stages[s].scale(), stages[t].scale()));
+            assert_eq!(operator.component(), LaplacianComponent::Full);
+            close(
+                &operator
+                    .spectrum(&Execution::default())
+                    .unwrap()
+                    .eigenvalues,
+                &pair(&source, stages[s].scale(), stages[t].scale(), q)
+                    .spectrum(&Execution::default())
+                    .unwrap()
+                    .eigenvalues,
+            );
+        }
+    }
+    let coarse = [source.stage(0.).unwrap(), source.stage(4.).unwrap()];
+    for q in 0..=3 {
+        let results = relevant_pair_laplacians(
+            &coarse,
+            &[(0, 0), (0, 1), (1, 1)],
+            q,
+            SpectralOptions::default(),
+            &Execution::default(),
+        )
+        .unwrap();
+        for (&(s, t), result) in [(0, 0), (0, 1), (1, 1)].iter().zip(&results) {
+            close(
+                result.operator().matrix(),
+                pair(&source, coarse[s].scale(), coarse[t].scale(), q).matrix(),
+            );
+        }
+    }
+}
+
+#[test]
+fn relevant_pairs_validate_the_whole_grid_and_bound_storage_and_work() {
+    let source = complex(&[(&[0], 0.), (&[1], 1.), (&[0, 1], 2.)]);
+    let other = source.clone();
+    let stages = [0., 1., 2.].map(|s| source.stage(s).unwrap());
+    let options = SpectralOptions::default();
+    let run = |grid: &[_], requests: &[_], options, execution: &_| {
+        relevant_pair_laplacians(grid, requests, 0, options, execution)
+    };
+    assert!(run(&stages, &[(2, 1)], options, &Execution::default()).is_err());
+    assert!(run(&stages, &[(0, 3)], options, &Execution::default()).is_err());
+    assert!(
+        run(
+            &[stages[1], stages[0], stages[2]],
+            &[(0, 2)],
+            options,
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        run(
+            &[stages[0], other.stage(2.).unwrap()],
+            &[(0, 1)],
+            options,
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        run(
+            &stages,
+            &[(0, 2)],
+            SpectralOptions {
+                max_dense_entries: 5,
+                ..options
+            },
+            &Execution::default()
+        )
+        .is_err()
+    );
+    assert!(
+        run(
+            &stages,
+            &[(2, 2); 2],
+            SpectralOptions {
+                max_dense_entries: 6,
+                ..options
+            },
+            &Execution::default()
+        )
+        .is_err()
+    );
+    for limit in [0, 10, 50] {
+        assert!(matches!(
+            run(
+                &stages,
+                &[(2, 2)],
+                options,
+                &Execution::default().max_work(limit)
+            ),
+            Err(Error::WorkLimitExceeded { .. })
+        ));
+    }
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        run(
+            &stages,
+            &[(0, 2)],
+            options,
+            &Execution::default().cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
+    assert!(
+        run(&[], &[], options, &Execution::default())
+            .unwrap()
+            .is_empty()
+    );
+    assert!(run(&[], &[(0, 0)], options, &Execution::default()).is_err());
 }
 
 #[test]

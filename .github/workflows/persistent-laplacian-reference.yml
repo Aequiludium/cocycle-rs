@@ -75,6 +75,11 @@ jobs:
           cargo build --locked --release
           rustdoc --edition 2024 -D warnings --test docs/guides/persistent-laplacian.md --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps
           cargo run --locked --example persistent_laplacian > target/persistent-laplacian-reference/example.jsonl
+      - name: Freeze and replay relevant-pair intermediates
+        run: |
+          curl --fail --location --retry 3 https://arxiv.org/pdf/2611.09610v1 --output target/persistent-laplacian-reference/relevant-paper.pdf
+          python tools/reproduce_relevant_pairs.py --paper target/persistent-laplacian-reference/relevant-paper.pdf --paper-style --output target/persistent-laplacian-reference/relevant-r1 2>&1 | tee target/persistent-laplacian-reference/relevant-r1.log
+          python tools/reproduce_relevant_pairs.py --paper target/persistent-laplacian-reference/relevant-paper.pdf --replay-frozen target/persistent-laplacian-reference/relevant-r1 --output target/persistent-laplacian-reference/relevant-r2 2>&1 | tee target/persistent-laplacian-reference/relevant-r2.log
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

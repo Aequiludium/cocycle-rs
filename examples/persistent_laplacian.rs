@@ -3,6 +3,7 @@ use cocycle::complex::{Simplex, SimplicialComplex};
 use cocycle::execution::Execution;
 use cocycle::persistent_laplacian::{
     PersistentLaplacian, SpectralOptions, fixed_endpoint_laplacians, fixed_endpoint_up_laplacians,
+    relevant_pair_laplacians,
 };
 use std::io::{self, Read};
 use std::time::Instant;
@@ -45,7 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
+    let relevant = args.as_slice() == ["--relevant"] || args.as_slice() == ["--relevant-direct"];
     let (benchmark, components, non_branching) = match args.as_slice() {
+        [a] if a == "--relevant" || a == "--relevant-direct" => (None, false, false),
         [a] if a == "--oracle" => (None, false, false),
         [a] if a == "--components" => (None, true, false),
         [a] if a == "--non-branching" => (None, true, true),
@@ -54,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "usage: persistent_laplacian [--oracle | --components | --non-branching | --benchmark direct|stepwise]".into(),
+                "usage: persistent_laplacian [--oracle | --components | --non-branching | --relevant | --relevant-direct | --benchmark direct|stepwise]".into(),
             );
         }
     };
@@ -93,6 +96,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         };
         let execution = Execution::default();
+        if relevant {
+            let requests: Vec<_> = (0..starts.len())
+                .flat_map(|t| (0..=t).map(move |s| (s, t)))
+                .collect();
+            let begin = Instant::now();
+            if args.as_slice() == ["--relevant-direct"] {
+                let results = requests
+                    .iter()
+                    .map(|&(s, t)| {
+                        PersistentLaplacian::compute(
+                            &starts[s], &starts[t], degree, options, &execution,
+                        )
+                    })
+                    .collect::<cocycle::Result<Vec<_>>>()?;
+                println!(
+                    "BATCH {} {} {:.17e}",
+                    requests.len(),
+                    requests.len(),
+                    begin.elapsed().as_secs_f64()
+                );
+                for (&(s, t), operator) in requests.iter().zip(&results) {
+                    print_relevant(s, t, operator, None, 0, &execution)?;
+                }
+                continue;
+            }
+            let results =
+                relevant_pair_laplacians(&starts, &requests, degree, options, &execution)?;
+            let elapsed = begin.elapsed().as_secs_f64();
+            println!(
+                "BATCH {} {} {:.17e}",
+                requests.len(),
+                results
+                    .iter()
+                    .filter_map(|r| r.representative())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                elapsed
+            );
+            for (&(s, t), result) in requests.iter().zip(&results) {
+                print_relevant(
+                    s,
+                    t,
+                    result.operator(),
+                    result.representative(),
+                    result.upper_embedding().len(),
+                    &execution,
+                )?;
+            }
+            continue;
+        }
         if let Some(route) = benchmark {
             let begin = Instant::now();
             let results = if route == "direct" {
@@ -188,6 +241,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+fn print_relevant(
+    s: usize,
+    t: usize,
+    operator: &PersistentLaplacian,
+    representative: Option<(usize, usize)>,
+    embedding: usize,
+    execution: &Execution<'_>,
+) -> cocycle::Result<()> {
+    println!(
+        "RELEVANT {} {} {} {:?}",
+        s,
+        t,
+        operator.basis().len(),
+        representative
+    );
+    print_values("MATRIX", operator.matrix());
+    print_values("SPECTRUM", &operator.spectrum(execution)?.eigenvalues);
+    println!("RESIDUAL {}", operator.solver_residual());
+    println!("EMBEDDING {}", embedding);
+    println!(
+        "BASIS {:?}",
+        operator
+            .basis()
+            .iter()
+            .map(Simplex::vertices)
+            .collect::<Vec<_>>()
+    );
+    println!(
+        "CONTEXT {} {} {}",
+        operator.degree(),
+        operator.scales().0,
+        operator.scales().1
+    );
+    Ok(())
+}
+
 fn next<T: std::str::FromStr>(
     words: &mut std::str::SplitWhitespace<'_>,
 ) -> Result<T, Box<dyn std::error::Error>>
