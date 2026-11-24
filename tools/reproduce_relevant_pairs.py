@@ -12,6 +12,7 @@ from fractions import Fraction
 import hashlib
 import itertools
 import json
+import os
 from pathlib import Path
 import platform
 import random
@@ -437,6 +438,200 @@ def compare_full_outputs(expected, actual):
         assert expected[index + 5:index + 7] == actual[index + 5:index + 7]
 
 
+def frozen_file(directory, name, hashes, manifest=None):
+    """Read only explicit in-directory artifacts and retain their input identity."""
+    path = (directory / name).resolve()
+    if not path.is_relative_to(directory.resolve()):
+        raise ValueError(f"frozen artifact escapes its directory: {name}")
+    raw = path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if manifest is not None and digest != manifest.get(name):
+        raise ValueError(f"frozen artifact hash mismatch: {name}")
+    hashes[str(path)] = digest
+    return json.loads(raw)
+
+
+def frozen_jobs(directory, hashes):
+    manifest = frozen_file(directory, "manifest.json", hashes) if (directory / "manifest.json").exists() else None
+    environment = frozen_file(directory, "environment.json", hashes, manifest)
+    if environment["paper_sha256"] != PAPER_SHA256:
+        raise ValueError("frozen reproduction uses a different paper")
+    jobs = []
+    for entry in frozen_file(directory, "summary.json", hashes, manifest):
+        name, q = entry["name"], entry["degree"]
+        fixture = frozen_file(directory, f"{name}-input.json", hashes, manifest)
+        if hashes[str((directory / f"{name}-input.json").resolve())] != entry["input_sha256"]:
+            # The first Windows writer hashed LF logical text before write_text
+            # translated its newline to CRLF. Verify that precise legacy form,
+            # while always retaining the actual raw-byte digest in this replay.
+            logical = (directory / f"{name}-input.json").read_text(encoding="utf-8").encode("utf-8")
+            if not environment["platform"].startswith("Windows") or hashlib.sha256(logical).hexdigest() != entry["input_sha256"]:
+                raise ValueError(f"frozen input hash mismatch: {name}")
+        payload = frozen_file(directory, f"{name}-q{q}.json", hashes, manifest)
+        stages = payload["stages"]
+        records = [r for r in payload["pairs"] if r["pair"][0] > 0]
+        expected = []
+        for record in records:
+            s, t = (i - 1 for i in record["pair"])
+            p = record["representative"]
+            expected.append({"pair": [s, t], "matrix": record["full"],
+                             "basis": payload["row_basis"][:record["size"]],
+                             "representative": None if p is None or p[0] == 0 else [i - 1 for i in p],
+                             "embedding": 0 if p is None or p[0] == 0 else len(record["embedding"])})
+        jobs.append({"name": f"frozen:{name}:q{q}", "degree": q, "cells": fixture["cells"],
+                     "stages": stages, "requests": [r["pair"] for r in expected],
+                     "expected": expected, "trace": payload})
+    return jobs
+
+
+def shared_jobs(directory, hashes):
+    manifest = frozen_file(directory, "manifest.json", hashes)
+    frozen_file(directory, "environment.json", hashes, manifest)
+    inputs = frozen_file(directory, "inputs.json", hashes, manifest)
+    fixtures = {row["name"]: row["cells"] for row in inputs}
+    grouped = {}
+    for entry in frozen_file(directory, "index.json", hashes, manifest):
+        record = frozen_file(directory, entry["artifact"], hashes, manifest)
+        if [record[k] for k in ["fixture", "q", "s", "t"]] != [entry[k] for k in ["fixture", "q", "s", "t"]]:
+            raise ValueError("shared pair index disagrees with its artifact")
+        if record["exact_delta"] is None:
+            raise ValueError("shared replay requires exact rational matrices")
+        grouped.setdefault((entry["fixture"], entry["q"]), []).append(record)
+    jobs = []
+    for (name, q), records in grouped.items():
+        stages = sorted({row[k] for row in records for k in ["s", "t"]})
+        expected = [{"pair": [stages.index(r["s"]), stages.index(r["t"])],
+                     "matrix": r["exact_delta"], "basis": r["K_basis"],
+                     "target_basis": r["L_basis"]} for r in records]
+        jobs.append({"name": f"shared:{name}:q{q}", "degree": q, "cells": fixtures[name],
+                     "stages": stages, "requests": [r["pair"] for r in expected], "expected": expected})
+    return jobs
+
+
+def replay_frozen(directory, shared, output):
+    """Round 2: read frozen truth; never rerun Algorithm 1 to generate expected R/V."""
+    import numpy as np
+    hashes = {}
+    jobs = frozen_jobs(directory, hashes)
+    if shared is not None:
+        jobs.extend(shared_jobs(shared, hashes))
+    path = dict(name="failure", degree=0, cells=[[[0], 0], [[1], 1], [[0, 1], 2]],
+                stages=[0, 1, 2], requests=[[2, 2]])
+    for label, changes, error in [
+        ("cancelled", {"cancelled": True}, "Cancelled"),
+        ("zero-work", {"work": 0}, "WorkLimitExceeded"),
+        ("partial-work", {"work": 30}, "WorkLimitExceeded"),
+        ("grid-limit", {"limit": 5}, "InvalidParameter"),
+        ("output-limit", {"limit": 6, "requests": [[2, 2], [2, 2]]}, "InvalidParameter"),
+        ("bad-index", {"requests": [[0, 3]]}, "InvalidParameter"),
+        ("reversed-pair", {"requests": [[2, 1]]}, "InvalidParameter"),
+        ("degree-overflow", {"degree": (1 << 64) - 1}, "SizeOverflow"),
+    ]:
+        jobs.append({**path, **changes, "name": f"failure:{label}", "expected_error": error})
+    words = [str(len(jobs))]
+    for job in jobs:
+        words.extend(map(str, [job["degree"], len(job["stages"]), len(job["cells"]), len(job["requests"]),
+                              job.get("limit", 4_000_000), job.get("work", "-")]))
+        words.append(str(job.get("cancelled", False)).lower())
+        words.extend(map(str, job["stages"]))
+        words.extend(str(i) for pair in job["requests"] for i in pair)
+        for simplex, birth in job["cells"]:
+            words.extend(map(str, [birth, len(simplex), *simplex]))
+    output.mkdir(parents=True, exist_ok=False)
+    for path in [Path(__file__), Path(reference.__file__)]:
+        shutil.copy2(path, output / path.name)
+    input_path = (output / "rust-input.txt").resolve()
+    input_path.write_text(" ".join(words) + "\n", encoding="utf-8")
+    source_root = Path(__file__).resolve().parents[1]
+    command = ["cargo", "test", "--locked", "--lib", "--no-run", "--message-format=json"]
+    build = subprocess.run(command, cwd=source_root, text=True, capture_output=True)
+    (output / "build-stdout.jsonl").write_text(build.stdout, encoding="utf-8")
+    (output / "build-stderr.txt").write_text(build.stderr, encoding="utf-8")
+    build.check_returncode()
+    artifacts = [json.loads(line) for line in build.stdout.splitlines() if line.startswith("{")]
+    executable, = [Path(row["executable"]) for row in artifacts
+                   if row.get("reason") == "compiler-artifact" and row.get("executable")
+                   and row.get("target", {}).get("name") == "cocycle" and row.get("profile", {}).get("test")]
+    worker = (output / executable.name).resolve()
+    shutil.copy2(executable, worker)
+    env = {**os.environ, "COCYCLE_RELEVANT_REPLAY_INPUT": str(input_path),
+           "COCYCLE_RELEVANT_REPLAY_OUTPUT": str((output / "rust-output.json").resolve())}
+    test = "persistent_laplacian::relevant_pairs::tests::replay_frozen_cases"
+    run = subprocess.run([str(worker), "--exact", test, "--ignored", "--nocapture"],
+                         cwd=source_root, env=env, text=True, capture_output=True)
+    (output / "worker-stdout.txt").write_text(run.stdout, encoding="utf-8")
+    (output / "worker-stderr.txt").write_text(run.stderr, encoding="utf-8")
+    identity = {"frozen_artifacts": hashes, "frozen_manifest_policy": "C raw hashes checked against manifest when present, otherwise captured at replay; legacy Windows C input_sha256 uses UTF-8 LF logical text; A raw hashes checked against original manifest",
+                "command": sys.argv, "build_command": command, "python": sys.version, "numpy": np.__version__,
+                "platform": platform.platform(),
+                "rustc": subprocess.check_output(["rustc", "--version", "--verbose"], text=True),
+                "cargo": subprocess.check_output(["cargo", "--version"], text=True).strip(),
+                "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source_root, text=True).strip(),
+                "git_status": subprocess.check_output(["git", "status", "--porcelain"], cwd=source_root, text=True),
+                "controller_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "reference_sha256": hashlib.sha256(Path(reference.__file__).read_bytes()).hexdigest(),
+                "source_sha256": {str(p.relative_to(source_root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                                  for p in source_root.glob("src/**/*.rs")},
+                "worker_sha256": hashlib.sha256(worker.read_bytes()).hexdigest(),
+                "scope": "unoptimized Rust replay, no performance measurement; diagnostics compile only under cfg(test)"}
+    (output / "environment.json").write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+    run.check_returncode()
+    actual = json.loads((output / "rust-output.json").read_text())
+    assert len(actual) == len(jobs)
+    summary = []
+    for number, (job, result) in enumerate(zip(jobs, actual)):
+        assert result["case"] == number
+        if "expected_error" in job:
+            assert result["status"] == "error" and result["error"].split(" {", 1)[0] == job["expected_error"], (job["name"], result)
+            assert "outputs" not in result
+            summary.append({"name": job["name"], "failure": job["expected_error"]})
+            continue
+        assert result["status"] == "success"
+        assert result["strategy"] == "new-chains" and result["schedule"] == "exact-rational"
+        trace = result["trace"]
+        frozen = job.get("trace")
+        if frozen and job["stages"]:
+            for key in ["R_columns", "V_columns", "events"]:
+                assert trace[key] == frozen[key], (job["name"], key)
+            assert trace["selected"] == [[s - 1, t - 1] for s, t in frozen["selected"] if s > 0]
+        if trace is not None:
+            cells = {tuple(s): v for s, v in job["cells"]}
+            rows = reference.ordered(cells, job["stages"][-1], job["degree"])
+            columns = reference.ordered(cells, job["stages"][-1], job["degree"] + 1)
+            boundary = reference.boundary(rows, columns)
+            for j, vector in enumerate(trace["V_columns"]):
+                vector = list(map(Fraction, vector))
+                assert vector[j] == 1 and all(x == 0 for x in vector[j + 1:])
+                assert [sum(Fraction(int(x)) * y for x, y in zip(row, vector)) for row in boundary] == list(map(Fraction, trace["R_columns"][j]))
+        assert len(result["outputs"]) == len(job["expected"])
+        max_error = 0.0
+        for expected, value in zip(job["expected"], result["outputs"]):
+            s, t = expected["pair"]
+            n = len(expected["basis"])
+            assert value["basis"] == expected["basis"]
+            assert value["degree"] == job["degree"] and value["scales"] == [job["stages"][s], job["stages"][t]]
+            cells = {tuple(a): b for a, b in job["cells"]}
+            target = expected.get("target_basis", [list(a) for a in reference.ordered(cells, job["stages"][t], job["degree"])])
+            assert value["target_basis"] == target
+            if "representative" in expected:
+                assert value["representative"] == expected["representative"] and value["embedding"] == expected["embedding"]
+            matrix = np.array([[float(Fraction(x)) for x in row] for row in expected["matrix"]]).reshape(n, n)
+            error = float(np.linalg.norm(np.array(value["matrix"]).reshape(n, n) - matrix))
+            assert error <= 1e-10 * max(1.0, np.linalg.norm(matrix)), (job["name"], s, t, error)
+            np.testing.assert_allclose(value["spectrum"], np.linalg.eigvalsh(matrix), rtol=1e-10, atol=1e-10)
+            assert 0 <= value["residual"] <= 1e-9
+            max_error = max(max_error, error)
+        summary.append({"name": job["name"], "pairs": len(job["expected"]),
+                        "frozen_intermediate_parity": frozen is not None, "max_matrix_frobenius_error": max_error})
+        print(job["name"], len(job["expected"]), "frozen pairs passed", flush=True)
+    for name, expected in hashes.items():
+        if hashlib.sha256(Path(name).read_bytes()).hexdigest() != expected:
+            raise ValueError(f"frozen input changed during replay: {name}")
+    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print("PASS", sum(row.get("pairs", 0) for row in summary), "frozen outputs,",
+          sum("failure" in row for row in summary), "failure cases", flush=True)
+
+
 def main():
     if not __debug__:
         raise RuntimeError("correctness reproduction requires Python without -O")
@@ -444,6 +639,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--paper", type=Path, required=True)
     parser.add_argument("--paper-style", action="store_true")
+    parser.add_argument("--replay-frozen", type=Path, help="Round-2 direct replay of an existing Round-1 artifact directory")
+    parser.add_argument("--shared-baseline", type=Path, help="Optional manifest-verified package-A shared R0 artifacts")
     parser.add_argument("--rust-worker", type=Path)
     parser.add_argument("--benchmark-baseline", type=Path)
     parser.add_argument("--baseline-revision")
@@ -456,6 +653,13 @@ def main():
         parser.error("--benchmark-direct requires --benchmark-baseline")
     if hashlib.sha256(args.paper.read_bytes()).hexdigest() != PAPER_SHA256:
         raise ValueError("paper does not match the frozen arXiv v1 bytes")
+    if args.shared_baseline and not args.replay_frozen:
+        parser.error("--shared-baseline requires --replay-frozen")
+    if args.replay_frozen:
+        if args.benchmark_baseline or args.benchmark_direct or args.rust_worker or args.paper_style:
+            parser.error("frozen replay is separate from reproduction and benchmarks")
+        replay_frozen(args.replay_frozen, args.shared_baseline, args.output)
+        return
     args.output.mkdir(parents=True, exist_ok=False)
     import gudhi
     import numpy as np
@@ -481,7 +685,7 @@ def main():
         (args.output / f"{name}-input.json").write_text(fixture + "\n", encoding="utf-8")
         for degree in range(4):
             result = check_case(name, cells, degree, args.output, benchmark=points is not None, worker=worker)
-            result["input_sha256"] = hashlib.sha256((fixture + "\n").encode()).hexdigest()
+            result["input_sha256"] = hashlib.sha256((args.output / f"{name}-input.json").read_bytes()).hexdigest()
             summaries.append(result)
             (args.output / "summary.json").write_text(json.dumps(summaries, indent=2) + "\n", encoding="utf-8")
             print(name, degree, result["exact_matrix_equalities"], "exact pairs passed", flush=True)
@@ -490,6 +694,9 @@ def main():
         baseline = (args.output / ("baseline-" + args.benchmark_baseline.name)).resolve()
         shutil.copy2(args.benchmark_baseline, baseline)
         benchmark_workers(baseline, worker, cases, args.output, args.baseline_revision, args.benchmark_direct)
+    manifest = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in args.output.iterdir() if p.is_file()}
+    (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

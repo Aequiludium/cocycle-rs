@@ -103,6 +103,41 @@ labels, scales, degree and evaluated representative against frozen rational
 results. Its `--relevant` mode accepts the existing whitespace fixture protocol,
 treating the start list as the entire grid and evaluating all legal pairs.
 
+Round 2 can replay an existing Round-1 directory directly, without regenerating
+expected R/V or matrices from the current Python algorithm:
+
+```sh
+python3 tools/reproduce_relevant_pairs.py --paper target/2611.09610v1.pdf \
+  --replay-frozen target/relevant-pair-reproduction \
+  --output target/relevant-pair-rust-replay
+```
+
+The controller builds and freezes the library test executable, then explicitly
+runs its ignored `replay_frozen_cases` test. Test-only capture hooks in the actual
+public constructor export exact rational R/V, events and selected pairs. They
+are absent from ordinary library builds. Frozen C intermediates, predecessors,
+embeddings, full matrices/spectra and owned coordinate metadata are compared;
+empty grids retain their empty output. Cancellation, work/storage exhaustion,
+invalid indices and degree overflow must return errors without partial output.
+Private arithmetic tests separately exercise checked i128 overflow.
+
+Add `--shared-baseline PATH` for package A's published R0 directory containing
+`manifest.json`, `inputs.json`, `index.json` and the indexed `pair-*.json` files.
+The tool verifies their original SHA-256 manifest and exact `exact_delta`
+matrices, then compares the same Rust batch outputs in matched coordinates.
+A's restricted-boundary Y/R are not the final-boundary C transforms, so only
+C's frozen transforms are compared directly; R=B V and upper-triangular V are
+checked independently for all exported traces. No A code or runtime API is
+imported. All read artifact hashes, the test binary, source fingerprints and
+raw input/output/logs are retained, and inputs are checked for concurrent edits.
+
+New Round-1 runs include raw-byte input hashes and an artifact manifest. Legacy
+Windows runs hashed UTF-8 LF logical input text before CRLF file writing; replay
+verifies precisely that legacy hash while also freezing the original raw bytes.
+Expected outputs from legacy runs without manifests receive current read-time
+hashes, not a claim of a historical signed manifest. Replay is correctness
+evidence only and is kept separate from reproduction/resource timing modes.
+
 Serial single-run Python timings compare exhaustive Schur, selective Schur and
 new-chain upper construction with identical returned matrices/spectra. They
 exclude input construction, oracle validation and export, and remain exploratory

@@ -181,8 +181,12 @@ pub fn relevant_pair_laplacians(
         let end = stages.partition_point(|stage| stage.len() <= upper_ids[j].index()) + 1;
         events.push((start, end));
     }
+    #[cfg(test)]
+    tests::capture_reduction(&reduced, &transform, &events, n, p);
     drop(reduced);
     let selected = select_pairs(&events, grid, pair_count, &mut budget)?;
+    #[cfg(test)]
+    tests::capture_selection(&selected);
     let mut solved: Vec<((usize, usize), Vec<f64>, f64)> = Vec::new();
     solved
         .try_reserve_exact(requests.len().min(selected.len()))
@@ -495,6 +499,187 @@ fn gcd(mut a: i128, mut b: i128) -> i128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    use std::fmt::Write as _;
+    use std::io::Write as _;
+
+    // The external replay exercises the actual public constructor and its private
+    // intermediates. These sinks and call sites do not exist in normal builds.
+    thread_local! {
+        static REPLAY_TRACE: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
+
+    pub(super) fn capture_reduction(
+        reduced: &[Rational],
+        transform: &[Rational],
+        events: &[(usize, usize)],
+        rows: usize,
+        columns: usize,
+    ) {
+        REPLAY_TRACE.with_borrow_mut(|trace| {
+            let Some(text) = trace else {
+                return;
+            };
+            write!(text, "{{\"rows\":{rows},\"columns\":{columns},").unwrap();
+            for (name, matrix, height) in [
+                ("R_columns", reduced, rows),
+                ("V_columns", transform, columns),
+            ] {
+                write!(text, "\"{name}\":[").unwrap();
+                for j in 0..columns {
+                    if j > 0 {
+                        text.push(',');
+                    }
+                    text.push('[');
+                    for i in 0..height {
+                        if i > 0 {
+                            text.push(',');
+                        }
+                        let value = matrix[j * height + i];
+                        if value.den == 1 {
+                            write!(text, "\"{}\"", value.num).unwrap();
+                        } else {
+                            write!(text, "\"{}/{}\"", value.num, value.den).unwrap();
+                        }
+                    }
+                    text.push(']');
+                }
+                text.push_str("],");
+            }
+            let events: Vec<_> = events.iter().map(|&(s, t)| [s, t]).collect();
+            write!(text, "\"events\":{events:?},\"selected\":null}}").unwrap();
+        });
+    }
+
+    pub(super) fn capture_selection(selected: &[(usize, usize)]) {
+        REPLAY_TRACE.with_borrow_mut(|trace| {
+            let Some(text) = trace else {
+                return;
+            };
+            text.truncate(text.strip_suffix("null}").unwrap().len());
+            let selected: Vec<_> = selected.iter().map(|&(s, t)| [s, t]).collect();
+            write!(text, "{selected:?}}}").unwrap();
+        });
+    }
+
+    /// Explicitly invoked by the frozen-data controller, never the normal suite.
+    #[test]
+    #[ignore = "requires COCYCLE_RELEVANT_REPLAY_INPUT/OUTPUT; see tools/README.md"]
+    fn replay_frozen_cases() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use crate::complex::{Simplex, SimplicialComplex};
+        use std::sync::atomic::AtomicBool;
+        fn next<T: std::str::FromStr>(words: &mut std::str::SplitWhitespace<'_>) -> T
+        where
+            T::Err: std::fmt::Debug,
+        {
+            words.next().unwrap().parse().unwrap()
+        }
+        let input = std::fs::read_to_string(std::env::var("COCYCLE_RELEVANT_REPLAY_INPUT")?)?;
+        let mut output = std::fs::File::create(std::env::var("COCYCLE_RELEVANT_REPLAY_OUTPUT")?)?;
+        let mut words = input.split_whitespace();
+        let cases: usize = next(&mut words);
+        writeln!(output, "[")?;
+        for case in 0..cases {
+            if case > 0 {
+                writeln!(output, ",")?;
+            }
+            let degree: usize = next(&mut words);
+            let grid: usize = next(&mut words);
+            let cells: usize = next(&mut words);
+            let requests: usize = next(&mut words);
+            let max_dense_entries = next(&mut words);
+            let work = words.next().unwrap();
+            let cancelled: bool = next(&mut words);
+            let scales: Vec<f64> = (0..grid).map(|_| next(&mut words)).collect();
+            let requests: Vec<(usize, usize)> = (0..requests)
+                .map(|_| (next(&mut words), next(&mut words)))
+                .collect();
+            let cells = (0..cells)
+                .map(|_| {
+                    let value = next(&mut words);
+                    let length: usize = next(&mut words);
+                    Simplex::new((0..length).map(|_| next(&mut words)).collect(), value)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let source = SimplicialComplex::new(cells)?;
+            let stages = scales
+                .into_iter()
+                .map(|s| source.stage(s))
+                .collect::<Result<Vec<_>>>()?;
+            let flag = AtomicBool::new(cancelled);
+            let execution = Execution::new(
+                if work == "-" {
+                    None
+                } else {
+                    Some(work.parse()?)
+                },
+                Some(&flag),
+            );
+            REPLAY_TRACE.with_borrow_mut(|trace| *trace = Some(String::new()));
+            let result = relevant_pair_laplacians(
+                &stages,
+                &requests,
+                degree,
+                SpectralOptions {
+                    max_dense_entries,
+                    ..Default::default()
+                },
+                &execution,
+            );
+            let trace = REPLAY_TRACE.with_borrow_mut(|trace| trace.take().unwrap());
+            write!(
+                output,
+                "{{\"case\":{case},\"trace\":{},",
+                if trace.is_empty() { "null" } else { &trace }
+            )?;
+            match result {
+                Ok(results) => {
+                    write!(
+                        output,
+                        "\"status\":\"success\",\"strategy\":\"new-chains\",\"schedule\":\"exact-rational\",\"outputs\":["
+                    )?;
+                    for (index, result) in results.iter().enumerate() {
+                        if index > 0 {
+                            write!(output, ",")?;
+                        }
+                        let operator = result.operator();
+                        let pair = result
+                            .representative()
+                            .map(|(s, t)| format!("[{s},{t}]"))
+                            .unwrap_or("null".into());
+                        let basis: Vec<_> =
+                            operator.basis().iter().map(Simplex::vertices).collect();
+                        let target_basis: Vec<_> = operator
+                            .target_basis()
+                            .iter()
+                            .map(Simplex::vertices)
+                            .collect();
+                        let spectrum = operator.spectrum(&Execution::default())?;
+                        writeln!(
+                            output,
+                            "{{\"representative\":{pair},\"embedding\":{},\"basis\":{basis:?},\"target_basis\":{target_basis:?},\"degree\":{},\"scales\":[{},{}],\"matrix\":{:?},\"spectrum\":{:?},\"residual\":{}}}",
+                            result.upper_embedding().len(),
+                            operator.degree(),
+                            operator.scales().0,
+                            operator.scales().1,
+                            operator.matrix(),
+                            spectrum.eigenvalues,
+                            operator.solver_residual()
+                        )?;
+                    }
+                    writeln!(output, "]}}")?;
+                }
+                Err(error) => writeln!(
+                    output,
+                    "\"status\":\"error\",\"error\":{:?}}}",
+                    format!("{error:?}")
+                )?,
+            }
+        }
+        writeln!(output, "]")?;
+        assert!(words.next().is_none(), "trailing frozen replay input");
+        Ok(())
+    }
 
     #[test]
     fn checked_rationals_do_not_turn_overflow_into_a_zero_pivot() {

@@ -1,14 +1,54 @@
 """Exact regressions for Algorithm 2 and coordinate reconstruction."""
 from fractions import Fraction
+import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import reproduce_relevant_pairs as reproduction
 
 
 class EventTests(unittest.TestCase):
+    def test_frozen_artifact_paths_and_hashes_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "payload.json"
+            path.write_bytes(b'{"answer":1}\n')
+            expected = hashlib.sha256(path.read_bytes()).hexdigest()
+            hashes = {}
+            self.assertEqual(reproduction.frozen_file(root, path.name, hashes, {path.name: expected}), {"answer": 1})
+            path.write_bytes(b'{"answer":2}\n')
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                reproduction.frozen_file(root, path.name, {}, {path.name: expected})
+            with self.assertRaisesRegex(ValueError, "escapes"):
+                reproduction.frozen_file(root, "../payload.json", {})
+
+    def test_frozen_replay_reads_expected_transforms_without_reducing_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = {"cells": [[[0], 0]], "points": None}
+            raw = (json.dumps(fixture) + "\n").encode()
+            (root / "tiny-input.json").write_bytes(raw)
+            environment = {"paper_sha256": reproduction.PAPER_SHA256, "platform": "Linux"}
+            summary = [{"name": "tiny", "degree": 0, "input_sha256": hashlib.sha256(raw).hexdigest()}]
+            payload = {"stages": [0], "row_basis": [[0]], "R_columns": [], "V_columns": [],
+                       "events": [], "selected": [], "pairs": [{"pair": [1, 1], "size": 1,
+                       "representative": None, "embedding": [], "full": [["0"]]}]}
+            for name, value in [("environment.json", environment), ("summary.json", summary), ("tiny-q0.json", payload)]:
+                (root / name).write_bytes((json.dumps(value) + "\n").encode())
+            manifest = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.iterdir()}
+            (root / "manifest.json").write_bytes(json.dumps(manifest).encode())
+            with patch.object(reproduction, "reduce_boundary", side_effect=AssertionError("must not regenerate truth")):
+                job, = reproduction.frozen_jobs(root, {})
+            self.assertEqual(job["trace"]["V_columns"], [])
+            self.assertEqual(job["expected"][0]["matrix"], [["0"]])
+            (root / "tiny-q0.json").write_bytes(b'{}')
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                reproduction.frozen_jobs(root, {})
+
     def test_distinct_buckets_jointly_trigger_a_pair(self):
         labels = [(2, 3), (1, 4)]
         selected = reproduction.selected_pairs(labels, 5)
