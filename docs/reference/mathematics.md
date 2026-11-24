@@ -1130,6 +1130,15 @@ its zero multiplicity is n_q(K)-rank(U)-rank(D), equivalently
 z(U)+z(D)-n_q(K). One must not concatenate both complete spectra, or infer these
 exact ranks from arbitrary floating-point near-zero cutoffs.
 
+For any real rectangular A, the positive spectral multisets of A^T A and A A^T
+agree. A positive dual mode z lifts by A^T z/sqrt(lambda). For a verified complete
+harmonic kernel N and an orthonormal complement X, X^T Delta X retains exactly
+the nonzero spectrum. An arbitrary homology representative need not lie in that
+kernel: for the connected two-vertex edge, Delta*[1,0]^T=[1,-1]^T. The
+[bounded external reproduction](../research/split-spectral-reproduction.md)
+checks these facts and a separate basic LOBPCG transcription; it changes no
+production spectral route or certification guarantee.
+
 The implementation exposes full/upper/lower results and separately tagged
 spectra. The lower term depends only on K and requires its q-skeleton; it does
 not require L or a q+1 skeleton. Full and upper operators retain the stronger

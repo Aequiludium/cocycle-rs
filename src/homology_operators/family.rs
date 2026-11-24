@@ -344,10 +344,10 @@ impl<Id: Clone + Eq + Hash> OperatorFamily<Id> {
             adjacent.push(self.transport_bases(j - 1, j, &source, &prepared, &mut budget)?);
             source = target;
         }
-        for i in 0..n {
+        for (i, operator) in self.operators.iter().enumerate() {
             budget.step()?;
-            ranks.set(i, i, self.operators[i].betti());
-            let mut action = identity(self.operators[i].betti(), &mut budget)?;
+            ranks.set(i, i, operator.betti());
+            let mut action = identity(operator.betti(), &mut budget)?;
             for j in i + 1..n {
                 action = adjacent[j - 1].product(&action, &mut budget)?;
                 ranks.set(i, j, action.reduce(&mut budget)?.1.len());

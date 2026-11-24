@@ -27,6 +27,14 @@ remain explicit; these controls are numerical diagnosis, not native timing.
 
 ## Spectral reference CI
 
+The [Gram and harmonic-restriction reproduction](../docs/research/split-spectral-reproduction.md)
+uses `reproduce_split_spectra.py` for PETLS Sections 4.4/4.5 and basic LOBPCG
+Algorithms 1/2. The `Gram and positive-spectrum reproduction` CI job runs its
+focused numerical tests and controls with pinned NumPy/SciPy/SymPy/GUDHI.
+It retains raw spectra, iteration traces and the paper-basic clustered-search
+failure separately from the explicit project rank correction. It does not
+certify author-software execution, Rust parity or production optimization.
+
 The `Real Hodge reference comparisons` CI job requires `--iterative
 --toponetx PATH --perslap PATH --gudhi` on fresh Rust example output. It checks
 matrices, actions, dense eigenpairs and matrix-free Ritz pairs against independent
