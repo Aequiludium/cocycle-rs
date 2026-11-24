@@ -29,8 +29,10 @@ def digest(path):
 
 def equivalent(expected, actual):
     """Preserve labels, integer identities and numerical outputs; omit timings."""
-    expected, actual = [re.sub(r"(?m)^(BATCH \d+ \d+) \S+$", r"\1 <timing>", text)
-                        for text in (expected, actual)]
+    def omit_text_timing(text):
+        text = re.sub(r"(?m)^(BATCH \d+ \d+) \S+$", r"\1 <timing>", text)
+        return re.sub(r"(?m)^((?:SETUP|SOLVE|TOTAL)_SECONDS) \S+$", r"\1 <timing>", text)
+    expected, actual = map(omit_text_timing, (expected, actual))
     def check(a, b):
         if isinstance(a, dict) and isinstance(b, dict):
             a = {k: v for k, v in a.items() if not k.endswith(("_ns", "_seconds"))}
@@ -147,7 +149,7 @@ def main():
                     worker_timer="main entry through fixture I/O, parsing, computation, verification and flushed output; excludes process startup",
                     process_timer="Popen through communicate; includes startup and input/output transport",
                     memory="absolute Windows process peak working set, not allocated/live algorithm bytes",
-                    tolerances="identical labels/integers; float abs/rel 1e-10; JSON *_ns/*_seconds and BATCH elapsed time omitted",
+                    tolerances="identical labels/integers; float abs/rel 1e-10; JSON *_ns/*_seconds, BATCH elapsed and SETUP/SOLVE/TOTAL_SECONDS omitted",
                     thread_environment={k: os.environ.get(k) for k in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")})
     (output / "environment.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     rows, expected = [], {}

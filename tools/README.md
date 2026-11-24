@@ -318,7 +318,8 @@ wrapper times worker main through flushed output, including fixture I/O, parsing
 computation, validation and export. Process wall time and absolute peak working
 set are separate. Full output comparisons preserve labels and integer identities;
 float absolute/relative tolerance is 1e-10. JSON timing fields and the `BATCH`
-header's elapsed time are excluded; requested/solved pair counts remain checked.
+header's elapsed time and `SETUP_SECONDS`/`SOLVE_SECONDS`/`TOTAL_SECONDS` are
+excluded; requested/solved pair counts remain checked.
 Mismatch, nonzero exit or timeout stops the run with retained diagnostics.
 
 Commit the controller and candidate before running, keep local builds/tests idle,
