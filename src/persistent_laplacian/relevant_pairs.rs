@@ -270,12 +270,45 @@ fn select_pairs(
     selected
         .try_reserve_exact(capacity)
         .map_err(|_| allocation())?;
+    let slots = grid.checked_add(1).ok_or_else(overflow)?;
+    let mut first_start = Vec::new();
+    let mut first_end = Vec::new();
+    first_start
+        .try_reserve_exact(slots)
+        .map_err(|_| allocation())?;
+    first_end
+        .try_reserve_exact(slots)
+        .map_err(|_| allocation())?;
+    first_start.resize(slots, None::<usize>);
+    first_end.resize(slots, None::<usize>);
+    for &(s, t) in events {
+        budget.step()?;
+        first_start[t] = Some(first_start[t].map_or(s, |old| old.min(s)));
+        if s > 0 {
+            first_end[s] = Some(first_end[s].map_or(t, |old| old.min(t)));
+        }
+    }
+    let mut starts = Vec::new();
+    starts
+        .try_reserve_exact(events.len().min(grid))
+        .map_err(|_| allocation())?;
+    for (s, end) in first_end.iter().enumerate() {
+        budget.step()?;
+        if let Some(end) = end {
+            starts.push((s, *end));
+        }
+    }
     for t in 1..=grid {
-        for s in 1..=t {
-            budget.step_by(events.len())?;
-            if events.iter().any(|&(a, b)| a <= s && b == t)
-                && events.iter().any(|&(a, b)| a == s && b <= t)
-            {
+        budget.step()?;
+        let Some(start) = first_start[t] else {
+            continue;
+        };
+        for &(s, end) in &starts {
+            budget.step()?;
+            if s > t {
+                break;
+            }
+            if start <= s && end <= t {
                 selected.push((s - 1, t - 1));
             }
         }
@@ -495,6 +528,36 @@ fn gcd(mut a: i128, mut b: i128) -> i128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sparse_event_selection_matches_the_literal_rule_for_all_tiny_bucket_sets() {
+        let buckets: Vec<_> = (1..=3).flat_map(|t| (0..=t).map(move |s| (s, t))).collect();
+        for mask in 0usize..(1 << buckets.len()) {
+            let events: Vec<_> = buckets
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &p)| (mask & (1 << i) != 0).then_some(p))
+                .collect();
+            let mut expected = Vec::new();
+            for t in 1..=3 {
+                for s in 1..=t {
+                    if events.iter().any(|&(a, b)| a <= s && b == t)
+                        && events.iter().any(|&(a, b)| a == s && b <= t)
+                    {
+                        expected.push((s - 1, t - 1));
+                    }
+                }
+            }
+            let actual = select_pairs(
+                &events,
+                3,
+                6,
+                &mut WorkBudget::new(&Execution::default()).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(actual, expected, "events: {events:?}");
+        }
+    }
 
     #[test]
     fn checked_rationals_do_not_turn_overflow_into_a_zero_pivot() {
