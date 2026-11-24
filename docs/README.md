@@ -142,6 +142,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Filtration stages and maps](research/filtration-stages.md) | Fixed-source scale/order comparison, finite single-parameter stage decision, checked inclusions and deferred general/multi-parameter maps |
 | [H1 optimization transfer](research/h1-fast-to-generic.md) | Source-linked F2 transfer matrix, complete clearing invariants and safe H2 continuation |
 | [Big Steps algorithms](research/big-steps.md) | Paper framework, all three main-text pseudocodes, bounded Partial U and production scope |
+| [Gram flips and harmonic restriction](research/split-spectral-reproduction.md) | Bounded PETLS/basic LOBPCG transcriptions, exact controls, retained failures and separate project corrections |
 | [Benchmarks](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/README.md) | Suite-specific protocols and maintained comparisons with measured revisions and evidence status |
 | [Rips comparison](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/reports/rips-comparison.md) | Measured native correctness and performance; updated in place on reruns |
 | [Computation-family preparation](research/input-contracts.md#computation-family-preparation-on-main-a7ee9e9) | Proposed Laplacian/Dirac/F2 inputs, generalized-model decisions and [output/resource contracts](research/result-contracts.md#computation-family-outputs-and-resources); standard real Dirac action is in the guide above; global spectral solvers remain future work |
