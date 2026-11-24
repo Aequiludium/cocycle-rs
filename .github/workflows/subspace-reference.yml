@@ -1,0 +1,57 @@
+name: Sequence subspace references
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  subspace-reference:
+    name: Controlled sequence subspace comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install numpy==2.2.6 gudhi==3.12.0
+      - name: Build selected Rust rewrite
+        run: |
+          mkdir -p target/subspace-reference
+          rustc --version | tee target/subspace-reference/rustc.txt
+          cargo --version | tee target/subspace-reference/cargo.txt
+          cargo build --locked --release 2>&1 | tee target/subspace-reference/build.log
+          rustfmt --edition 2024 --check tools/reference/subspace_cocycle.rs
+          rustc --edition 2024 -D warnings -O tools/reference/subspace_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/subspace_cocycle
+          rustc --edition 2024 -D warnings --test tools/reference/subspace_cocycle.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/subspace_tests
+          target/subspace_tests 2>&1 | tee target/subspace-reference/rust-unit.log
+      - name: Check polynomial, ordering, subspaces and basis transfer
+        run: |
+          python -m unittest discover -s tools -p test_reproduce_subspaces.py 2>&1 | tee target/subspace-reference/unit.log
+          python tools/reproduce_subspaces.py --worker target/subspace_cocycle --gudhi --output target/subspace-reference/reproduction 2>&1 | tee target/subspace-reference/reproduction.log
+          python tools/reproduce_subspaces.py --worker target/subspace_cocycle --rust-sequences --frozen target/subspace-reference/reproduction/results.json --gudhi --output target/subspace-reference/rewrite 2>&1 | tee target/subspace-reference/rewrite.log
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: subspace-reference-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: target/subspace-reference/

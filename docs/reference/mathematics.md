@@ -1070,6 +1070,13 @@ no full coordinate matrix or full n-value spectrum is required. Residual
 convergence alone cannot certify extremal index coverage or missing multiplicity.
 It provides no harmonic-nullity claim. Both paths retain the same standard
 inner product and full/lower/upper operator, without weighted normalization.
+The private LOBPCG helper also accepts a finite starting block in the current
+orthonormal coordinates. Reorthogonalization and deterministic rank completion
+transfer vectors only; every Ritz value and final residual uses the current
+operator. A supplied invariant subspace can still miss extremal modes. Public
+callers retain cold starts. The separate
+[sequence controls](../research/sequence-subspaces.md) describe corrected
+Chebyshev-filter experiments and their limited reproduction scope.
 General SPD Grams change adjoints to A*=Gk^-1 A^T Gprev and
 D*=Gnext^-1 D^T Gk, and require a transformed/generalized eigenproblem.
 That extension, complex conjugate adjoints and persistent Laplacians are outside
