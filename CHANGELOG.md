@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add direct regular/full path H0/H1 boundary presentations, without general
+  Omega2 kernel construction. Reuse ordinary reduction and canonical results;
+  dependent generators do not define a computed H2 or an arboricity guarantee.
+
 - Add endpoint-block Omega construction, exact linear duals, checked algebraic
   projections/chain homotopies and bounded global minimum F2 path H1 bases with
   checked integer support costs. These carry neither real metric meaning nor
