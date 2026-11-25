@@ -16,6 +16,9 @@ dependencies and no unsafe code.
   filtrations, and frozen simplicial complexes with boundary/cofacet queries.
 - **Supplied complexes** — validated simplicial storage and a small filtered-cell
   trait for boundary reduction, including signed scales and unequal vertex births.
+- **Unreleased directed path topology** — ordered graphs, returning paths,
+  exact field-bound homology/persistence and bounded real Laplacian action.
+  See the [path topology guide](docs/guides/path-topology.md).
 - **Real Hodge analysis** — sparse action, explicit matrices, bounded dense
   spectra and matrix-free partial eigenpairs under the standard inner product (Unreleased).
 - **Unreleased stage access** — borrowed sublevel stages and checked inclusions

@@ -91,7 +91,10 @@ jobs:
       - run: rustfmt --edition 2024 --check tools/diagram_dump.rs tools/benchmark_driver.rs benches/native/cocycle.rs tools/reference/rips_cocycle.rs tools/reference/sparse_cocycle.rs tools/reference/homology_operator.rs benches/pipeline/cocycle.rs benches/distances/cocycle.rs
       - run: rustfmt --edition 2024 --config skip_children=true --check benches/optimization/cocycle.rs benches/optimization/dense_core.rs
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: rustfmt --edition 2024 --check benches/path/cocycle.rs
       - run: cargo build --locked
+      - run: rustfmt --edition 2024 --check tools/reference/path_real.rs
+      - run: rustc --edition 2024 -D warnings tools/reference/path_real.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/path-real-worker
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/getting-started/quickstart.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/diagram-distances.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -103,6 +106,7 @@ jobs:
       - run: rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/interface-contracts.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+      - run: rustdoc --edition 2024 -D warnings --test docs/guides/path-topology.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/research/route-integration.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: python tools/check_algorithm.py diagram-analysis
       - run: python tools/check_algorithm.py complex-construction
@@ -140,6 +144,9 @@ jobs:
       - run: cargo run --locked --example diagram_distances
       - run: cargo run --locked --example critical_sets
       - run: cargo run --locked --example homology_operators
+      - run: cargo run --locked --example path_homology
+      - run: cargo run --locked --example path_persistence
+      - run: cargo run --locked --example path_laplacian
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
 

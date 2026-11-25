@@ -46,6 +46,10 @@ do not waive its retained direct-graph and H2/H3 performance regressions.
 
 ## Use the library
 
+- [Directed path topology](guides/path-topology.md): ordered edges, bounded
+  returning paths, endpoint closure and field-bound exact path homology
+  (Unreleased).
+
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,
   selected class costs, controlled finite transport, historical simplex features
   and bounded exact integer class/filling/volume minima.

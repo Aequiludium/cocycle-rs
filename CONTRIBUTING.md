@@ -97,6 +97,10 @@ cargo run --locked --example diagram_distances
 cargo run --locked --example dirac
 cargo run --locked --example critical_sets
 cargo run --locked --example homology_operators
+cargo run --locked --example path_homology
+cargo run --locked --example path_persistence
+cargo run --locked --example path_laplacian
+rustfmt --edition 2024 --check tools/reference/path_real.rs
 cargo run --locked --example persistent_laplacian
 cargo test --locked --example critical_sets
 cargo test --locked --release --example critical_sets
@@ -121,6 +125,7 @@ rustdoc --edition 2024 --test docs/guides/sparse-rips.md --extern cocycle=target
 rustdoc --edition 2024 --test docs/guides/dirac.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/filtered-complexes.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/homology-operators.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
+rustdoc --edition 2024 -D warnings --test docs/guides/path-topology.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/critical-sets.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 --test docs/guides/persistent-laplacian.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
 rustdoc --edition 2024 -D warnings --test docs/guides/hodge-laplacian.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps

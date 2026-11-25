@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- Hide real path operator factors behind action/read-only mathematical coordinates.
+  Add a self-contained rational/SVD oracle, corruption check and CI artifacts,
+  plus an explicitly dispatched matched-output path performance study.
+
+- Direct path H0/H1 computation returns the shared PersistenceResult, keeping
+  relation generators and traversal diagnostics private. Add a matched-output
+  native comparison protocol for generic and direct ordinary H0/H1 diagrams.
+
+- Keep minimum-basis search diagnostics private; expose exact cycles and costs.
+  Projection/cohomology coordinates use the same read-only mathematical views.
+
+- Default directed path persistence returns the shared PersistenceResult. Request
+  compatible-chain data explicitly with the certificate terminal; stage setup
+  constructs Omega without computing unused static homology representatives.
+
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
+- Add bounded real path Omega chains and factorized static/persistent Laplacian
+  action in the Hodge domain. Recompute over f64 with orthonormal metrics,
+  tolerance/residual metadata, ambiguity rejection and cooperative controls;
+  do not lift modular bases or expose a production path eigensolver.
+
+- Add direct regular/full path H0/H1 boundary presentations, without general
+  Omega2 kernel construction. Reuse ordinary reduction and canonical results;
+  dependent generators do not define a computed H2 or an arboricity guarantee.
+
+- Add endpoint-block Omega construction, exact linear duals, checked algebraic
+  projections/chain homotopies and bounded global minimum F2 path H1 bases with
+  checked integer support costs. These carry neither real metric meaning nor
+  polynomial-time or performance guarantees.
+
+- Add compatible-basis directed path persistence through the existing ordinary
+  boundary reducer and canonical diagram/context assembly. Path source context
+  records the regular/full model with unspecified geometric units. The exhaustive
+  `FiltrationKind` enum gains `RegularDirectedPaths` and `NonRegularDirectedPaths`;
+  downstream exhaustive matches must handle these Unreleased source variants.
+
+- Add exact field-bound Omega chains and non-reduced path homology through a
+  requested degree, with owned path identities and cycle representatives. Use
+  the existing complete u32 prime-field arithmetic and cooperative work controls;
+  modular Omega boundaries are not integer filtered-cell incidence.
+
+- Add directed allowed-path sources with preserved reverse edges, endpoint-closed
+  explicit complexes, finite graph truncation metadata and regular/full ambient
+  integer boundaries. Graph enumeration has cooperative execution controls;
+  forbidden boundary faces remain visible and do not imply an Omega computation.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

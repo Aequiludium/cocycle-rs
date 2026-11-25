@@ -1,5 +1,24 @@
 # Third-party notices
 
+## Directed path topology
+
+The directed path, exact Omega, homology, compatible persistence and algebraic
+splitting implementations were independently written from mathematical
+definitions for the path-homology research project and adapted here. No external
+algorithm implementation or research runtime dependency is included. Definitions
+follow [Grigor'yan, Lin, Muranov and Yau](https://www.math.uni-bielefeld.de/~grigor/dnoterev.pdf).
+The characteristic-sensitive test edge data describes the graph in
+[Fu and Ivanov, section 5.4](https://arxiv.org/html/2407.17001v1#S5.SS4).
+External GPL, noncommercial and unlicensed research implementations are not part
+of this contribution.
+
+The direct H0/H1 boundary generators were independently derived from
+[Dey, Li and Wang, Theorem 3.1](https://arxiv.org/abs/2001.09549v1), without copying
+their implementation or claiming its arboricity bound. The real path chains
+and persistent-domain construction were independently written from the standard
+real path metric definitions. Optional NumPy/SciPy/SymPy research references are
+not Cargo dependencies and are not redistributed with the runtime.
+
 ## homology-operator
 
 The F2 generalized-inverse, stable packed elimination, factorized projection,
