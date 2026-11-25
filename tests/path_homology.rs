@@ -11,6 +11,7 @@ use cocycle::persistence::{
 use cocycle::persistence::{
     PathPersistence, compute_path_persistence, compute_path_persistence_with,
 };
+use cocycle::persistence::{compute_minimum_path_basis, compute_minimum_path_basis_with};
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 
@@ -675,4 +676,198 @@ fn path_result_context_composition_and_whole_operation_limits_are_preserved() {
         compute_path_persistence(2, &[(0, 1, -0.0)], 1, field, Mode::Regular, 100, 1000).unwrap();
     assert_eq!(zero.times(), [0.0]);
     assert_eq!(zero.times()[0].to_bits(), 0.0f64.to_bits());
+}
+
+#[test]
+fn projections_homotopies_and_dual_pairings_have_independent_dense_checks() {
+    let edges = vec![(0, 1), (1, 2), (2, 0), (0, 3), (3, 2)];
+    let source = DirectedGraph::new(4, edges)
+        .unwrap()
+        .allowed_paths(3, 1000)
+        .unwrap();
+    for p in [2, 3, 4_294_967_291] {
+        for mode in [Mode::Regular, Mode::NonRegular] {
+            let h = compute_path_homology(&source, 2, PrimeField::new(p).unwrap(), mode, 100000)
+                .unwrap();
+            let projection = h.projection(100000).unwrap();
+            let dual = h.cohomology(100000).unwrap();
+            assert_eq!(projection.field(), h.field());
+            assert_eq!(dual.mode(), mode);
+            for n in 0..=2 {
+                let width = h.omega_bases(n).unwrap().len();
+                let upper = h.omega_bases(n + 1).unwrap().len();
+                let lower = if n == 0 {
+                    0
+                } else {
+                    h.omega_bases(n - 1).unwrap().len()
+                };
+                let b = dense(h.boundaries(n).unwrap(), lower, p);
+                let next = dense(h.boundaries(n + 1).unwrap(), width, p);
+                let homotopy = dense(projection.homotopies(n).unwrap(), upper, p);
+                let proj = dense(projection.projections(n).unwrap(), width, p);
+                let a = dense(
+                    projection.annotations(n).unwrap(),
+                    h.representatives(n).unwrap().len(),
+                    p,
+                );
+                let cochains = dense(dual.representatives(n).unwrap(), width, p);
+                for j in 0..width {
+                    let mut rhs = apply(&next, &homotopy[j], width, p);
+                    if n > 0 {
+                        let lower_h = dense(projection.homotopies(n - 1).unwrap(), width, p);
+                        let extra = apply(&lower_h, &b[j], width, p);
+                        for (x, y) in rhs.iter_mut().zip(extra) {
+                            *x = add(*x, y, p);
+                        }
+                    }
+                    let lhs: Vec<_> = proj[j]
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &x)| add(u32::from(i == j), if x == 0 { 0 } else { p - x }, p))
+                        .collect();
+                    assert_eq!(lhs, rhs);
+                    assert_eq!(apply(&proj, &proj[j], width, p), proj[j]);
+                    for (i, c) in cochains.iter().enumerate() {
+                        assert_eq!(c[j], a[j][i]);
+                    }
+                }
+                let s = dense(h.omega_bases(n).unwrap(), h.paths(n).unwrap().len(), p);
+                for (i, c) in cochains.iter().enumerate() {
+                    for column in &next {
+                        assert_eq!(
+                            column
+                                .iter()
+                                .zip(c)
+                                .fold(0, |z, (&x, &y)| add(z, product(x, y, p), p)),
+                            0
+                        );
+                    }
+                    // Evaluations on the original path representatives are checked
+                    // by expressing Z through the dense augmented system S x=Z.
+                    for (j, r) in h.representatives(n).unwrap().iter().enumerate() {
+                        let mut augmented = s.clone();
+                        augmented.extend(dense(
+                            std::slice::from_ref(r),
+                            h.paths(n).unwrap().len(),
+                            p,
+                        ));
+                        let dependencies = kernel(&augmented, h.paths(n).unwrap().len(), p).1;
+                        let witness = dependencies.iter().find(|v| v[width] != 0).unwrap();
+                        let scale = if witness[width] == 0 {
+                            0
+                        } else {
+                            p - witness[width]
+                        };
+                        let coords: Vec<_> = witness[..width]
+                            .iter()
+                            .map(|&x| product(x, inverse(scale, p), p))
+                            .collect();
+                        let value = coords
+                            .iter()
+                            .zip(c)
+                            .fold(0, |z, (&x, &y)| add(z, product(x, y, p), p));
+                        assert_eq!(value, u32::from(i == j));
+                    }
+                }
+            }
+            assert!(h.projection(1).is_err());
+            assert!(matches!(
+                h.projection_with(100000, &Execution::default().max_work(0)),
+                Err(Error::WorkLimitExceeded { .. })
+            ));
+        }
+    }
+}
+
+#[test]
+fn minimum_integer_basis_matches_all_cycle_subsets_and_preserves_large_costs() {
+    let pairs = [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)];
+    for mask in 0..64 {
+        let edges: Vec<_> = pairs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &e)| (mask & (1 << i) != 0).then_some(e))
+            .collect();
+        let graph = DirectedGraph::new(3, edges.clone()).unwrap();
+        let costs: Vec<_> = (0..edges.len()).map(|i| ((i + mask) % 4) as u64).collect();
+        for mode in [Mode::Regular, Mode::NonRegular] {
+            let result =
+                compute_minimum_path_basis(&graph, &costs, mode, 1000, 100000, 1000, 10000)
+                    .unwrap();
+            let source = graph.allowed_paths(2, 1000).unwrap();
+            let h = compute_path_homology(&source, 1, PrimeField::default(), mode, 100000).unwrap();
+            certificate(&h);
+            let s = dense(h.omega_bases(1).unwrap(), edges.len(), 2);
+            let boundaries = dense(h.boundaries(2).unwrap(), s.len(), 2);
+            let mut span: Vec<_> = boundaries
+                .iter()
+                .map(|v| apply(&s, v, edges.len(), 2))
+                .collect();
+            let mut rank = kernel(&span, edges.len(), 2).0;
+            let mut cycles = Vec::new();
+            for subset in 1usize..1 << edges.len() {
+                let vector: Vec<_> = (0..edges.len())
+                    .map(|i| u32::from(subset & (1 << i) != 0))
+                    .collect();
+                let mut parity = [0; 3];
+                let mut cost = 0u128;
+                for (i, &(a, b)) in edges.iter().enumerate() {
+                    if vector[i] != 0 {
+                        parity[a] ^= 1;
+                        parity[b] ^= 1;
+                        cost += u128::from(costs[i]);
+                    }
+                }
+                if parity == [0; 3] {
+                    cycles.push((cost, vector));
+                }
+            }
+            cycles.sort();
+            let mut expected = 0u128;
+            let mut selected = 0;
+            for (cost, cycle) in cycles {
+                let mut candidate = span.clone();
+                candidate.push(cycle.clone());
+                let next = kernel(&candidate, edges.len(), 2).0;
+                if next > rank {
+                    span.push(cycle);
+                    rank = next;
+                    expected += cost;
+                    selected += 1;
+                }
+            }
+            assert_eq!(
+                result.total_cost(),
+                expected,
+                "edges={edges:?} mode={mode:?}"
+            );
+            assert_eq!(result.representatives().len(), selected);
+        }
+    }
+    let graph = DirectedGraph::new(3, vec![(0, 1), (1, 2), (2, 0)]).unwrap();
+    assert_eq!(
+        compute_minimum_path_basis(&graph, &[u64::MAX; 3], Mode::Regular, 100, 10000, 100, 1000)
+            .unwrap()
+            .total_cost(),
+        3 * u128::from(u64::MAX)
+    );
+    assert!(
+        compute_minimum_path_basis(&graph, &[1; 3], Mode::Regular, 100, 10000, 100, 1).is_err()
+    );
+    assert!(
+        compute_minimum_path_basis(&graph, &[1; 2], Mode::Regular, 100, 10000, 100, 1000).is_err()
+    );
+    assert!(matches!(
+        compute_minimum_path_basis_with(
+            &graph,
+            &[1; 3],
+            Mode::Regular,
+            100,
+            10000,
+            100,
+            1000,
+            &Execution::default().max_work(100)
+        ),
+        Err(Error::WorkLimitExceeded { .. })
+    ));
 }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add endpoint-block Omega construction, exact linear duals, checked algebraic
+  projections/chain homotopies and bounded global minimum F2 path H1 bases with
+  checked integer support costs. These carry neither real metric meaning nor
+  polynomial-time or performance guarantees.
+
 - Add compatible-basis directed path persistence through the existing ordinary
   boundary reducer and canonical diagram/context assembly. Path source context
   records the regular/full model with unspecified geometric units. The exhaustive

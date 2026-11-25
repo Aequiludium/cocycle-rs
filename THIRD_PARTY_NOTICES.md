@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Directed path topology
+
+The directed path, exact Omega, homology, compatible persistence and algebraic
+splitting implementations were independently written from mathematical
+definitions for the path-homology research project and adapted here. No external
+algorithm implementation or research runtime dependency is included. Definitions
+follow [Grigor'yan, Lin, Muranov and Yau](https://www.math.uni-bielefeld.de/~grigor/dnoterev.pdf).
+The characteristic-sensitive test edge data describes the graph in
+[Fu and Ivanov, section 5.4](https://arxiv.org/html/2407.17001v1#S5.SS4).
+External GPL, noncommercial and unlicensed research implementations are not part
+of this contribution.
+
 ## homology-operator
 
 The F2 generalized-inverse, stable packed elimination, factorized projection,
