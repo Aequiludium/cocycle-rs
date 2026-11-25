@@ -107,7 +107,7 @@ pub fn compute_low_dimensional_path_persistence_with(
         });
     }
     let mut path_count = sum(vertex_count, weighted.len())?;
-    count(path_count, max_paths)?;
+    crate::complex::path_count_cap(path_count, max_paths)?;
     count(vertex_count, limit)?;
     count(weighted.len(), limit)?;
     let (mut pairs, mut weights, mut times) = (Vec::new(), BTreeMap::new(), Vec::new());
@@ -156,7 +156,7 @@ pub fn compute_low_dimensional_path_persistence_with(
         for &(c, bc) in &outgoing[b] {
             budget.step()?;
             path_count = sum(path_count, 1)?;
-            count(path_count, max_paths)?;
+            crate::complex::path_count_cap(path_count, max_paths)?;
             if a != c || mode == PathBoundaryMode::NonRegular {
                 let route = (edge_births[ab].max(edge_births[bc]), b);
                 let anchor = anchors.entry((a, c)).or_insert(route);

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add bounded real path Omega chains and factorized static/persistent Laplacian
+  action in the Hodge domain. Recompute over f64 with orthonormal metrics,
+  tolerance/residual metadata, ambiguity rejection and cooperative controls;
+  do not lift modular bases or expose a production path eigensolver.
+
 - Add direct regular/full path H0/H1 boundary presentations, without general
   Omega2 kernel construction. Reuse ordinary reduction and canonical results;
   dependent generators do not define a computed H2 or an arboricity guarantee.

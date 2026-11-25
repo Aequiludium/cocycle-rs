@@ -8,9 +8,18 @@
 //! Laplacians are outside this API's explicitly real, standard-inner-product
 //! definition. See Lim, *Hodge Laplacians on Graphs* (2020), Theorems 5.2–5.3,
 //! <https://doi.org/10.1137/18M1223101>.
+//!
+//! The separate concrete path API recomputes real Omega spaces with numerical
+//! rank/residual checks and supports factorized static/persistent path action.
+//! It does not reinterpret modular coordinates or integer filtered-cell inputs.
 
+mod path;
 mod spectrum;
 pub use crate::eigensolver::IterativeOptions;
+pub use path::{
+    PathRealChain, PathRealLaplacian, compute_persistent_path_laplacian,
+    compute_persistent_path_laplacian_with, compute_real_path_chain, compute_real_path_chain_with,
+};
 pub use spectrum::{HodgeEigenpairs, HodgeSpectrum, SpectrumOptions};
 
 use crate::complex::FilteredComplex;
