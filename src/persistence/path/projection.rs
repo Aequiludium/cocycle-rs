@@ -6,9 +6,9 @@ use super::*;
 pub struct PathProjection {
     field: PrimeField,
     mode: PathBoundaryMode,
-    annotations: Vec<Vec<PathVector>>,
-    projections: Vec<Vec<PathVector>>,
-    homotopies: Vec<Vec<PathVector>>,
+    pub(super) annotations: Vec<Vec<SparseVector>>,
+    projections: Vec<Vec<SparseVector>>,
+    homotopies: Vec<Vec<SparseVector>>,
 }
 impl PathProjection {
     /// Selected field; no interpretation over another field is established.
@@ -20,16 +20,31 @@ impl PathProjection {
         self.mode
     }
     /// A_n maps Omega_n coordinates to the selected H_n coordinates.
-    pub fn annotations(&self, n: usize) -> Option<&[PathVector]> {
-        self.annotations.get(n).map(Vec::as_slice)
+    pub fn annotations(
+        &self,
+        n: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.annotations
+            .get(n)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Columns of P_n=Z_n A_n in Omega_n coordinates.
-    pub fn projections(&self, n: usize) -> Option<&[PathVector]> {
-        self.projections.get(n).map(Vec::as_slice)
+    pub fn projections(
+        &self,
+        n: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.projections
+            .get(n)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// h_n maps Omega_n to Omega_(n+1), including h_d in the upper layer.
-    pub fn homotopies(&self, n: usize) -> Option<&[PathVector]> {
-        self.homotopies.get(n).map(Vec::as_slice)
+    pub fn homotopies(
+        &self,
+        n: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.homotopies
+            .get(n)
+            .map(|columns| columns.iter().map(PathVector))
     }
 }
 
@@ -38,7 +53,7 @@ impl PathProjection {
 pub struct PathCohomology {
     field: PrimeField,
     mode: PathBoundaryMode,
-    cochains: Vec<Vec<PathVector>>,
+    cochains: Vec<Vec<SparseVector>>,
 }
 impl PathCohomology {
     /// Bound coefficient field.
@@ -50,8 +65,13 @@ impl PathCohomology {
         self.mode
     }
     /// Cocycle columns in the dual Omega basis, paired in the original H order.
-    pub fn representatives(&self, n: usize) -> Option<&[PathVector]> {
-        self.cochains.get(n).map(Vec::as_slice)
+    pub fn representatives(
+        &self,
+        n: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.cochains
+            .get(n)
+            .map(|columns| columns.iter().map(PathVector))
     }
 }
 
@@ -105,7 +125,7 @@ impl PathHomology {
             budget.step()?;
             let mut layer = Vec::new();
             for _ in &self.representatives[n] {
-                push(&mut layer, PathVector::new())?;
+                push(&mut layer, SparseVector::new())?;
             }
             for (j, column) in columns.iter().enumerate() {
                 for (&i, &value) in column {
@@ -153,7 +173,7 @@ impl PathHomology {
             push(&mut lifts, lift)?;
         }
         let (mut annotations, mut projections, mut homotopies) =
-            (Vec::new(), Vec::new(), Vec::<Vec<PathVector>>::new());
+            (Vec::new(), Vec::new(), Vec::<Vec<SparseVector>>::new());
         for n in 0..self.representatives.len() {
             budget.step()?;
             let solver = Echelon::from_columns(&self.omega_bases[n], field, limit, budget)?;
@@ -176,7 +196,7 @@ impl PathHomology {
             let (mut alpha, mut h_coeffs) = (Vec::new(), Vec::new());
             for j in 0..width {
                 let coordinates = solver.coordinates(&BTreeMap::from([(j, 1)]), budget)?;
-                let (mut a, mut h) = (PathVector::new(), PathVector::new());
+                let (mut a, mut h) = (SparseVector::new(), SparseVector::new());
                 for (i, v) in coordinates {
                     budget.step()?;
                     if i < c.len() {

@@ -5,6 +5,22 @@
 This Unreleased API keeps directed edges and nonadjacent vertex repetitions.
 It is independent of the undirected `WeightedGraph` and simplicial storage.
 
+## Draft API boundaries
+
+| Owner | Mathematical public contract | Private implementation choices |
+| --- | --- | --- |
+| Directed sources | Ordered edges/words, endpoint closure and truncation coverage | Enumeration workspace and work-counter implementation |
+| Exact homology | Owned field/model-bound spaces and read-only coordinates | Sparse containers, pivots, block order and basis normalization |
+| Persistence | Standard diagram/context by default; compatible certificate explicitly requested | Stage solvers and ordinary reducer columns |
+| Linear algebra and minimum basis | Duals, algebraic projection/homotopy, exact cycles and costs | Search counts/frontier, candidate ordering and elimination state |
+| Direct H0/H1 | Standard PersistenceResult with the same semantic context | Anchors, dependent relations and traversed two-path counters |
+| Real operators | Read-only mathematical basis coordinates, apply, events and tolerance/residual evidence | D/U factors, row-elimination layout and numerical workspaces |
+
+These are refinements to unmerged draft APIs, not released 0.1.1 changes.
+The former sparse map alias is replaced by `PathVector::terms()`/`coefficient()`
+views; generic/direct default persistence now shares PersistenceResult. Use the
+explicit certificate terminal when compatible-chain coordinates are needed.
+
 ```rust
 use cocycle::complex::{DirectedGraph, PathBoundaryMode, PathComplex, path_boundary};
 
@@ -62,11 +78,14 @@ assert_eq!(result.omega_bases(2).unwrap().len(), 0);
 # Ok::<(), cocycle::Error>(())
 ```
 
-`PathVector` stores only nonzero canonical residues. Omega columns and homology
+`PathVector` is a read-only borrowed coordinate view with `terms()` and
+`coefficient()`. The sparse container is private; only nonzero canonical residues
+are iterated. Omega columns and homology
 cycles use the result's allowed-path order; boundary columns use the preceding
 Omega basis. The chain includes degrees 0 through d+1, while representatives and
 Betti numbers cover 0 through d. A missing accessor degree is outside that
-window. Bases are deterministic, without a canonical, minimum or metric claim.
+window. Basis choices and their order are result-local and may change between versions;
+no pivot/block strategy, canonical basis, minimum basis or metric is promised.
 
 The positive `max_entries` bounds layer/column counts, each sparse matrix and
 each elimination's retained plus temporary entries, including transformations.
@@ -103,8 +122,10 @@ is Complete and the computed domain is 0 through d. Zero-length bars are omitted
 by the existing ordinary interval assembler. No cutoff or unequal vertex births
 are offered by this operation.
 
-`PathPersistence` composes canonical `PersistenceData`, implements
-`AsRef<PersistenceData>`, and owns the compatible Omega certificate. Births index
+The default terminal returns the existing `PersistenceResult`, retaining only
+the ordinary diagram and context. `compute_path_persistence_certificate` and its
+`_with` variant explicitly request an owned `PathPersistenceCertificate`. It
+composes `PersistenceData` and implements `AsRef<PersistenceData>`. Births index
 `times()`; paths are final-graph coordinates. A basis prefix at an event spans
 that event's Omega. This certificate does not claim interval-specific simplex
 representatives. Source context distinguishes both path models, records the
@@ -167,6 +188,8 @@ Omega2 directly from bigons, triangles and anchored quadrangle differences,
 including the full-model returning-path constraints. Earliest completed routes
 provide anchors, so the generators span the one-boundaries at every event.
 They need not be independent and are not an Omega2 basis.
+The terminal returns the existing `PersistenceResult`; dependent generators,
+anchors and traversal counters are private working state.
 
 The upstream adapter feeds this dependent boundary presentation to the existing
 ordinary reducer, requests only H0/H1 and returns canonical PersistenceData with
@@ -215,7 +238,7 @@ pair s<=t, model, (path cap,dense cap) and tolerance. Events are sorted zero plu
 edge births. The upper domain consists of target Omega_(d+1) vectors whose full
 boundary lies in source Omega_d, with its induced real orthonormal metric.
 `PathRealLaplacian` owns final-graph path identities, the embedded source basis
-and rectangular D/U factors, and applies D transpose D + U U transpose. The
+and private rectangular D/U factors, and applies D transpose D + U U transpose. The
 library API builds neither square matrices nor spectra and does not use the
 generic Hodge/Dirac integer-source adapter.
 
@@ -231,9 +254,31 @@ and coordinate visits are charged inside the main loops.
 `tests/path_real.rs` checks ambient equations, orthonormality, symmetric
 positive-semidefinite action, hand-derived operators, the characteristic-sensitive
 real/finite-field distinction and invalid/resource cases. The standalone worker
-`tools/reference/path_real.rs` exposes factors and sampled action columns for
+`tools/reference/path_real.rs` exposes coordinates and sampled action columns for
 independent rational/SVD verification; it is not a production spectrum interface
 or performance benchmark. Run `cargo run --locked --example path_laplacian`.
+
+The self-contained independent verifier reconstructs vertex words and alternating
+deletions, computes rational kernels and exact stage-pair ranks with SymPy, and
+compares the full native operator against rational-projector and independent
+numerical-SVD induced-domain routes. It checks source spaces, orthonormality,
+symmetry, ambient operators, full spectra and zero multiplicities. The diamond's
+hand-derived spectrum rejects the wrong nonorthogonal-transpose metric. A fault
+injection test confirms a corrupted native action is rejected. No research
+checkout, external algorithm source or test skipping is needed for the full run:
+
+```sh
+python -m pip install -r benches/path/requirements-lock.txt
+cargo build --locked --release
+rustc --edition 2024 -C opt-level=3 tools/reference/path_real.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/path-real-worker
+python tools/check_path_real.py --worker target/path-real-worker --output target/path-real-reference
+```
+
+On Windows append `.exe` to the worker filename. Use a fresh output directory
+per attempt. The verifier records source/worker/input hashes, package versions,
+complete certificates and maximum errors. CI runs it and uploads these artifacts
+for 14 days; the full workflow's optional performance dispatch runs the
+[matched-output protocol](../../benches/path/README.md).
 
 The Rust series does not include the research Python Grounded, Weighted, Mayer,
 cup-product or large-network workstreams, nor a sparse path eigensolver.

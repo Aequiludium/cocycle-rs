@@ -36,12 +36,16 @@ impl PathRealChain {
         self.paths.get(n).map(Vec::as_slice)
     }
     /// Orthonormal real Omega columns in allowed-path coordinates.
-    pub fn bases(&self, n: usize) -> Option<&[Vec<f64>]> {
-        self.bases.get(n).map(Vec::as_slice)
+    pub fn bases(&self, n: usize) -> Option<impl ExactSizeIterator<Item = &[f64]> + Clone> {
+        self.bases
+            .get(n)
+            .map(|columns| columns.iter().map(Vec::as_slice))
     }
     /// Coordinate boundaries between orthonormal Omega bases; B0 is zero.
-    pub fn boundaries(&self, n: usize) -> Option<&[Vec<f64>]> {
-        self.boundaries.get(n).map(Vec::as_slice)
+    pub fn boundaries(&self, n: usize) -> Option<impl ExactSizeIterator<Item = &[f64]> + Clone> {
+        self.boundaries
+            .get(n)
+            .map(|columns| columns.iter().map(Vec::as_slice))
     }
     /// Own the two adjacent factors of the standard real path Laplacian.
     ///
@@ -122,16 +126,8 @@ impl PathRealLaplacian {
         &self.paths
     }
     /// Orthonormal source Omega columns in these path coordinates.
-    pub fn basis(&self) -> &[Vec<f64>] {
-        &self.basis
-    }
-    /// Down-boundary columns; the lower term is D^T D.
-    pub fn down(&self) -> &[Vec<f64>] {
-        &self.down
-    }
-    /// Induced upper-boundary columns; the upper term is U U^T.
-    pub fn upper(&self) -> &[Vec<f64>] {
-        &self.upper
+    pub fn basis(&self) -> impl ExactSizeIterator<Item = &[f64]> + Clone {
+        self.basis.iter().map(Vec::as_slice)
     }
     /// Apply the two rectangular factors without constructing a square matrix.
     ///
