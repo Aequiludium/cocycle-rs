@@ -15,18 +15,53 @@ use crate::algebra::PrimeField;
 use crate::complex::{Path, PathBoundaryMode, PathComplex, path_boundary_budget};
 use crate::execution::{Execution, WorkBudget};
 use crate::{Error, Result};
-pub use filtered::{PathPersistence, compute_path_persistence, compute_path_persistence_with};
+pub use filtered::{
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_certificate_with, compute_path_persistence_with,
+};
 use linear::*;
 pub use minimum::{MinimumPathBasis, compute_minimum_path_basis, compute_minimum_path_basis_with};
 pub use projection::{PathCohomology, PathProjection};
 use std::collections::BTreeMap;
 
-/// Sparse nonzero canonical residues indexed in a documented path/Omega basis.
-pub type PathVector = BTreeMap<usize, u32>;
+type SparseVector = BTreeMap<usize, u32>;
+
+/// Read-only sparse coordinates in a documented mathematical path/Omega basis.
+///
+/// Storage, pivot order and elimination strategy are private. Coordinates refer
+/// only to the containing result's field, model and basis. Values are nonzero
+/// canonical residues. This view cannot mutate a certificate or choose its field.
+///
+/// ```compile_fail
+/// fn expose_storage(vector: cocycle::persistence::PathVector<'_>) {
+///     let _: &std::collections::BTreeMap<usize, u32> = &vector;
+/// }
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct PathVector<'a>(&'a SparseVector);
+impl PathVector<'_> {
+    /// Nonzero (coordinate, coefficient) terms in increasing coordinate order.
+    pub fn terms(&self) -> impl ExactSizeIterator<Item = (usize, u32)> + DoubleEndedIterator + '_ {
+        self.0.iter().map(|(&i, &v)| (i, v))
+    }
+    /// Coefficient at a coordinate, with absent terms interpreted as zero.
+    pub fn coefficient(&self, coordinate: usize) -> u32 {
+        self.0.get(&coordinate).copied().unwrap_or(0)
+    }
+    /// Number of nonzero terms.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    /// Whether the vector is zero.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 /// Owned exact path homology and its field-bound coordinate chain through d+1.
 ///
-/// Bases are deterministic, without a canonical/minimal/orthogonal claim. This
+/// Bases are result-local; pivot, block and normalization choices may change.
+/// No canonical/minimal/orthogonal basis is promised. This
 /// result owns path identities and stays interpretable after releasing its source.
 /// Read-only access prevents changing the field without recomputing Omega.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,10 +69,10 @@ pub struct PathHomology {
     field: PrimeField,
     mode: PathBoundaryMode,
     paths: Vec<Vec<Path>>,
-    omega_bases: Vec<Vec<PathVector>>,
-    boundaries: Vec<Vec<PathVector>>,
+    omega_bases: Vec<Vec<SparseVector>>,
+    boundaries: Vec<Vec<SparseVector>>,
     boundary_ranks: Vec<usize>,
-    representatives: Vec<Vec<PathVector>>,
+    representatives: Vec<Vec<SparseVector>>,
 }
 
 impl PathHomology {
@@ -58,20 +93,35 @@ impl PathHomology {
         self.paths.get(dimension).map(Vec::as_slice)
     }
     /// Omega columns in the corresponding allowed-path coordinates, through d+1.
-    pub fn omega_bases(&self, dimension: usize) -> Option<&[PathVector]> {
-        self.omega_bases.get(dimension).map(Vec::as_slice)
+    pub fn omega_bases(
+        &self,
+        dimension: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.omega_bases
+            .get(dimension)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Boundary columns in the preceding Omega basis; degree-zero columns are empty.
-    pub fn boundaries(&self, dimension: usize) -> Option<&[PathVector]> {
-        self.boundaries.get(dimension).map(Vec::as_slice)
+    pub fn boundaries(
+        &self,
+        dimension: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.boundaries
+            .get(dimension)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Boundary ranks through the upper degree d+1.
     pub fn boundary_ranks(&self) -> &[usize] {
         &self.boundary_ranks
     }
     /// Homology basis cycles in allowed-path coordinates, through degree d.
-    pub fn representatives(&self, dimension: usize) -> Option<&[PathVector]> {
-        self.representatives.get(dimension).map(Vec::as_slice)
+    pub fn representatives(
+        &self,
+        dimension: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.representatives
+            .get(dimension)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Betti numbers in the contiguous computed domain 0..=d.
     pub fn betti(&self) -> Vec<usize> {
@@ -174,14 +224,16 @@ fn copy_paths(
     Ok(result)
 }
 
-fn homology(
+type GradedColumns = Vec<Vec<SparseVector>>;
+
+fn omega(
     source: &PathComplex,
     dimension: usize,
     field: PrimeField,
     mode: PathBoundaryMode,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<PathHomology> {
+) -> Result<(GradedColumns, GradedColumns)> {
     let layers = layers(source, dimension, limit)?;
     count(source.vertex_count(), limit)?;
     let mut vertices = Vec::new();
@@ -189,7 +241,7 @@ fn homology(
     for i in 0..source.vertex_count() {
         budget.step()?;
         push(&mut vertices, BTreeMap::from([(i, 1)]))?;
-        push(&mut zero, PathVector::new())?;
+        push(&mut zero, SparseVector::new())?;
     }
     let mut previous = Echelon::from_columns(&vertices, field, limit, budget)?;
     let mut omega_bases = Vec::new();
@@ -209,7 +261,7 @@ fn homology(
         let mut entries = 0;
         for path in source.paths(q) {
             budget.step()?;
-            let (mut a, mut f) = (PathVector::new(), PathVector::new());
+            let (mut a, mut f) = (SparseVector::new(), SparseVector::new());
             for (face, coefficient) in path_boundary_budget(path, mode, budget)? {
                 budget.step_by(face.len())?;
                 let value = coefficient.rem_euclid(i64::from(field.characteristic())) as u32;
@@ -261,6 +313,19 @@ fn homology(
         push(&mut omega_bases, basis)?;
         push(&mut boundaries, boundary)?;
     }
+    Ok((omega_bases, boundaries))
+}
+
+fn homology(
+    source: &PathComplex,
+    dimension: usize,
+    field: PrimeField,
+    mode: PathBoundaryMode,
+    limit: usize,
+    budget: &mut WorkBudget<'_>,
+) -> Result<PathHomology> {
+    let (omega_bases, boundaries) = omega(source, dimension, field, mode, limit, budget)?;
+    let layers = omega_bases.len();
     let mut boundary_ranks = Vec::new();
     let mut representatives = Vec::new();
     for q in 0..layers {
@@ -318,11 +383,11 @@ fn homology(
 // endpoints. Independent endpoint blocks therefore have disjoint forbidden rows.
 fn omega_kernel(
     paths: &[Path],
-    forbidden: &[PathVector],
+    forbidden: &[SparseVector],
     field: PrimeField,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<Vec<PathVector>> {
+) -> Result<Vec<SparseVector>> {
     let mut blocks = BTreeMap::<_, Vec<usize>>::new();
     for (j, path) in paths.iter().enumerate() {
         budget.step()?;
@@ -338,7 +403,7 @@ fn omega_kernel(
             push(&mut columns, copy_vector(&forbidden[j], budget)?)?;
         }
         for local in kernel(&columns, field, limit, budget)?.1 {
-            let mut vector = PathVector::new();
+            let mut vector = SparseVector::new();
             for (j, value) in local {
                 budget.step()?;
                 vector.insert(indices[j], value);

@@ -44,6 +44,9 @@ pub use path::{
 pub use path::{MinimumPathBasis, compute_minimum_path_basis, compute_minimum_path_basis_with};
 pub use path::{PathCohomology, PathProjection};
 pub use path::{PathHomology, PathVector, compute_path_homology, compute_path_homology_with};
-pub use path::{PathPersistence, compute_path_persistence, compute_path_persistence_with};
+pub use path::{
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_certificate_with, compute_path_persistence_with,
+};
 
 mod union_find;

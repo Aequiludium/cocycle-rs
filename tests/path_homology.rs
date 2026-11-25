@@ -9,7 +9,8 @@ use cocycle::persistence::{
     PathHomology, PathVector, compute_path_homology, compute_path_homology_with,
 };
 use cocycle::persistence::{
-    PathPersistence, compute_path_persistence, compute_path_persistence_with,
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_with,
 };
 use cocycle::persistence::{
     compute_low_dimensional_path_persistence, compute_low_dimensional_path_persistence_with,
@@ -90,12 +91,16 @@ fn apply(columns: &[Vec<u32>], vector: &[u32], rows: usize, p: u32) -> Vec<u32> 
     }
     result
 }
-fn dense(columns: &[PathVector], rows: usize, p: u32) -> Vec<Vec<u32>> {
+fn dense<'a>(
+    columns: impl IntoIterator<Item = PathVector<'a>>,
+    rows: usize,
+    p: u32,
+) -> Vec<Vec<u32>> {
     columns
-        .iter()
+        .into_iter()
         .map(|c| {
             let mut v = vec![0; rows];
-            for (&i, &value) in c {
+            for (i, value) in c.terms() {
                 assert!(i < rows && value > 0 && value < p);
                 v[i] = value;
             }
@@ -421,7 +426,7 @@ fn higher_join_and_characteristic_sensitive_omega_spaces_are_recomputed() {
     }
 }
 
-fn persistent_ranks(h: &PathPersistence, edges: &[(usize, usize, f64)], mode: Mode) {
+fn persistent_ranks(h: &PathPersistenceCertificate, edges: &[(usize, usize, f64)], mode: Mode) {
     let p = h.context().characteristic();
     for q in 0..=h.diagram().max_dimension() {
         let paths = h.paths(q).unwrap();
@@ -504,12 +509,11 @@ fn persistent_ranks(h: &PathPersistence, edges: &[(usize, usize, f64)], mode: Mo
             let active_s: Vec<_> = h
                 .omega_bases(q)
                 .unwrap()
-                .iter()
                 .zip(h.births(q).unwrap())
                 .filter(|(_, b)| **b <= event)
-                .map(|(v, _)| v.clone())
+                .map(|(v, _)| v)
                 .collect();
-            let dense_s = dense(&active_s, paths.len(), p);
+            let dense_s = dense(active_s, paths.len(), p);
             assert_eq!(kernel(&dense_s, paths.len(), p).0, dense_s.len());
             let cycle_rank = cycles.len();
             let (_, forbidden_kernel) = kernel(&f, forbidden.len(), p);
@@ -567,7 +571,7 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
             .collect();
         for p in [2, 3, 4_294_967_291] {
             for mode in [Mode::Regular, Mode::NonRegular] {
-                let h = compute_path_persistence(
+                let h = compute_path_persistence_certificate(
                     3,
                     &edges,
                     2,
@@ -607,7 +611,7 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
                 reversed.reverse();
                 assert_eq!(
                     h,
-                    compute_path_persistence(
+                    compute_path_persistence_certificate(
                         3,
                         &reversed,
                         2,
@@ -740,8 +744,16 @@ fn path_result_context_composition_and_whole_operation_limits_are_preserved() {
     let empty = compute_path_persistence(0, &[], 3, field, Mode::Regular, 1, 1000).unwrap();
     assert_eq!(empty.diagram().max_dimension(), 3);
     assert!(empty.diagram().is_empty());
-    let zero =
-        compute_path_persistence(2, &[(0, 1, -0.0)], 1, field, Mode::Regular, 100, 1000).unwrap();
+    let zero = compute_path_persistence_certificate(
+        2,
+        &[(0, 1, -0.0)],
+        1,
+        field,
+        Mode::Regular,
+        100,
+        1000,
+    )
+    .unwrap();
     assert_eq!(zero.times(), [0.0]);
     assert_eq!(zero.times()[0].to_bits(), 0.0f64.to_bits());
 }
@@ -812,13 +824,9 @@ fn projections_homotopies_and_dual_pairings_have_independent_dense_checks() {
                     }
                     // Evaluations on the original path representatives are checked
                     // by expressing Z through the dense augmented system S x=Z.
-                    for (j, r) in h.representatives(n).unwrap().iter().enumerate() {
+                    for (j, r) in h.representatives(n).unwrap().enumerate() {
                         let mut augmented = s.clone();
-                        augmented.extend(dense(
-                            std::slice::from_ref(r),
-                            h.paths(n).unwrap().len(),
-                            p,
-                        ));
+                        augmented.extend(dense(std::iter::once(r), h.paths(n).unwrap().len(), p));
                         let dependencies = kernel(&augmented, h.paths(n).unwrap().len(), p).1;
                         let witness = dependencies.iter().find(|v| v[width] != 0).unwrap();
                         let scale = if witness[width] == 0 {

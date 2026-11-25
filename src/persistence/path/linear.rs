@@ -28,7 +28,7 @@ pub(super) fn sum(a: usize, b: usize) -> Result<usize> {
     })
 }
 
-pub(super) fn matrix(columns: &[PathVector], limit: usize) -> Result<()> {
+pub(super) fn matrix(columns: &[SparseVector], limit: usize) -> Result<()> {
     count(columns.len(), limit)?;
     let mut entries = 0;
     for column in columns {
@@ -38,8 +38,8 @@ pub(super) fn matrix(columns: &[PathVector], limit: usize) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn copy_vector(v: &PathVector, budget: &mut WorkBudget<'_>) -> Result<PathVector> {
-    let mut output = PathVector::new();
+pub(super) fn copy_vector(v: &SparseVector, budget: &mut WorkBudget<'_>) -> Result<SparseVector> {
+    let mut output = SparseVector::new();
     budget.step()?;
     for (&row, &value) in v {
         budget.step()?;
@@ -49,8 +49,8 @@ pub(super) fn copy_vector(v: &PathVector, budget: &mut WorkBudget<'_>) -> Result
 }
 
 pub(super) fn add_scaled(
-    target: &mut PathVector,
-    source: &PathVector,
+    target: &mut SparseVector,
+    source: &SparseVector,
     factor: u32,
     field: PrimeField,
     retained: usize,
@@ -77,18 +77,18 @@ pub(super) fn add_scaled(
 }
 
 pub(super) fn apply(
-    columns: &[PathVector],
-    vectors: &[PathVector],
+    columns: &[SparseVector],
+    vectors: &[SparseVector],
     field: PrimeField,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<Vec<PathVector>> {
+) -> Result<Vec<SparseVector>> {
     count(vectors.len(), limit)?;
     let mut result = Vec::new();
     let mut retained = 0;
     for vector in vectors {
         budget.step()?;
-        let mut image = PathVector::new();
+        let mut image = SparseVector::new();
         for (&index, &value) in vector {
             budget.step()?;
             let column = columns
@@ -103,7 +103,7 @@ pub(super) fn apply(
 }
 
 pub(super) struct Echelon {
-    pivots: BTreeMap<usize, (PathVector, PathVector)>,
+    pivots: BTreeMap<usize, (SparseVector, SparseVector)>,
     entries: usize,
     field: PrimeField,
     limit: usize,
@@ -120,7 +120,7 @@ impl Echelon {
     }
 
     pub(super) fn from_columns(
-        columns: &[PathVector],
+        columns: &[SparseVector],
         field: PrimeField,
         limit: usize,
         budget: &mut WorkBudget<'_>,
@@ -139,8 +139,8 @@ impl Echelon {
 
     fn reduce(
         &self,
-        vector: &mut PathVector,
-        witness: &mut PathVector,
+        vector: &mut SparseVector,
+        witness: &mut SparseVector,
         reserved: usize,
         budget: &mut WorkBudget<'_>,
     ) -> Result<()> {
@@ -180,11 +180,11 @@ impl Echelon {
     // None adds an independent column; Some is a dependency in input coordinates.
     pub(super) fn insert(
         &mut self,
-        column: &PathVector,
+        column: &SparseVector,
         index: usize,
         reserved: usize,
         budget: &mut WorkBudget<'_>,
-    ) -> Result<Option<PathVector>> {
+    ) -> Result<Option<SparseVector>> {
         budget.step()?;
         count(
             sum(sum(sum(self.entries, reserved)?, column.len())?, 1)?,
@@ -209,12 +209,12 @@ impl Echelon {
 
     pub(super) fn coordinates(
         &self,
-        column: &PathVector,
+        column: &SparseVector,
         budget: &mut WorkBudget<'_>,
-    ) -> Result<PathVector> {
+    ) -> Result<SparseVector> {
         count(sum(self.entries, column.len())?, self.limit)?;
         let mut vector = copy_vector(column, budget)?;
-        let mut witness = PathVector::new();
+        let mut witness = SparseVector::new();
         self.reduce(&mut vector, &mut witness, 0, budget)?;
         if !vector.is_empty() {
             return Err(invariant("boundary belongs to lower Omega"));
@@ -228,11 +228,11 @@ impl Echelon {
 }
 
 pub(super) fn kernel(
-    columns: &[PathVector],
+    columns: &[SparseVector],
     field: PrimeField,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<(usize, Vec<PathVector>)> {
+) -> Result<(usize, Vec<SparseVector>)> {
     matrix(columns, limit)?;
     let mut solver = Echelon::new(field, limit);
     let mut basis = Vec::new();

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Keep minimum-basis search diagnostics private; expose exact cycles and costs.
+  Projection/cohomology coordinates use the same read-only mathematical views.
+
+- Default directed path persistence returns the shared PersistenceResult. Request
+  compatible-chain data explicitly with the certificate terminal; stage setup
+  constructs Omega without computing unused static homology representatives.
+
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
 - Add direct regular/full path H0/H1 boundary presentations, without general
   Omega2 kernel construction. Reuse ordinary reduction and canonical results;
   dependent generators do not define a computed H2 or an arboricity guarantee.
