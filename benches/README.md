@@ -28,6 +28,7 @@ Windows Python/native comparisons and separate Linux timing/RSS measurements.
 | Do sparse sampling, blockers and persistence agree? | [Sparse correctness](../tools/README.md#native-sparse-rips-checks); `tools/compare_sparse_rips.py` | Approximation validation, not performance |
 | What do critical sets and existing persistence paths cost? | [Critical-set protocol](optimization/README.md); `tools/benchmark_critical_sets.py` | Sparse/dense/Oineus cold and warm targets; separate persistence context |
 | What does the Rust API cost without external comparisons? | [rips.rs](rips.rs), `cargo bench --locked --bench rips` | Rust-only timings, not a cross-library baseline |
+| When does direct directed-path H0/H1 beat the generic route? | [Path protocol](path/README.md); `tools/benchmark_path_topology.py` | [Matched-output comparison](reports/path-topology-comparison.md), complete interval agreement and repeated native time |
 
 The pipeline covers matrix/graph/point construction, explicit complexes, prime
 fields, representatives and approximation. Protocol v2 defaults to 12 measured

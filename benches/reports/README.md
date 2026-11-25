@@ -10,6 +10,7 @@ actual measured commits, protocols, environment and evidence status. Follow the
 
 | Report | Scope |
 | --- | --- |
+| [Directed path H0/H1 comparison](path-topology-comparison.md) | Generic/direct matched diagrams, 64 measured cells, advantageous graph sizes and independent real certificates |
 | [Dirac resources and conditioning](dirac-resources.md) | Repeated sparse-mode costs, small-singular-value failures and explicit index limits |
 | [Persistent Laplacian reference resources](persistent-laplacian-resources.md) | Repeated direct/reverse dense costs, numeric safeguards and default storage rejections |
 | [Hodge resources and small-gap convergence](hodge-resources.md) | Repeated native time/memory, default nonconvergence and independent preconditioning diagnosis |
