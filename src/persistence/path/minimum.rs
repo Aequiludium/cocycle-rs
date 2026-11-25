@@ -8,11 +8,9 @@ use std::collections::BTreeSet;
 pub struct MinimumPathBasis {
     mode: PathBoundaryMode,
     edges: Vec<(usize, usize)>,
-    representatives: Vec<PathVector>,
+    representatives: Vec<SparseVector>,
     costs: Vec<u128>,
     total_cost: u128,
-    candidate_count: usize,
-    search_steps: usize,
 }
 impl MinimumPathBasis {
     /// Ambient boundary convention; coefficients are always F2.
@@ -24,8 +22,8 @@ impl MinimumPathBasis {
         &self.edges
     }
     /// Selected basis cycles in these directed edge coordinates.
-    pub fn representatives(&self) -> &[PathVector] {
-        &self.representatives
+    pub fn representatives(&self) -> impl ExactSizeIterator<Item = PathVector<'_>> + Clone {
+        self.representatives.iter().map(PathVector)
     }
     /// Exact support costs, one per selected cycle; zero costs are permitted.
     pub fn costs(&self) -> &[u128] {
@@ -34,14 +32,6 @@ impl MinimumPathBasis {
     /// Exact total cost, accumulated without floating-point rounding.
     pub fn total_cost(&self) -> u128 {
         self.total_cost
-    }
-    /// Number of distinct elementary-cycle candidates (zero when H1 is zero).
-    pub fn candidate_count(&self) -> usize {
-        self.candidate_count
-    }
-    /// Number of visited DFS states.
-    pub fn search_steps(&self) -> usize {
-        self.search_steps
     }
 }
 
@@ -163,7 +153,6 @@ pub fn compute_minimum_path_basis_with(
             }
         }
     }
-    let candidate_count = candidates.len();
     let mut ordered = Vec::new();
     for cycle in candidates {
         let mut cost = 0u128;
@@ -185,16 +174,14 @@ pub fn compute_minimum_path_basis_with(
     let (mut reps, mut selected_costs, mut total_cost) = (Vec::new(), Vec::new(), 0u128);
     for (cost, cycle) in ordered {
         budget.step()?;
-        let mut vector = PathVector::new();
+        let mut vector = SparseVector::new();
         for i in cycle {
             budget.step()?;
             vector.insert(i, 1);
         }
         let coordinates = omega.coordinates(&vector, &mut budget)?;
         let mut annotations = apply(
-            projection
-                .annotations(1)
-                .ok_or(invariant("H1 annotations"))?,
+            &projection.annotations[1],
             std::slice::from_ref(&coordinates),
             field,
             limit,
@@ -237,8 +224,6 @@ pub fn compute_minimum_path_basis_with(
         representatives: reps,
         costs: selected_costs,
         total_cost,
-        candidate_count,
-        search_steps,
     })
 }
 fn copy_indices(input: &[usize], budget: &mut WorkBudget<'_>) -> Result<Vec<usize>> {

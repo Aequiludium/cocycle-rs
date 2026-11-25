@@ -756,13 +756,9 @@ fn projections_homotopies_and_dual_pairings_have_independent_dense_checks() {
                     }
                     // Evaluations on the original path representatives are checked
                     // by expressing Z through the dense augmented system S x=Z.
-                    for (j, r) in h.representatives(n).unwrap().iter().enumerate() {
+                    for (j, r) in h.representatives(n).unwrap().enumerate() {
                         let mut augmented = s.clone();
-                        augmented.extend(dense(
-                            std::slice::from_ref(r),
-                            h.paths(n).unwrap().len(),
-                            p,
-                        ));
+                        augmented.extend(dense(std::iter::once(r), h.paths(n).unwrap().len(), p));
                         let dependencies = kernel(&augmented, h.paths(n).unwrap().len(), p).1;
                         let witness = dependencies.iter().find(|v| v[width] != 0).unwrap();
                         let scale = if witness[width] == 0 {

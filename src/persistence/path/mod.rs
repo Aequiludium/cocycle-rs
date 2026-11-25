@@ -378,11 +378,11 @@ fn homology(
 // endpoints. Independent endpoint blocks therefore have disjoint forbidden rows.
 fn omega_kernel(
     paths: &[Path],
-    forbidden: &[PathVector],
+    forbidden: &[SparseVector],
     field: PrimeField,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<Vec<PathVector>> {
+) -> Result<Vec<SparseVector>> {
     let mut blocks = BTreeMap::<_, Vec<usize>>::new();
     for (j, path) in paths.iter().enumerate() {
         budget.step()?;
@@ -398,7 +398,7 @@ fn omega_kernel(
             push(&mut columns, copy_vector(&forbidden[j], budget)?)?;
         }
         for local in kernel(&columns, field, limit, budget)?.1 {
-            let mut vector = PathVector::new();
+            let mut vector = SparseVector::new();
             for (j, value) in local {
                 budget.step()?;
                 vector.insert(indices[j], value);
