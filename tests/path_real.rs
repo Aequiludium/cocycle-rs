@@ -12,7 +12,8 @@ use std::sync::atomic::AtomicBool;
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(a, b)| a * b).sum()
 }
-fn apply(columns: &[Vec<f64>], v: &[f64], rows: usize) -> Vec<f64> {
+fn apply<'a>(columns: impl IntoIterator<Item = &'a [f64]>, v: &[f64], rows: usize) -> Vec<f64> {
+    let columns: Vec<_> = columns.into_iter().collect();
     (0..rows)
         .map(|i| columns.iter().zip(v).map(|(c, s)| c[i] * s).sum())
         .collect()
@@ -22,8 +23,8 @@ fn check(chain: &PathRealChain, d: usize) {
     assert!(chain.boundary_residual().is_finite() && chain.boundary_residual() < 1e-8);
     for q in 0..=d + 1 {
         let paths = chain.paths(q).unwrap();
-        let basis = chain.bases(q).unwrap();
-        for (j, v) in basis.iter().enumerate() {
+        let basis: Vec<_> = chain.bases(q).unwrap().collect();
+        for (j, &v) in basis.iter().enumerate() {
             assert_eq!(v.len(), paths.len());
             assert!((dot(v, v) - 1.0).abs() < 1e-8);
             for u in &basis[..j] {
@@ -44,7 +45,7 @@ fn check(chain: &PathRealChain, d: usize) {
                 }
             }
             if q == 0 {
-                assert!(chain.boundaries(q).unwrap()[j].is_empty());
+                assert!(chain.boundaries(q).unwrap().nth(j).unwrap().is_empty());
                 continue;
             }
             let lower = chain.paths(q - 1).unwrap();
@@ -55,7 +56,7 @@ fn check(chain: &PathRealChain, d: usize) {
             }
             let actual = apply(
                 chain.bases(q - 1).unwrap(),
-                &chain.boundaries(q).unwrap()[j],
+                chain.boundaries(q).unwrap().nth(j).unwrap(),
                 lower.len(),
             );
             for (face, x) in lower.iter().zip(&actual) {
@@ -69,7 +70,7 @@ fn check(chain: &PathRealChain, d: usize) {
             assert!(
                 apply(
                     chain.boundaries(q - 1).unwrap(),
-                    &chain.boundaries(q).unwrap()[j],
+                    chain.boundaries(q).unwrap().nth(j).unwrap(),
                     rows
                 )
                 .iter()
@@ -228,7 +229,7 @@ fn real_omega_is_not_lifted_from_the_characteristic_two_basis() {
         .allowed_paths(4, 10000)
         .unwrap();
     let chain = compute_real_path_chain(&source, 3, Mode::Regular, 1000000, 1e-10).unwrap();
-    assert!(chain.bases(4).unwrap().is_empty());
+    assert!(chain.bases(4).unwrap().len() == 0);
     check(&chain, 3);
 }
 

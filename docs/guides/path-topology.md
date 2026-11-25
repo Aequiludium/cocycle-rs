@@ -5,6 +5,22 @@
 This Unreleased API keeps directed edges and nonadjacent vertex repetitions.
 It is independent of the undirected `WeightedGraph` and simplicial storage.
 
+## Draft API boundaries
+
+| Owner | Mathematical public contract | Private implementation choices |
+| --- | --- | --- |
+| Directed sources | Ordered edges/words, endpoint closure and truncation coverage | Enumeration workspace and work-counter implementation |
+| Exact homology | Owned field/model-bound spaces and read-only coordinates | Sparse containers, pivots, block order and basis normalization |
+| Persistence | Standard diagram/context by default; compatible certificate explicitly requested | Stage solvers and ordinary reducer columns |
+| Linear algebra and minimum basis | Duals, algebraic projection/homotopy, exact cycles and costs | Search counts/frontier, candidate ordering and elimination state |
+| Direct H0/H1 | Standard PersistenceResult with the same semantic context | Anchors, dependent relations and traversed two-path counters |
+| Real operators | Read-only mathematical basis coordinates, apply, events and tolerance/residual evidence | D/U factors, row-elimination layout and numerical workspaces |
+
+These are refinements to unmerged draft APIs, not released 0.1.1 changes.
+The former sparse map alias is replaced by `PathVector::terms()`/`coefficient()`
+views; generic/direct default persistence now shares PersistenceResult. Use the
+explicit certificate terminal when compatible-chain coordinates are needed.
+
 ```rust
 use cocycle::complex::{DirectedGraph, PathBoundaryMode, PathComplex, path_boundary};
 
@@ -222,7 +238,7 @@ pair s<=t, model, (path cap,dense cap) and tolerance. Events are sorted zero plu
 edge births. The upper domain consists of target Omega_(d+1) vectors whose full
 boundary lies in source Omega_d, with its induced real orthonormal metric.
 `PathRealLaplacian` owns final-graph path identities, the embedded source basis
-and rectangular D/U factors, and applies D transpose D + U U transpose. The
+and private rectangular D/U factors, and applies D transpose D + U U transpose. The
 library API builds neither square matrices nor spectra and does not use the
 generic Hodge/Dirac integer-source adapter.
 
@@ -238,9 +254,31 @@ and coordinate visits are charged inside the main loops.
 `tests/path_real.rs` checks ambient equations, orthonormality, symmetric
 positive-semidefinite action, hand-derived operators, the characteristic-sensitive
 real/finite-field distinction and invalid/resource cases. The standalone worker
-`tools/reference/path_real.rs` exposes factors and sampled action columns for
+`tools/reference/path_real.rs` exposes coordinates and sampled action columns for
 independent rational/SVD verification; it is not a production spectrum interface
 or performance benchmark. Run `cargo run --locked --example path_laplacian`.
+
+The self-contained independent verifier reconstructs vertex words and alternating
+deletions, computes rational kernels and exact stage-pair ranks with SymPy, and
+compares the full native operator against rational-projector and independent
+numerical-SVD induced-domain routes. It checks source spaces, orthonormality,
+symmetry, ambient operators, full spectra and zero multiplicities. The diamond's
+hand-derived spectrum rejects the wrong nonorthogonal-transpose metric. A fault
+injection test confirms a corrupted native action is rejected. No research
+checkout, external algorithm source or test skipping is needed for the full run:
+
+```sh
+python -m pip install -r benches/path/requirements-lock.txt
+cargo build --locked --release
+rustc --edition 2024 -C opt-level=3 tools/reference/path_real.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/path-real-worker
+python tools/check_path_real.py --worker target/path-real-worker --output target/path-real-reference
+```
+
+On Windows append `.exe` to the worker filename. Use a fresh output directory
+per attempt. The verifier records source/worker/input hashes, package versions,
+complete certificates and maximum errors. CI runs it and uploads these artifacts
+for 14 days; the full workflow's optional performance dispatch runs the
+[matched-output protocol](../../benches/path/README.md).
 
 The Rust series does not include the research Python Grounded, Weighted, Mayer,
 cup-product or large-network workstreams, nor a sparse path eigensolver.

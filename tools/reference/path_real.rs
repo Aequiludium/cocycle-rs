@@ -45,15 +45,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         columns.push(operator.apply(&v)?);
     }
     println!(
-        "{{\"field\":\"real\",\"regular\":{},\"dimension\":{},\"source_time\":{},\"target_time\":{},\"paths\":{:?},\"basis\":{:?},\"down\":{:?},\"upper\":{:?},\"laplacian_columns\":{:?}}}",
+        "{{\"protocol\":\"cocycle-path-real-certificate-v1\",\"field\":\"real\",\"regular\":{},\"dimension\":{},\"source_time\":{},\"target_time\":{},\"paths\":{:?},\"basis\":{:?},\"laplacian_columns\":{:?}}}",
         mode == PathBoundaryMode::Regular,
         operator.dimension(),
         operator.times().0,
         operator.times().1,
         operator.paths(),
-        operator.basis(),
-        operator.down(),
-        operator.upper(),
+        operator.basis().collect::<Vec<_>>(),
         columns
     );
     Ok(())

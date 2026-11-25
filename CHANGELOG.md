@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hide real path operator factors behind action/read-only mathematical coordinates.
+  Add a self-contained rational/SVD oracle, corruption check and CI artifacts,
+  plus an explicitly dispatched matched-output path performance study.
+
 - Direct path H0/H1 computation returns the shared PersistenceResult, keeping
   relation generators and traversal diagnostics private. Add a matched-output
   native comparison protocol for generic and direct ordinary H0/H1 diagrams.
