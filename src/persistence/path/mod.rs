@@ -7,8 +7,7 @@ mod linear;
 mod low_dimensional;
 mod minimum;
 pub use low_dimensional::{
-    LowDimensionalPathPersistence, compute_low_dimensional_path_persistence,
-    compute_low_dimensional_path_persistence_with,
+    compute_low_dimensional_path_persistence, compute_low_dimensional_path_persistence_with,
 };
 mod projection;
 use crate::algebra::PrimeField;

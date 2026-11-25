@@ -172,6 +172,8 @@ Omega2 directly from bigons, triangles and anchored quadrangle differences,
 including the full-model returning-path constraints. Earliest completed routes
 provide anchors, so the generators span the one-boundaries at every event.
 They need not be independent and are not an Omega2 basis.
+The terminal returns the existing `PersistenceResult`; dependent generators,
+anchors and traversal counters are private working state.
 
 The upstream adapter feeds this dependent boundary presentation to the existing
 ordinary reducer, requests only H0/H1 and returns canonical PersistenceData with

@@ -633,8 +633,6 @@ fn low_dimensional_presentation_caps_and_model_contracts_are_explicit() {
     let field = PrimeField::new(4_294_967_291).unwrap();
     for mode in [Mode::Regular, Mode::NonRegular] {
         let h = compute_low_dimensional_path_persistence(2, &edges, field, mode, 6, 1000).unwrap();
-        assert_eq!(h.two_path_count(), 2);
-        assert_eq!(h.edges(), [(0, 1), (1, 0)]);
         assert_eq!(
             h.diagram().dimension(1).unwrap().len(),
             usize::from(mode == Mode::NonRegular)

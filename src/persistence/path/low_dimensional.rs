@@ -2,59 +2,9 @@
 use super::*;
 use crate::algebra::column::Column;
 use crate::complex::DirectedGraph;
-use crate::diagram::{ComputationContext, PersistenceData, PersistenceDiagram};
+use crate::diagram::{ComputationContext, PersistenceResult};
 use crate::filtration::{Coverage, FiltrationKind};
 use crate::persistence::boundary::{self, BoundaryInput};
-
-/// Canonical H0/H1 results plus dependent generators of the filtered one-boundaries.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LowDimensionalPathPersistence {
-    data: PersistenceData,
-    times: Vec<f64>,
-    edges: Vec<(usize, usize)>,
-    generators: Vec<PathVector>,
-    births: Vec<usize>,
-    two_path_count: usize,
-}
-impl LowDimensionalPathPersistence {
-    /// Ordinary H0/H1 diagram with complete coverage and preserved multiplicity.
-    pub fn diagram(&self) -> &PersistenceDiagram {
-        self.data.diagram()
-    }
-    /// Selected field and regular/full directed-path model.
-    pub fn context(&self) -> &ComputationContext {
-        self.data.context()
-    }
-    /// Exact represented events, always including zero.
-    pub fn times(&self) -> &[f64] {
-        &self.times
-    }
-    /// Lexicographic directed-edge coordinates for every generator.
-    pub fn edges(&self) -> &[(usize, usize)] {
-        &self.edges
-    }
-    /// Generators of partial Omega2 in directed-edge coordinates, not an Omega basis.
-    pub fn boundary_generators(&self) -> &[PathVector] {
-        &self.generators
-    }
-    /// Birth event index of every boundary generator.
-    pub fn births(&self) -> &[usize] {
-        &self.births
-    }
-    /// Number of traversed allowed two-paths, including returning paths.
-    pub fn two_path_count(&self) -> usize {
-        self.two_path_count
-    }
-    /// Retain common data while discarding the presentation certificate.
-    pub fn into_data(self) -> PersistenceData {
-        self.data
-    }
-}
-impl AsRef<PersistenceData> for LowDimensionalPathPersistence {
-    fn as_ref(&self) -> &PersistenceData {
-        &self.data
-    }
-}
 
 /// Compute graph H0/H1 from bigon, triangle and anchored quadrangle boundaries.
 ///
@@ -73,7 +23,7 @@ pub fn compute_low_dimensional_path_persistence(
     mode: PathBoundaryMode,
     max_paths: usize,
     max_entries: usize,
-) -> Result<LowDimensionalPathPersistence> {
+) -> Result<PersistenceResult> {
     compute_low_dimensional_path_persistence_with(
         vertex_count,
         edges,
@@ -98,7 +48,7 @@ pub fn compute_low_dimensional_path_persistence_with(
     max_paths: usize,
     limit: usize,
     execution: &Execution<'_>,
-) -> Result<LowDimensionalPathPersistence> {
+) -> Result<PersistenceResult> {
     let mut budget = WorkBudget::new(execution)?;
     if max_paths == 0 || limit == 0 {
         return Err(Error::InvalidParameter {
@@ -165,7 +115,6 @@ pub fn compute_low_dimensional_path_persistence_with(
             }
         }
     }
-    let two_path_count = path_count - vertex_count - edges.len();
     let (mut generators, mut births) = (Vec::new(), Vec::new());
     let mut entries = 0;
     let minus = field.negate(1);
@@ -308,12 +257,5 @@ pub fn compute_low_dimensional_path_persistence_with(
     };
     let context = ComputationContext::new(field, kind, vertex_count, None, None, None);
     budget.check()?;
-    Ok(LowDimensionalPathPersistence {
-        data: PersistenceData::new(diagram, context),
-        times,
-        edges,
-        generators,
-        births,
-        two_path_count,
-    })
+    Ok(PersistenceResult::new(diagram, context, None))
 }
