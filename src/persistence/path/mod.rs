@@ -2,11 +2,16 @@
 //!
 //! Allowed paths are data, not integer filtered cells. Omega is rebuilt in the
 //! selected field; its modular coordinate boundaries never implement that trait.
+mod filtered;
 mod linear;
 use crate::algebra::PrimeField;
 use crate::complex::{Path, PathBoundaryMode, PathComplex, path_boundary_budget};
 use crate::execution::{Execution, WorkBudget};
 use crate::{Error, Result};
+pub use filtered::{
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_certificate_with, compute_path_persistence_with,
+};
 use linear::*;
 use std::collections::BTreeMap;
 
@@ -210,14 +215,16 @@ fn copy_paths(
     Ok(result)
 }
 
-fn homology(
+type GradedColumns = Vec<Vec<SparseVector>>;
+
+fn omega(
     source: &PathComplex,
     dimension: usize,
     field: PrimeField,
     mode: PathBoundaryMode,
     limit: usize,
     budget: &mut WorkBudget<'_>,
-) -> Result<PathHomology> {
+) -> Result<(GradedColumns, GradedColumns)> {
     let layers = layers(source, dimension, limit)?;
     count(source.vertex_count(), limit)?;
     let mut vertices = Vec::new();
@@ -297,6 +304,19 @@ fn homology(
         push(&mut omega_bases, basis)?;
         push(&mut boundaries, boundary)?;
     }
+    Ok((omega_bases, boundaries))
+}
+
+fn homology(
+    source: &PathComplex,
+    dimension: usize,
+    field: PrimeField,
+    mode: PathBoundaryMode,
+    limit: usize,
+    budget: &mut WorkBudget<'_>,
+) -> Result<PathHomology> {
+    let (omega_bases, boundaries) = omega(source, dimension, field, mode, limit, budget)?;
+    let layers = omega_bases.len();
     let mut boundary_ranks = Vec::new();
     let mut representatives = Vec::new();
     for q in 0..layers {

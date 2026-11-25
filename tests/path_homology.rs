@@ -2,9 +2,15 @@
 use cocycle::Error;
 use cocycle::algebra::PrimeField;
 use cocycle::complex::{DirectedGraph, PathBoundaryMode as Mode, PathComplex};
+use cocycle::diagram::{Coverage, IntervalEnd, PersistenceData};
 use cocycle::execution::Execution;
+use cocycle::filtration::{FiltrationKind, FiltrationScale, FiltrationSource};
 use cocycle::persistence::{
     PathHomology, PathVector, compute_path_homology, compute_path_homology_with,
+};
+use cocycle::persistence::{
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_with,
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
@@ -414,4 +420,271 @@ fn higher_join_and_characteristic_sensitive_omega_spaces_are_recomputed() {
         assert_eq!(h.omega_bases(4).unwrap().len(), expected);
         certificate(&h);
     }
+}
+
+fn persistent_ranks(h: &PathPersistenceCertificate, edges: &[(usize, usize, f64)], mode: Mode) {
+    let p = h.context().characteristic();
+    for q in 0..=h.diagram().max_dimension() {
+        let paths = h.paths(q).unwrap();
+        let upper = h.paths(q + 1).unwrap();
+        let birth = |path: &[usize]| {
+            path.windows(2)
+                .map(|v| edges.iter().find(|e| (e.0, e.1) == (v[0], v[1])).unwrap().2)
+                .fold(0.0f64, f64::max)
+        };
+        let mut stages = Vec::new();
+        for (event, &time) in h.times().iter().enumerate() {
+            let active: Vec<_> = paths
+                .iter()
+                .enumerate()
+                .filter(|(_, w)| birth(w) <= time)
+                .map(|(i, _)| i)
+                .collect();
+            let mut rows = BTreeMap::new();
+            let full: Vec<_> = active
+                .iter()
+                .map(|&i| ambient(&paths[i], mode, p))
+                .collect();
+            for c in &full {
+                for row in c.keys() {
+                    let n = rows.len();
+                    rows.entry(row.clone()).or_insert(n);
+                }
+            }
+            let columns: Vec<_> = full
+                .iter()
+                .map(|c| {
+                    let mut v = vec![0; rows.len()];
+                    for (r, &x) in c {
+                        v[rows[r]] = x;
+                    }
+                    v
+                })
+                .collect();
+            let cycles: Vec<_> = kernel(&columns, rows.len(), p)
+                .1
+                .iter()
+                .map(|v| {
+                    let mut out = vec![0; paths.len()];
+                    for (&i, &x) in active.iter().zip(v) {
+                        out[i] = x;
+                    }
+                    out
+                })
+                .collect();
+            let upper_words: Vec<_> = upper
+                .iter()
+                .filter(|w| birth(w) <= time)
+                .map(|w| ambient(w, mode, p))
+                .collect();
+            let mut forbidden = BTreeMap::new();
+            for c in &upper_words {
+                for row in c.keys() {
+                    if !active.iter().any(|&i| paths[i] == *row) {
+                        let n = forbidden.len();
+                        forbidden.entry(row.clone()).or_insert(n);
+                    }
+                }
+            }
+            let mut a = vec![vec![0; paths.len()]; upper_words.len()];
+            let mut f = vec![vec![0; forbidden.len()]; upper_words.len()];
+            for (j, c) in upper_words.iter().enumerate() {
+                for (row, &x) in c {
+                    if let Some(&i) = active.iter().find(|&&i| paths[i] == *row) {
+                        a[j][i] = x;
+                    } else {
+                        f[j][forbidden[row]] = x;
+                    }
+                }
+            }
+            let images: Vec<_> = kernel(&f, forbidden.len(), p)
+                .1
+                .iter()
+                .map(|v| apply(&a, v, paths.len(), p))
+                .collect();
+            let active_s: Vec<_> = h
+                .omega_bases(q)
+                .unwrap()
+                .zip(h.births(q).unwrap())
+                .filter(|(_, b)| **b <= event)
+                .map(|(v, _)| v)
+                .collect();
+            let dense_s = dense(active_s, paths.len(), p);
+            assert_eq!(kernel(&dense_s, paths.len(), p).0, dense_s.len());
+            let cycle_rank = cycles.len();
+            let (_, forbidden_kernel) = kernel(&f, forbidden.len(), p);
+            assert_eq!(
+                forbidden_kernel.len(),
+                h.births(q + 1)
+                    .unwrap()
+                    .iter()
+                    .filter(|&&b| b <= event)
+                    .count()
+            );
+            assert!(cycle_rank <= dense_s.len());
+            stages.push((cycles, images));
+        }
+        for (s, (z, _)) in stages.iter().enumerate() {
+            for (t, (_, b)) in stages.iter().enumerate().skip(s) {
+                let mut combined = z.clone();
+                combined.extend(b.clone());
+                let expected = kernel(&combined, paths.len(), p).0 - kernel(b, paths.len(), p).0;
+                let bars = h
+                    .diagram()
+                    .dimension(q)
+                    .unwrap()
+                    .iter()
+                    .filter(|bar| {
+                        bar.birth() <= h.times()[s]
+                            && match bar.end() {
+                                IntervalEnd::Essential => true,
+                                IntervalEnd::Finite(death) => death > h.times()[t],
+                                IntervalEnd::RightCensored { .. } => {
+                                    panic!("complete graph has no censored bars")
+                                }
+                            }
+                    })
+                    .count();
+                assert_eq!(
+                    bars, expected,
+                    "q={q} s={s} t={t} p={p} mode={mode:?} edges={edges:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
+    let pairs = [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)];
+    for mask in 0..64 {
+        let edges: Vec<_> = pairs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &(a, b))| {
+                (mask & (1 << i) != 0).then_some((a, b, ((i + mask) % 3) as f64))
+            })
+            .collect();
+        for p in [2, 3, 4_294_967_291] {
+            for mode in [Mode::Regular, Mode::NonRegular] {
+                let h = compute_path_persistence_certificate(
+                    3,
+                    &edges,
+                    2,
+                    PrimeField::new(p).unwrap(),
+                    mode,
+                    1000,
+                    100000,
+                )
+                .unwrap();
+                assert_eq!(h.diagram().coverage(), Coverage::Complete);
+                assert_eq!(
+                    h.context().filtration().scale(),
+                    FiltrationScale::Unspecified
+                );
+                persistent_ranks(&h, &edges, mode);
+                let mut reversed = edges.clone();
+                reversed.reverse();
+                assert_eq!(
+                    h,
+                    compute_path_persistence_certificate(
+                        3,
+                        &reversed,
+                        2,
+                        PrimeField::new(p).unwrap(),
+                        mode,
+                        1000,
+                        100000
+                    )
+                    .unwrap()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn path_result_context_composition_and_whole_operation_limits_are_preserved() {
+    let edges = [(0, 1, 1.0), (1, 2, 1.0), (2, 0, 1.0), (0, 2, 2.0)];
+    let field = PrimeField::new(3).unwrap();
+    let h = compute_path_persistence(3, &edges, 1, field, Mode::Regular, 100, 10000).unwrap();
+    let data: &PersistenceData = h.as_ref();
+    assert_eq!(
+        data.context().filtration_kind(),
+        FiltrationKind::RegularDirectedPaths
+    );
+    assert!(matches!(
+        data.context().filtration().source(),
+        FiltrationSource::DirectedPaths {
+            mode: Mode::Regular
+        }
+    ));
+    assert_eq!(
+        cocycle::descriptors::betti_curve(data.diagram(), 1, &[0.0, 1.0, 2.0]).unwrap(),
+        [0, 1, 0]
+    );
+    assert_eq!(h.clone().into_data(), *data);
+    for work in [0, 100, 1000] {
+        assert!(matches!(
+            compute_path_persistence_with(
+                3,
+                &edges,
+                1,
+                field,
+                Mode::Regular,
+                100,
+                10000,
+                &Execution::default().max_work(work)
+            ),
+            Err(Error::WorkLimitExceeded { .. })
+        ));
+    }
+    let flag = AtomicBool::new(true);
+    assert!(matches!(
+        compute_path_persistence_with(
+            3,
+            &edges,
+            1,
+            field,
+            Mode::Regular,
+            100,
+            10000,
+            &Execution::default().cancellation(&flag)
+        ),
+        Err(Error::Cancelled)
+    ));
+    for bad in [-1.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            compute_path_persistence(2, &[(0, 1, bad)], 1, field, Mode::Regular, 100, 1000)
+                .is_err()
+        );
+    }
+    assert!(
+        compute_path_persistence(
+            2,
+            &[(0, 1, 1.0), (0, 1, 2.0)],
+            1,
+            field,
+            Mode::Regular,
+            100,
+            1000
+        )
+        .is_err()
+    );
+    assert!(compute_path_persistence(0, &[], usize::MAX, field, Mode::Regular, 100, 1000).is_err());
+    let empty = compute_path_persistence(0, &[], 3, field, Mode::Regular, 1, 1000).unwrap();
+    assert_eq!(empty.diagram().max_dimension(), 3);
+    assert!(empty.diagram().is_empty());
+    let zero = compute_path_persistence_certificate(
+        2,
+        &[(0, 1, -0.0)],
+        1,
+        field,
+        Mode::Regular,
+        100,
+        1000,
+    )
+    .unwrap();
+    assert_eq!(zero.times(), [0.0]);
+    assert_eq!(zero.times()[0].to_bits(), 0.0f64.to_bits());
 }

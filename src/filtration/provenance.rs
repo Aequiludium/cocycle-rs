@@ -14,6 +14,10 @@ pub enum Coverage {
 /// Mathematical source of a computed ordinary persistence diagram.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FiltrationKind {
+    /// Regular non-reduced paths of a weighted directed graph; all vertices born at zero.
+    RegularDirectedPaths,
+    /// Full ambient boundary on regular allowed directed paths; vertices born at zero.
+    NonRegularDirectedPaths,
     /// A supplied simplicial complex, without a claim about a larger source.
     SuppliedSimplicial,
     /// A supplied filtered cell complex accessed through the public contract.

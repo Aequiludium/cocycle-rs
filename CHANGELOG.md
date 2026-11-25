@@ -2,8 +2,18 @@
 
 ## Unreleased
 
+- Default directed path persistence returns the shared PersistenceResult. Request
+  compatible-chain data explicitly with the certificate terminal; stage setup
+  constructs Omega without computing unused static homology representatives.
+
 - Refine the draft path API: sparse coordinates are read-only mathematical views,
   without exposing a BTreeMap representation or promising elimination/basis choices.
+
+- Add compatible-basis directed path persistence through the existing ordinary
+  boundary reducer and canonical diagram/context assembly. Path source context
+  records the regular/full model with unspecified geometric units. The exhaustive
+  `FiltrationKind` enum gains `RegularDirectedPaths` and `NonRegularDirectedPaths`;
+  downstream exhaustive matches must handle these Unreleased source variants.
 
 - Add exact field-bound Omega chains and non-reduced path homology through a
   requested degree, with owned path identities and cycle representatives. Use
