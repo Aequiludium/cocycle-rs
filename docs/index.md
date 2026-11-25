@@ -63,6 +63,7 @@ Documentation map and version status <README>
 guides/rips
 guides/rips-construction
 guides/filtered-complexes
+guides/path-topology
 guides/rips-representatives
 guides/sparse-rips
 guides/diagram-distances
