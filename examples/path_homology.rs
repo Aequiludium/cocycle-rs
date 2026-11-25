@@ -14,6 +14,13 @@ fn main() -> cocycle::Result<()> {
     )?;
     drop(source);
     assert_eq!(result.betti(), [1, 1]);
+    let dual = result.cohomology(10_000)?;
+    let projection = result.projection(10_000)?;
+    assert_eq!(dual.representatives(1).unwrap().len(), 1);
+    assert_eq!(
+        projection.homotopies(1).unwrap().len(),
+        result.omega_bases(1).unwrap().len()
+    );
     assert_eq!(
         result.paths(1).unwrap(),
         [vec![0, 1], vec![1, 2], vec![2, 0]]
