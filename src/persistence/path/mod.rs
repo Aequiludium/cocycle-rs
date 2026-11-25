@@ -4,7 +4,12 @@
 //! selected field; its modular coordinate boundaries never implement that trait.
 mod filtered;
 mod linear;
+mod low_dimensional;
 mod minimum;
+pub use low_dimensional::{
+    LowDimensionalPathPersistence, compute_low_dimensional_path_persistence,
+    compute_low_dimensional_path_persistence_with,
+};
 mod projection;
 use crate::algebra::PrimeField;
 use crate::complex::{Path, PathBoundaryMode, PathComplex, path_boundary_budget};
