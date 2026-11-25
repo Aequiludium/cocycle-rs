@@ -182,3 +182,58 @@ variant shares one work counter through construction and ordinary reduction.
 Ordinary fill-in follows that work control, without a byte/aggregate memory cap.
 Full diagrams match the independently checked generic route for the tested
 small graphs, ties and prime fields; no speedup or large-network result is claimed.
+
+## Numerical real path operators
+
+The separate `hodge` entries recompute Omega from integer ambient boundaries
+over f64. They do not lift a finite-field basis or implement integer
+FilteredComplex. Allowed paths have their standard orthonormal metric; the
+returned Omega bases use two reorthogonalization passes.
+
+```rust
+use cocycle::complex::{DirectedGraph, PathBoundaryMode};
+use cocycle::hodge::compute_real_path_chain;
+let source = DirectedGraph::new(2, vec![(0,1)])?.allowed_paths(2, 10)?;
+let chain = compute_real_path_chain(&source, 1, PathBoundaryMode::Regular, 1000, 1e-10)?;
+let operator = chain.laplacian(0)?;
+drop(chain);
+assert_eq!(operator.apply(&[1.0,0.0])?, [1.0,-1.0]);
+assert!(operator.boundary_residual() < 1e-8);
+# Ok::<(), cocycle::Error>(())
+```
+
+`PathRealChain` owns allowed path identities, orthonormal Omega columns and
+coordinate boundaries through d+1. A graph truncation must include that upper
+degree. The finite relative tolerance lies strictly in (0,1e-3). Pivots within
+the ambiguity band around the tolerance, nonfinite arithmetic and failed kernel,
+coordinate-boundary or boundary-square residuals return errors. Results retain
+the tolerance and largest measured absolute boundary residual; this is numerical
+evidence, without a certified exact rank or arbitrary-condition guarantee.
+
+`compute_persistent_path_laplacian` takes weighted edges, degree, an event-index
+pair s<=t, model, (path cap,dense cap) and tolerance. Events are sorted zero plus
+edge births. The upper domain consists of target Omega_(d+1) vectors whose full
+boundary lies in source Omega_d, with its induced real orthonormal metric.
+`PathRealLaplacian` owns final-graph path identities, the embedded source basis
+and rectangular D/U factors, and applies D transpose D + U U transpose. The
+library API builds neither square matrices nor spectra and does not use the
+generic Hodge/Dirac integer-source adapter.
+
+The positive dense cap bounds each matrix/vector, layer count, ambient word
+workspace dimension squared and kernel width squared, including zero entries.
+It differs from the exact sparse cap and does not aggregate live memory.
+Vector reservations are fallible where supported; B-tree allocations can abort.
+Construction `_with` terminals share work across requested chains, kernels
+and residuals. Snapshot and action `_with` terminals each start a new counter.
+Sorting/container operations are cooperative checkpoints; numerical arithmetic
+and coordinate visits are charged inside the main loops.
+
+`tests/path_real.rs` checks ambient equations, orthonormality, symmetric
+positive-semidefinite action, hand-derived operators, the characteristic-sensitive
+real/finite-field distinction and invalid/resource cases. The standalone worker
+`tools/reference/path_real.rs` exposes factors and sampled action columns for
+independent rational/SVD verification; it is not a production spectrum interface
+or performance benchmark. Run `cargo run --locked --example path_laplacian`.
+
+The Rust series does not include the research Python Grounded, Weighted, Mayer,
+cup-product or large-network workstreams, nor a sparse path eigensolver.
