@@ -62,11 +62,14 @@ assert_eq!(result.omega_bases(2).unwrap().len(), 0);
 # Ok::<(), cocycle::Error>(())
 ```
 
-`PathVector` stores only nonzero canonical residues. Omega columns and homology
+`PathVector` is a read-only borrowed coordinate view with `terms()` and
+`coefficient()`. The sparse container is private; only nonzero canonical residues
+are iterated. Omega columns and homology
 cycles use the result's allowed-path order; boundary columns use the preceding
 Omega basis. The chain includes degrees 0 through d+1, while representatives and
 Betti numbers cover 0 through d. A missing accessor degree is outside that
-window. Bases are deterministic, without a canonical, minimum or metric claim.
+window. Basis choices and their order are result-local and may change between versions;
+no pivot/block strategy, canonical basis, minimum basis or metric is promised.
 
 The positive `max_entries` bounds layer/column counts, each sparse matrix and
 each elimination's retained plus temporary entries, including transformations.
@@ -103,8 +106,10 @@ is Complete and the computed domain is 0 through d. Zero-length bars are omitted
 by the existing ordinary interval assembler. No cutoff or unequal vertex births
 are offered by this operation.
 
-`PathPersistence` composes canonical `PersistenceData`, implements
-`AsRef<PersistenceData>`, and owns the compatible Omega certificate. Births index
+The default terminal returns the existing `PersistenceResult`, retaining only
+the ordinary diagram and context. `compute_path_persistence_certificate` and its
+`_with` variant explicitly request an owned `PathPersistenceCertificate`. It
+composes `PersistenceData` and implements `AsRef<PersistenceData>`. Births index
 `times()`; paths are final-graph coordinates. A basis prefix at an event spans
 that event's Omega. This certificate does not claim interval-specific simplex
 representatives. Source context distinguishes both path models, records the
@@ -167,6 +172,8 @@ Omega2 directly from bigons, triangles and anchored quadrangle differences,
 including the full-model returning-path constraints. Earliest completed routes
 provide anchors, so the generators span the one-boundaries at every event.
 They need not be independent and are not an Omega2 basis.
+The terminal returns the existing `PersistenceResult`; dependent generators,
+anchors and traversal counters are private working state.
 
 The upstream adapter feeds this dependent boundary presentation to the existing
 ordinary reducer, requests only H0/H1 and returns canonical PersistenceData with

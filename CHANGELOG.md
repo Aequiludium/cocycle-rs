@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Direct path H0/H1 computation returns the shared PersistenceResult, keeping
+  relation generators and traversal diagnostics private. Add a matched-output
+  native comparison protocol for generic and direct ordinary H0/H1 diagrams.
+
+- Keep minimum-basis search diagnostics private; expose exact cycles and costs.
+  Projection/cohomology coordinates use the same read-only mathematical views.
+
+- Default directed path persistence returns the shared PersistenceResult. Request
+  compatible-chain data explicitly with the certificate terminal; stage setup
+  constructs Omega without computing unused static homology representatives.
+
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
 - Add bounded real path Omega chains and factorized static/persistent Laplacian
   action in the Hodge domain. Recompute over f64 with orthonormal metrics,
   tolerance/residual metadata, ambiguity rejection and cooperative controls;
