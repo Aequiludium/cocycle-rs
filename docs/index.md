@@ -113,6 +113,7 @@ design/rips
 design/rips-acceptance
 design/rips-implementation
 design/kernel
+design/computation-resources/README
 design/interface-compatibility
 ```
 

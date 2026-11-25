@@ -131,6 +131,7 @@ and numbered derivations in one place; rustdoc owns individual API contracts.
 | [Rips acceptance audit](design/rips-acceptance.md) | R1-R10 evidence, resource boundaries and local/hosted validation distinction |
 | [Rips implementation scope](design/rips-implementation.md) | Stage-specific new directories, source moves, code/tooling changes and review units |
 | [Kernel design](design/kernel.md) | Implemented adapter, result and algorithm-boundary revisions; ownership, conversion costs, extension policy, API migration and primary design references |
+| [Computation and resource architecture proposal](design/computation-resources/README.md) | Proposed resource-aware computation, mathematical/execution boundaries, eight implementation designs and staged refactor plan; no production or default change |
 | [Interface preparation reports](design/interface-compatibility.md) | Complete #59–#63 delivery chain, existing-interface reuse, runnable framework entries and dated compatibility acceptance |
 | [Route integration](research/route-integration.md) | Same-version legacy acceptance and current handoffs versus future running goals for #86 |
 | [Interface inventory](research/interface-inventory.md) | Historical source audit, borrow/move/copy costs and fixed PR stacks; use the architecture for current capabilities |
