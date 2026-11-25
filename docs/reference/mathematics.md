@@ -1228,3 +1228,35 @@ It verifies the reconstructed signed residuals with the actual truncated K.
 Thresholded positive modes do not certify rank, the kernel or extremal coverage.
 Normal-map tolerances have sigma² units; division by |sigma| translates the
 absolute error scale to signed Dirac residual units and reflects conditioning.
+
+## 25. Directed allowed-path sources
+
+`complex::DirectedGraph` stores ordered edges without normalizing their endpoints.
+Reverse edges remain distinct; self-loops and duplicate ordered edges are rejected,
+and every declared vertex has a singleton path, including isolates. Regular paths
+exclude equal adjacent vertices but retain nonadjacent repetitions such as 010.
+Graph enumeration is bounded by a positive total count across all retained layers.
+A nonempty `truncated_at()` means unenumerated allowed extensions still exist;
+absent higher layers do not then certify vanishing higher homology.
+
+`PathComplex::new` instead declares a complete finite endpoint-closed set of allowed
+paths. It requires all singletons and both endpoint truncations, without inferring
+higher paths from edges or silently adding closure. Internal faces may be absent.
+The non-reduced alternating boundary has zero singleton boundary. Regular mode
+quotients out nonregular faces; full mode retains every face, including 00 in the
+boundary of 010. Faces not in the supplied allowed complex remain visible.
+
+These are source and ambient-boundary operations only. The allowed space A need
+not be closed under the boundary. Subsequent path homology must construct
+Omega_n={x in A_n : boundary(x) in A_(n-1)} over its explicitly selected field and
+include Omega_(d+1) to compute H_d. This module supplies neither that construction
+nor an implementation of the integer `FilteredComplex` chain contract. In
+particular, residue coordinates of a future field-specific Omega basis cannot be
+silently presented as integer incidence coefficients. The conventions follow
+[Grigor'yan, Lin, Muranov and Yau, Path homology theory of digraphs](https://www.math.uni-bielefeld.de/~grigor/dnoterev.pdf), sections 2 and 3.
+
+Graph `_with` constructors and enumeration share `Execution` controls across edge,
+vertex and candidate visits. Count and work exhaustion return errors, not partial
+sources. Path-count caps and cooperative work are not byte quotas or OS memory
+limits; sorting, allocation and collection operations cannot be interrupted inside
+one operation. Public contracts are exercised by `tests/path_complex.rs`.

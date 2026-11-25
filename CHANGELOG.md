@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add directed allowed-path sources with preserved reverse edges, endpoint-closed
+  explicit complexes, finite graph truncation metadata and regular/full ambient
+  integer boundaries. Graph enumeration has cooperative execution controls;
+  forbidden boundary faces remain visible and do not imply an Omega computation.
+
 - Reuse incremental adjacent column bases in exact F2 family/history queries;
   retain independent raw-boundary validation and document
   eager stage storage. Extend seeded properties, integer epsilon coverage and

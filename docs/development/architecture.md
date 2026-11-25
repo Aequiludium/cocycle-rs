@@ -74,6 +74,7 @@ src/
     euclidean.rs                 shared pair evaluation and dense conversion
   complex/
     filtered.rs                  public four-method FilteredComplex contract
+    path/mod.rs                  directed graphs, bounded paths and ambient integer boundaries
     graph/
       mod.rs                     owned WeightedGraph, edges and queries
       adjacency.rs               compact sorted adjacency construction
