@@ -12,6 +12,9 @@ use cocycle::persistence::{
     PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
     compute_path_persistence_with,
 };
+use cocycle::persistence::{
+    compute_low_dimensional_path_persistence, compute_low_dimensional_path_persistence_with,
+};
 use cocycle::persistence::{compute_minimum_path_basis, compute_minimum_path_basis_with};
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
@@ -584,6 +587,26 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
                     FiltrationScale::Unspecified
                 );
                 persistent_ranks(&h, &edges, mode);
+                let low = compute_low_dimensional_path_persistence(
+                    3,
+                    &edges,
+                    PrimeField::new(p).unwrap(),
+                    mode,
+                    1000,
+                    100000,
+                )
+                .unwrap();
+                for q in 0..=1 {
+                    assert_eq!(
+                        low.diagram()
+                            .dimension(q)
+                            .unwrap()
+                            .iter()
+                            .collect::<Vec<_>>(),
+                        h.diagram().dimension(q).unwrap().iter().collect::<Vec<_>>()
+                    );
+                }
+                assert_eq!(low.context(), h.context());
                 let mut reversed = edges.clone();
                 reversed.reverse();
                 assert_eq!(
@@ -602,6 +625,49 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
             }
         }
     }
+}
+
+#[test]
+fn low_dimensional_presentation_caps_and_model_contracts_are_explicit() {
+    let edges = [(0, 1, 0.0), (1, 0, 0.0)];
+    let field = PrimeField::new(4_294_967_291).unwrap();
+    for mode in [Mode::Regular, Mode::NonRegular] {
+        let h = compute_low_dimensional_path_persistence(2, &edges, field, mode, 6, 1000).unwrap();
+        assert_eq!(
+            h.diagram().dimension(1).unwrap().len(),
+            usize::from(mode == Mode::NonRegular)
+        );
+        assert_eq!(h.clone().into_data(), *h.as_ref());
+        assert!(compute_low_dimensional_path_persistence(2, &edges, field, mode, 5, 1000).is_err());
+        assert!(compute_low_dimensional_path_persistence(2, &edges, field, mode, 6, 1).is_err());
+        assert!(matches!(
+            compute_low_dimensional_path_persistence_with(
+                2,
+                &edges,
+                field,
+                mode,
+                6,
+                1000,
+                &Execution::default().max_work(10)
+            ),
+            Err(Error::WorkLimitExceeded { .. })
+        ));
+    }
+    assert!(
+        compute_low_dimensional_path_persistence(
+            2,
+            &[(0, 1, f64::NAN)],
+            field,
+            Mode::Regular,
+            10,
+            100
+        )
+        .is_err()
+    );
+    let empty =
+        compute_low_dimensional_path_persistence(0, &[], field, Mode::Regular, 1, 10).unwrap();
+    assert!(empty.diagram().is_empty());
+    assert_eq!(empty.diagram().max_dimension(), 1);
 }
 
 #[test]

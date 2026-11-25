@@ -163,3 +163,29 @@ can be forbidden. The independent dense tests check the resulting complete space
 in both models, including characteristic-sensitive and high-prime examples.
 This grouping has no public tuning switch and no claimed speedup. The minimum
 basis is independently checked against all cycle subsets of three-vertex graphs.
+
+## Direct H0 and H1 presentation
+
+`compute_low_dimensional_path_persistence` takes weighted edges, a PrimeField,
+the model, a path cap and an entry cap. It constructs generators of partial
+Omega2 directly from bigons, triangles and anchored quadrangle differences,
+including the full-model returning-path constraints. Earliest completed routes
+provide anchors, so the generators span the one-boundaries at every event.
+They need not be independent and are not an Omega2 basis.
+The terminal returns the existing `PersistenceResult`; dependent generators,
+anchors and traversal counters are private working state.
+
+The upstream adapter feeds this dependent boundary presentation to the existing
+ordinary reducer, requests only H0/H1 and returns canonical PersistenceData with
+the same path context as the generic route. Artificial H2 of the presentation is
+not computed or exposed. The research implementation's separate forest/chord
+reducer is not duplicated in production. The formulas follow
+[Dey, Li and Wang, Theorem 3.1](https://arxiv.org/abs/2001.09549v1); this code does
+not implement its arboricity enumeration bound.
+
+The path cap includes vertices, edges and every visited two-path. The entry cap
+bounds generators, presentation columns and initial incidence terms. The `_with`
+variant shares one work counter through construction and ordinary reduction.
+Ordinary fill-in follows that work control, without a byte/aggregate memory cap.
+Full diagrams match the independently checked generic route for the tested
+small graphs, ties and prime fields; no speedup or large-network result is claimed.

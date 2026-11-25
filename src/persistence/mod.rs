@@ -44,5 +44,8 @@ pub use path::{
     PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
     compute_path_persistence_certificate_with, compute_path_persistence_with,
 };
+pub use path::{
+    compute_low_dimensional_path_persistence, compute_low_dimensional_path_persistence_with,
+};
 
 mod union_find;
