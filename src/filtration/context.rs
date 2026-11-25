@@ -5,6 +5,11 @@ use super::{FiltrationKind, RipsApproximation, RipsInputKind};
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum FiltrationSource {
+    /// Weighted directed graph, with max-edge path births and zero-born vertices.
+    DirectedPaths {
+        /// Ambient boundary convention; allowed vertex words remain regular.
+        mode: crate::complex::PathBoundaryMode,
+    },
     /// Rips from a declared input, with approximation facts only when applicable.
     Rips {
         /// Convention used to supply the pairwise values.
@@ -55,6 +60,12 @@ impl FiltrationContext {
     /// Compatibility classification of construction and input convention.
     pub fn filtration_kind(&self) -> FiltrationKind {
         match &self.source {
+            FiltrationSource::DirectedPaths { mode } => match mode {
+                crate::complex::PathBoundaryMode::Regular => FiltrationKind::RegularDirectedPaths,
+                crate::complex::PathBoundaryMode::NonRegular => {
+                    FiltrationKind::NonRegularDirectedPaths
+                }
+            },
             FiltrationSource::Rips {
                 input,
                 approximation,
@@ -93,6 +104,12 @@ impl FiltrationContext {
         approximation: Option<RipsApproximation>,
     ) -> Self {
         let source = match kind {
+            FiltrationKind::RegularDirectedPaths => FiltrationSource::DirectedPaths {
+                mode: crate::complex::PathBoundaryMode::Regular,
+            },
+            FiltrationKind::NonRegularDirectedPaths => FiltrationSource::DirectedPaths {
+                mode: crate::complex::PathBoundaryMode::NonRegular,
+            },
             FiltrationKind::RipsDissimilarities | FiltrationKind::SparseRipsDissimilarities => {
                 FiltrationSource::Rips {
                     input: RipsInputKind::Dissimilarities,

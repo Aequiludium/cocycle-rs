@@ -2,11 +2,13 @@
 //!
 //! Allowed paths are data, not integer filtered cells. Omega is rebuilt in the
 //! selected field; its modular coordinate boundaries never implement that trait.
+mod filtered;
 mod linear;
 use crate::algebra::PrimeField;
 use crate::complex::{Path, PathBoundaryMode, PathComplex, path_boundary_budget};
 use crate::execution::{Execution, WorkBudget};
 use crate::{Error, Result};
+pub use filtered::{PathPersistence, compute_path_persistence, compute_path_persistence_with};
 use linear::*;
 use std::collections::BTreeMap;
 

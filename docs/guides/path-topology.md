@@ -81,3 +81,47 @@ three-vertex graphs, the largest u32 prime, a higher-dimensional join and a
 characteristic-sensitive Omega example. These are bounded correctness checks,
 not evidence for a speedup or arbitrary-size workloads. Run
 `cargo run --locked --example path_homology` for an owned-result workflow.
+
+## Directed graph persistence
+
+```rust
+use cocycle::algebra::PrimeField;
+use cocycle::complex::PathBoundaryMode;
+use cocycle::persistence::compute_path_persistence;
+let edges = [(0,1,1.0), (1,2,1.0), (2,0,1.0), (0,2,2.0)];
+let result = compute_path_persistence(3, &edges, 1, PrimeField::new(3)?,
+    PathBoundaryMode::Regular, 100, 10_000)?;
+assert_eq!(cocycle::descriptors::betti_curve(result.diagram(), 1, &[0.0,1.0,2.0])?,
+    [0,1,0]);
+# Ok::<(), cocycle::Error>(())
+```
+
+Every vertex is born at zero. Finite nonnegative edge births control appearance
+only; each path is born at its largest edge birth. Equal represented f64 values
+are simultaneous, including signed zero. All graph events are included: coverage
+is Complete and the computed domain is 0 through d. Zero-length bars are omitted
+by the existing ordinary interval assembler. No cutoff or unequal vertex births
+are offered by this operation.
+
+`PathPersistence` composes canonical `PersistenceData`, implements
+`AsRef<PersistenceData>`, and owns the compatible Omega certificate. Births index
+`times()`; paths are final-graph coordinates. A basis prefix at an event spans
+that event's Omega. This certificate does not claim interval-specific simplex
+representatives. Source context distinguishes both path models, records the
+selected prime field and declares Unspecified scale units. Context-aware diagram
+distances consequently retain their existing rejection of unsupported units.
+Raw-diagram comparisons remain caller-interpreted operations.
+
+The `_with` entry shares one Execution counter across validation, graph/path
+enumeration, all static stage computations, basis extensions and the existing
+ordinary reducer. `max_paths` bounds each stage. Positive `max_entries` bounds
+construction matrices, events/columns and Omega elimination workspaces. Ordinary
+reduction fill-in follows the existing reducer's work controls rather than this
+entry cap; neither is an aggregate memory quota. This recomputing baseline makes
+no scalability or performance claim.
+
+The Unreleased exhaustive `FiltrationKind` enum gains RegularDirectedPaths and
+NonRegularDirectedPaths. External exhaustive matches must add these variants.
+`FiltrationSource` is already non-exhaustive. Existing Rips, flag, simplicial and
+filtered-cell dispatch are unchanged. Run
+`cargo run --locked --example path_persistence` for result composition.

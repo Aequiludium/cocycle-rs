@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add compatible-basis directed path persistence through the existing ordinary
+  boundary reducer and canonical diagram/context assembly. Path source context
+  records the regular/full model with unspecified geometric units. The exhaustive
+  `FiltrationKind` enum gains `RegularDirectedPaths` and `NonRegularDirectedPaths`;
+  downstream exhaustive matches must handle these Unreleased source variants.
+
 - Add exact field-bound Omega chains and non-reduced path homology through a
   requested degree, with owned path identities and cycle representatives. Use
   the existing complete u32 prime-field arithmetic and cooperative work controls;
