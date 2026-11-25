@@ -38,5 +38,6 @@ mod boundary;
 mod filtered;
 mod path;
 pub use path::{PathHomology, PathVector, compute_path_homology, compute_path_homology_with};
+pub use path::{PathPersistence, compute_path_persistence, compute_path_persistence_with};
 
 mod union_find;
