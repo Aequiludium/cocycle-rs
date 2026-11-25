@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
+- Add exact field-bound Omega chains and non-reduced path homology through a
+  requested degree, with owned path identities and cycle representatives. Use
+  the existing complete u32 prime-field arithmetic and cooperative work controls;
+  modular Omega boundaries are not integer filtered-cell incidence.
+
 - Add directed allowed-path sources with preserved reverse edges, endpoint-closed
   explicit complexes, finite graph truncation metadata and regular/full ambient
   integer boundaries. Graph enumeration has cooperative execution controls;

@@ -46,8 +46,8 @@ do not waive its retained direct-graph and H2/H3 performance regressions.
 
 ## Use the library
 
-- [Directed path sources](guides/path-topology.md): ordered edges, bounded
-  returning paths, explicit endpoint closure and ambient boundary conventions
+- [Directed path topology](guides/path-topology.md): ordered edges, bounded
+  returning paths, endpoint closure and field-bound exact path homology
   (Unreleased).
 
 - [F2 homology operators](guides/homology-operators.md): owned chain windows,

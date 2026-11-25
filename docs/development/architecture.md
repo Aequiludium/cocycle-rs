@@ -117,6 +117,7 @@ src/
   eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/
     mod.rs                       public exports and private computation wiring
+    path/                        field-bound Omega construction, coordinate solves and exact homology
     assembly.rs                  shared raw intervals and endpoint normalization
     execution.rs                 compatibility control imports
     builder.rs                   borrowed analysis settings and validated execution
