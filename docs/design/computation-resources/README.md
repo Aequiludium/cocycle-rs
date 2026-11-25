@@ -4,7 +4,7 @@
 
 Status on 2026-11-25: proposed responsibilities and staged implementation for
 review. This package does not change production code, public APIs, defaults,
-dependencies or MSRV. The [current architecture](../../development/architecture.md)
+Rust dependencies or MSRV. The [current architecture](../../development/architecture.md)
 and [kernel design](../kernel.md) remain authoritative for implemented behavior.
 
 The execution-side organizing concept is a **computation unit with an explicit
@@ -65,3 +65,19 @@ Profiling and independent validation must still establish whether each boundary
 or retention policy earns adoption. A failed gate keeps the simpler owner-local
 route and records the negative result. Publishing this design is distinct from
 implementing the refactor, selecting a new default, merging code or releasing it.
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+overview
+01-semantics-and-computation
+02-resource-contracts
+03-plans-and-selection
+04-preparation-and-sequences
+05-numerical-path
+06-exact-algebra
+07-construction-and-consumers
+08-verification-and-admission
+development-plan
+```

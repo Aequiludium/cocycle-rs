@@ -23,11 +23,17 @@ version = package["version"]
 release = f"{version} + Unreleased"
 language = "en"
 
-extensions = ["myst_parser", "sphinx.ext.mathjax", "sphinx_copybutton"]
+extensions = [
+    "myst_parser",
+    "sphinx.ext.mathjax",
+    "sphinx_copybutton",
+    "sphinxcontrib.mermaid",
+]
 source_suffix = {".md": "markdown"}
 root_doc = "index"
 exclude_patterns = ["_build", "__pycache__"]
 myst_enable_extensions = ["colon_fence", "dollarmath", "fieldlist"]
+myst_fence_as_directive = ["mermaid"]
 myst_dmath_double_inline = True
 myst_heading_anchors = 6
 
