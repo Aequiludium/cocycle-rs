@@ -36,5 +36,7 @@ mod simplicial;
 pub use simplicial::representatives::{RepresentativeRequest, RepresentativeSelection};
 mod boundary;
 mod filtered;
+mod path;
+pub use path::{PathHomology, PathVector, compute_path_homology, compute_path_homology_with};
 
 mod union_find;

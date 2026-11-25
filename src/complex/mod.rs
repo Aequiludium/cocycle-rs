@@ -12,6 +12,7 @@ pub(crate) use simplicial::compare_filtration;
 mod filtered;
 pub use filtered::FilteredComplex;
 mod path;
+pub(crate) use path::boundary_budget as path_boundary_budget;
 pub use path::{
     DirectedGraph, Path, PathBoundaryMode, PathComplex, path_boundary, path_boundary_with,
 };
