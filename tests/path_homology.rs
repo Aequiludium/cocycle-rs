@@ -9,7 +9,8 @@ use cocycle::persistence::{
     PathHomology, PathVector, compute_path_homology, compute_path_homology_with,
 };
 use cocycle::persistence::{
-    PathPersistence, compute_path_persistence, compute_path_persistence_with,
+    PathPersistenceCertificate, compute_path_persistence, compute_path_persistence_certificate,
+    compute_path_persistence_with,
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
@@ -421,7 +422,7 @@ fn higher_join_and_characteristic_sensitive_omega_spaces_are_recomputed() {
     }
 }
 
-fn persistent_ranks(h: &PathPersistence, edges: &[(usize, usize, f64)], mode: Mode) {
+fn persistent_ranks(h: &PathPersistenceCertificate, edges: &[(usize, usize, f64)], mode: Mode) {
     let p = h.context().characteristic();
     for q in 0..=h.diagram().max_dimension() {
         let paths = h.paths(q).unwrap();
@@ -504,12 +505,11 @@ fn persistent_ranks(h: &PathPersistence, edges: &[(usize, usize, f64)], mode: Mo
             let active_s: Vec<_> = h
                 .omega_bases(q)
                 .unwrap()
-                .iter()
                 .zip(h.births(q).unwrap())
                 .filter(|(_, b)| **b <= event)
-                .map(|(v, _)| v.clone())
+                .map(|(v, _)| v)
                 .collect();
-            let dense_s = dense(&active_s, paths.len(), p);
+            let dense_s = dense(active_s, paths.len(), p);
             assert_eq!(kernel(&dense_s, paths.len(), p).0, dense_s.len());
             let cycle_rank = cycles.len();
             let (_, forbidden_kernel) = kernel(&f, forbidden.len(), p);
@@ -567,7 +567,7 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
             .collect();
         for p in [2, 3, 4_294_967_291] {
             for mode in [Mode::Regular, Mode::NonRegular] {
-                let h = compute_path_persistence(
+                let h = compute_path_persistence_certificate(
                     3,
                     &edges,
                     2,
@@ -587,7 +587,7 @@ fn complete_path_intervals_match_independent_all_stage_pair_ranks() {
                 reversed.reverse();
                 assert_eq!(
                     h,
-                    compute_path_persistence(
+                    compute_path_persistence_certificate(
                         3,
                         &reversed,
                         2,
@@ -675,8 +675,16 @@ fn path_result_context_composition_and_whole_operation_limits_are_preserved() {
     let empty = compute_path_persistence(0, &[], 3, field, Mode::Regular, 1, 1000).unwrap();
     assert_eq!(empty.diagram().max_dimension(), 3);
     assert!(empty.diagram().is_empty());
-    let zero =
-        compute_path_persistence(2, &[(0, 1, -0.0)], 1, field, Mode::Regular, 100, 1000).unwrap();
+    let zero = compute_path_persistence_certificate(
+        2,
+        &[(0, 1, -0.0)],
+        1,
+        field,
+        Mode::Regular,
+        100,
+        1000,
+    )
+    .unwrap();
     assert_eq!(zero.times(), [0.0]);
     assert_eq!(zero.times()[0].to_bits(), 0.0f64.to_bits());
 }

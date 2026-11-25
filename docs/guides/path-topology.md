@@ -106,8 +106,10 @@ is Complete and the computed domain is 0 through d. Zero-length bars are omitted
 by the existing ordinary interval assembler. No cutoff or unequal vertex births
 are offered by this operation.
 
-`PathPersistence` composes canonical `PersistenceData`, implements
-`AsRef<PersistenceData>`, and owns the compatible Omega certificate. Births index
+The default terminal returns the existing `PersistenceResult`, retaining only
+the ordinary diagram and context. `compute_path_persistence_certificate` and its
+`_with` variant explicitly request an owned `PathPersistenceCertificate`. It
+composes `PersistenceData` and implements `AsRef<PersistenceData>`. Births index
 `times()`; paths are final-graph coordinates. A basis prefix at an event spans
 that event's Omega. This certificate does not claim interval-specific simplex
 representatives. Source context distinguishes both path models, records the

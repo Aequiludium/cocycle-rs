@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Default directed path persistence returns the shared PersistenceResult. Request
+  compatible-chain data explicitly with the certificate terminal; stage setup
+  constructs Omega without computing unused static homology representatives.
+
 - Refine the draft path API: sparse coordinates are read-only mathematical views,
   without exposing a BTreeMap representation or promising elimination/basis choices.
 

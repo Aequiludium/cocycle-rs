@@ -2,7 +2,7 @@
 use super::*;
 use crate::algebra::column::Column;
 use crate::complex::DirectedGraph;
-use crate::diagram::{ComputationContext, PersistenceData, PersistenceDiagram};
+use crate::diagram::{ComputationContext, PersistenceData, PersistenceDiagram, PersistenceResult};
 use crate::filtration::{Coverage, FiltrationKind};
 use crate::persistence::boundary::{self, BoundaryInput};
 use std::collections::BTreeSet;
@@ -12,16 +12,16 @@ use std::collections::BTreeSet;
 /// A basis prefix at an event is that event's complete Omega space. This is a
 /// chain certificate, not a collection of persistent simplicial representatives.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PathPersistence {
+pub struct PathPersistenceCertificate {
     data: PersistenceData,
     times: Vec<f64>,
     paths: Vec<Vec<Path>>,
-    omega_bases: Vec<Vec<PathVector>>,
+    omega_bases: Vec<Vec<SparseVector>>,
     births: Vec<Vec<usize>>,
-    boundaries: Vec<Vec<PathVector>>,
+    boundaries: Vec<Vec<SparseVector>>,
 }
 
-impl PathPersistence {
+impl PathPersistenceCertificate {
     /// Canonical ordinary intervals, computed dimensions and complete coverage.
     pub fn diagram(&self) -> &PersistenceDiagram {
         self.data.diagram()
@@ -39,23 +39,33 @@ impl PathPersistence {
         self.paths.get(dimension).map(Vec::as_slice)
     }
     /// Compatible Omega columns in final allowed-path coordinates.
-    pub fn omega_bases(&self, dimension: usize) -> Option<&[PathVector]> {
-        self.omega_bases.get(dimension).map(Vec::as_slice)
+    pub fn omega_bases(
+        &self,
+        dimension: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.omega_bases
+            .get(dimension)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Birth event index for each compatible Omega column.
     pub fn births(&self, dimension: usize) -> Option<&[usize]> {
         self.births.get(dimension).map(Vec::as_slice)
     }
     /// Coordinate boundary columns in the preceding compatible Omega basis.
-    pub fn boundaries(&self, dimension: usize) -> Option<&[PathVector]> {
-        self.boundaries.get(dimension).map(Vec::as_slice)
+    pub fn boundaries(
+        &self,
+        dimension: usize,
+    ) -> Option<impl ExactSizeIterator<Item = PathVector<'_>> + Clone> {
+        self.boundaries
+            .get(dimension)
+            .map(|columns| columns.iter().map(PathVector))
     }
     /// Retain common result data, discarding the path-chain certificate without cloning.
     pub fn into_data(self) -> PersistenceData {
         self.data
     }
 }
-impl AsRef<PersistenceData> for PathPersistence {
+impl AsRef<PersistenceData> for PathPersistenceCertificate {
     fn as_ref(&self) -> &PersistenceData {
         &self.data
     }
@@ -77,7 +87,7 @@ impl AsRef<PersistenceData> for PathPersistence {
 /// Rejects invalid directed edges, births, limits, dimension overflow, allocation
 /// failure or an internal filtration/chain violation, without a partial result.
 #[allow(clippy::too_many_arguments)]
-pub fn compute_path_persistence(
+pub fn compute_path_persistence_certificate(
     vertex_count: usize,
     edges: &[(usize, usize, f64)],
     dimension: usize,
@@ -85,8 +95,8 @@ pub fn compute_path_persistence(
     mode: PathBoundaryMode,
     max_paths: usize,
     max_entries: usize,
-) -> Result<PathPersistence> {
-    compute_path_persistence_with(
+) -> Result<PathPersistenceCertificate> {
+    compute_path_persistence_certificate_with(
         vertex_count,
         edges,
         dimension,
@@ -107,7 +117,7 @@ pub fn compute_path_persistence(
 /// # Errors
 /// Returns the errors of [`compute_path_persistence`], cancellation or work exhaustion.
 #[allow(clippy::too_many_arguments)]
-pub fn compute_path_persistence_with(
+pub fn compute_path_persistence_certificate_with(
     vertex_count: usize,
     edges: &[(usize, usize, f64)],
     dimension: usize,
@@ -116,7 +126,7 @@ pub fn compute_path_persistence_with(
     max_paths: usize,
     limit: usize,
     execution: &Execution<'_>,
-) -> Result<PathPersistence> {
+) -> Result<PathPersistenceCertificate> {
     let mut budget = WorkBudget::new(execution)?;
     if max_paths == 0 || limit == 0 {
         return Err(Error::InvalidParameter {
@@ -175,9 +185,9 @@ pub fn compute_path_persistence_with(
     let (mut bases, mut births, mut boundaries) = (Vec::new(), Vec::new(), Vec::new());
     for _ in 0..layers {
         budget.step()?;
-        push(&mut bases, Vec::<PathVector>::new())?;
+        push(&mut bases, Vec::<SparseVector>::new())?;
         push(&mut births, Vec::<usize>::new())?;
-        push(&mut boundaries, Vec::<PathVector>::new())?;
+        push(&mut boundaries, Vec::<SparseVector>::new())?;
     }
     let mut cells = Vec::new();
     for (stage, &time) in times.iter().enumerate() {
@@ -191,7 +201,8 @@ pub fn compute_path_persistence_with(
         }
         let complex = DirectedGraph::new_budget(vertex_count, pairs, &mut budget)?
             .allowed_paths_budget(upper, max_paths, &mut budget)?;
-        let local = homology(&complex, dimension, field, mode, limit, &mut budget)?;
+        let (local_bases, local_boundaries) =
+            omega(&complex, dimension, field, mode, limit, &mut budget)?;
         let mut embedding = Vec::new();
         for (q, index) in indices.iter().enumerate() {
             let mut layer = Vec::new();
@@ -223,14 +234,14 @@ pub fn compute_path_persistence_with(
                 Vec::new()
             } else {
                 apply(
-                    &local.omega_bases[q - 1],
-                    &local.boundaries[q],
+                    &local_bases[q - 1],
+                    &local_boundaries[q],
                     field,
                     limit,
                     &mut budget,
                 )?
             };
-            for (i, vector) in local.omega_bases[q].iter().enumerate() {
+            for (i, vector) in local_bases[q].iter().enumerate() {
                 let mapped = embed(vector, &embedding[q], &mut budget)?;
                 let j = bases[q].len();
                 if solver.insert(&mapped, j, 0, &mut budget)?.is_some() {
@@ -241,7 +252,7 @@ pub fn compute_path_persistence_with(
                     let image = embed(&images[i], &embedding[q - 1], &mut budget)?;
                     lower.coordinates(&image, &mut budget)?
                 } else {
-                    PathVector::new()
+                    SparseVector::new()
                 };
                 push(&mut bases[q], mapped)?;
                 push(&mut boundaries[q], column)?;
@@ -250,7 +261,7 @@ pub fn compute_path_persistence_with(
                 push(&mut births[q], stage)?;
                 push(&mut cells, (stage, q, j))?;
             }
-            if bases[q].len() != local.omega_bases[q].len() {
+            if bases[q].len() != local_bases[q].len() {
                 return Err(invariant("compatible prefix spans each stage"));
             }
         }
@@ -306,7 +317,7 @@ pub fn compute_path_persistence_with(
     let context = ComputationContext::new(field, kind, vertex_count, None, None, None);
     drop(indices);
     budget.check()?;
-    Ok(PathPersistence {
+    Ok(PathPersistenceCertificate {
         data: PersistenceData::new(diagram, context),
         times,
         paths,
@@ -317,11 +328,11 @@ pub fn compute_path_persistence_with(
 }
 
 fn embed(
-    vector: &PathVector,
+    vector: &SparseVector,
     indices: &[usize],
     budget: &mut WorkBudget<'_>,
-) -> Result<PathVector> {
-    let mut mapped = PathVector::new();
+) -> Result<SparseVector> {
+    let mut mapped = SparseVector::new();
     for (&row, &value) in vector {
         budget.step()?;
         mapped.insert(
@@ -332,4 +343,65 @@ fn embed(
         );
     }
     Ok(mapped)
+}
+
+/// Compute only the ordinary directed-path diagram and context.
+///
+/// Birth/model/limit rules follow [`compute_path_persistence_certificate`].
+/// Compatible bases are private working state and are released before return.
+/// No static homology representatives are computed during stage preparation.
+///
+/// # Errors
+/// Returns invalid-input, allocation, size, entry-limit or chain errors.
+pub fn compute_path_persistence(
+    n: usize,
+    edges: &[(usize, usize, f64)],
+    dimension: usize,
+    field: PrimeField,
+    mode: PathBoundaryMode,
+    max_paths: usize,
+    max_entries: usize,
+) -> Result<PersistenceResult> {
+    compute_path_persistence_with(
+        n,
+        edges,
+        dimension,
+        field,
+        mode,
+        max_paths,
+        max_entries,
+        &Execution::default(),
+    )
+}
+/// Compute a diagram with one shared validation/stage/reduction work budget.
+///
+/// # Errors
+/// Returns the errors of [`compute_path_persistence`], cancellation or work exhaustion.
+#[allow(clippy::too_many_arguments)]
+pub fn compute_path_persistence_with(
+    n: usize,
+    edges: &[(usize, usize, f64)],
+    dimension: usize,
+    field: PrimeField,
+    mode: PathBoundaryMode,
+    max_paths: usize,
+    max_entries: usize,
+    execution: &Execution<'_>,
+) -> Result<PersistenceResult> {
+    let certificate = compute_path_persistence_certificate_with(
+        n,
+        edges,
+        dimension,
+        field,
+        mode,
+        max_paths,
+        max_entries,
+        execution,
+    )?;
+    let context = certificate.context().clone();
+    Ok(PersistenceResult::new(
+        certificate.into_data().into_diagram(),
+        context,
+        None,
+    ))
 }
