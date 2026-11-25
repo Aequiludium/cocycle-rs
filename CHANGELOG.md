@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
 - Add exact field-bound Omega chains and non-reduced path homology through a
   requested degree, with owned path identities and cycle representatives. Use
   the existing complete u32 prime-field arithmetic and cooperative work controls;
