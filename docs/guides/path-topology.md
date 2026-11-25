@@ -5,6 +5,22 @@
 This Unreleased API keeps directed edges and nonadjacent vertex repetitions.
 It is independent of the undirected `WeightedGraph` and simplicial storage.
 
+## Draft API boundaries
+
+| Owner | Mathematical public contract | Private implementation choices |
+| --- | --- | --- |
+| Directed sources | Ordered edges/words, endpoint closure and truncation coverage | Enumeration workspace and work-counter implementation |
+| Exact homology | Owned field/model-bound spaces and read-only coordinates | Sparse containers, pivots, block order and basis normalization |
+| Persistence | Standard diagram/context by default; compatible certificate explicitly requested | Stage solvers and ordinary reducer columns |
+| Linear algebra and minimum basis | Duals, algebraic projection/homotopy, exact cycles and costs | Search counts/frontier, candidate ordering and elimination state |
+| Direct H0/H1 | Standard PersistenceResult with the same semantic context | Anchors, dependent relations and traversed two-path counters |
+| Real operators | Read-only mathematical basis coordinates, apply, events and tolerance/residual evidence | D/U factors, row-elimination layout and numerical workspaces |
+
+These are refinements to unmerged draft APIs, not released 0.1.1 changes.
+The former sparse map alias is replaced by `PathVector::terms()`/`coefficient()`
+views; generic/direct default persistence now shares PersistenceResult. Use the
+explicit certificate terminal when compatible-chain coordinates are needed.
+
 ```rust
 use cocycle::complex::{DirectedGraph, PathBoundaryMode, PathComplex, path_boundary};
 
@@ -189,3 +205,80 @@ variant shares one work counter through construction and ordinary reduction.
 Ordinary fill-in follows that work control, without a byte/aggregate memory cap.
 Full diagrams match the independently checked generic route for the tested
 small graphs, ties and prime fields; no speedup or large-network result is claimed.
+
+## Numerical real path operators
+
+The separate `hodge` entries recompute Omega from integer ambient boundaries
+over f64. They do not lift a finite-field basis or implement integer
+FilteredComplex. Allowed paths have their standard orthonormal metric; the
+returned Omega bases use two reorthogonalization passes.
+
+```rust
+use cocycle::complex::{DirectedGraph, PathBoundaryMode};
+use cocycle::hodge::compute_real_path_chain;
+let source = DirectedGraph::new(2, vec![(0,1)])?.allowed_paths(2, 10)?;
+let chain = compute_real_path_chain(&source, 1, PathBoundaryMode::Regular, 1000, 1e-10)?;
+let operator = chain.laplacian(0)?;
+drop(chain);
+assert_eq!(operator.apply(&[1.0,0.0])?, [1.0,-1.0]);
+assert!(operator.boundary_residual() < 1e-8);
+# Ok::<(), cocycle::Error>(())
+```
+
+`PathRealChain` owns allowed path identities, orthonormal Omega columns and
+coordinate boundaries through d+1. A graph truncation must include that upper
+degree. The finite relative tolerance lies strictly in (0,1e-3). Pivots within
+the ambiguity band around the tolerance, nonfinite arithmetic and failed kernel,
+coordinate-boundary or boundary-square residuals return errors. Results retain
+the tolerance and largest measured absolute boundary residual; this is numerical
+evidence, without a certified exact rank or arbitrary-condition guarantee.
+
+`compute_persistent_path_laplacian` takes weighted edges, degree, an event-index
+pair s<=t, model, (path cap,dense cap) and tolerance. Events are sorted zero plus
+edge births. The upper domain consists of target Omega_(d+1) vectors whose full
+boundary lies in source Omega_d, with its induced real orthonormal metric.
+`PathRealLaplacian` owns final-graph path identities, the embedded source basis
+and private rectangular D/U factors, and applies D transpose D + U U transpose. The
+library API builds neither square matrices nor spectra and does not use the
+generic Hodge/Dirac integer-source adapter.
+
+The positive dense cap bounds each matrix/vector, layer count, ambient word
+workspace dimension squared and kernel width squared, including zero entries.
+It differs from the exact sparse cap and does not aggregate live memory.
+Vector reservations are fallible where supported; B-tree allocations can abort.
+Construction `_with` terminals share work across requested chains, kernels
+and residuals. Snapshot and action `_with` terminals each start a new counter.
+Sorting/container operations are cooperative checkpoints; numerical arithmetic
+and coordinate visits are charged inside the main loops.
+
+`tests/path_real.rs` checks ambient equations, orthonormality, symmetric
+positive-semidefinite action, hand-derived operators, the characteristic-sensitive
+real/finite-field distinction and invalid/resource cases. The standalone worker
+`tools/reference/path_real.rs` exposes coordinates and sampled action columns for
+independent rational/SVD verification; it is not a production spectrum interface
+or performance benchmark. Run `cargo run --locked --example path_laplacian`.
+
+The self-contained independent verifier reconstructs vertex words and alternating
+deletions, computes rational kernels and exact stage-pair ranks with SymPy, and
+compares the full native operator against rational-projector and independent
+numerical-SVD induced-domain routes. It checks source spaces, orthonormality,
+symmetry, ambient operators, full spectra and zero multiplicities. The diamond's
+hand-derived spectrum rejects the wrong nonorthogonal-transpose metric. A fault
+injection test confirms a corrupted native action is rejected. No research
+checkout, external algorithm source or test skipping is needed for the full run:
+
+```sh
+python -m pip install -r benches/path/requirements-lock.txt
+cargo build --locked --release
+rustc --edition 2024 -C opt-level=3 tools/reference/path_real.rs --extern cocycle=target/release/libcocycle.rlib -L dependency=target/release/deps -o target/path-real-worker
+python tools/check_path_real.py --worker target/path-real-worker --output target/path-real-reference
+```
+
+On Windows append `.exe` to the worker filename. Use a fresh output directory
+per attempt. The verifier records source/worker/input hashes, package versions,
+complete certificates and maximum errors. CI runs it and uploads these artifacts
+for 14 days; the full workflow's optional performance dispatch runs the
+[matched-output protocol](https://github.com/Aequiludium/cocycle-rs/blob/84556cf532a77435af0ae1c6504c5567554fbefb/benches/path/README.md).
+
+The Rust series does not include the research Python Grounded, Weighted, Mayer,
+cup-product or large-network workstreams, nor a sparse path eigensolver.

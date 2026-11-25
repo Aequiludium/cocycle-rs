@@ -141,8 +141,7 @@ pub fn compute_path_persistence_certificate_with(
         operation: "path chain degrees",
     })?;
     count(layers, limit)?;
-    count(vertex_count, max_paths)?;
-    count(edges.len(), max_paths.saturating_sub(vertex_count))?;
+    crate::complex::path_count_cap(sum(vertex_count, edges.len())?, max_paths)?;
     count(edges.len(), limit)?;
     let mut times = Vec::new();
     push(&mut times, 0.0)?;

@@ -374,7 +374,7 @@ fn reserve<T>(v: &mut Vec<T>, additional: usize) -> Result<()> {
             context: "directed paths",
         })
 }
-fn count_cap(count: usize, limit: usize) -> Result<()> {
+pub(crate) fn count_cap(count: usize, limit: usize) -> Result<()> {
     if limit == 0 || count > limit {
         Err(Error::InvalidParameter {
             parameter: "max_paths",

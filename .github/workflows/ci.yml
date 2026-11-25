@@ -93,6 +93,8 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: rustfmt --edition 2024 --check benches/path/cocycle.rs
       - run: cargo build --locked
+      - run: rustfmt --edition 2024 --check tools/reference/path_real.rs
+      - run: rustc --edition 2024 -D warnings tools/reference/path_real.rs --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps -o target/path-real-worker
       - run: rustdoc --edition 2024 --test README.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/getting-started/quickstart.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
       - run: rustdoc --edition 2024 -D warnings --test docs/guides/diagram-distances.md --extern cocycle=target/debug/libcocycle.rlib -L dependency=target/debug/deps
@@ -144,6 +146,7 @@ jobs:
       - run: cargo run --locked --example homology_operators
       - run: cargo run --locked --example path_homology
       - run: cargo run --locked --example path_persistence
+      - run: cargo run --locked --example path_laplacian
       - run: cargo test --locked --example critical_sets
       - run: cargo test --locked --release --example critical_sets
 

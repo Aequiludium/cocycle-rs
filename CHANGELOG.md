@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hide real path operator factors behind action/read-only mathematical coordinates.
+  Add a self-contained rational/SVD oracle, corruption check and CI artifacts,
+  plus an explicitly dispatched matched-output path performance study.
+
 - Direct path H0/H1 computation returns the shared PersistenceResult, keeping
   relation generators and traversal diagnostics private. Add a matched-output
   native comparison protocol for generic and direct ordinary H0/H1 diagrams.
@@ -15,6 +19,11 @@
 
 - Refine the draft path API: sparse coordinates are read-only mathematical views,
   without exposing a BTreeMap representation or promising elimination/basis choices.
+
+- Add bounded real path Omega chains and factorized static/persistent Laplacian
+  action in the Hodge domain. Recompute over f64 with orthonormal metrics,
+  tolerance/residual metadata, ambiguity rejection and cooperative controls;
+  do not lift modular bases or expose a production path eigensolver.
 
 - Add direct regular/full path H0/H1 boundary presentations, without general
   Omega2 kernel construction. Reuse ordinary reduction and canonical results;

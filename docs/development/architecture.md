@@ -113,6 +113,7 @@ src/
       expansion.rs               shared explicit clique construction
   hodge/
     mod.rs                       real signed chain windows and sparse Hodge action
+    path.rs                      numerical real path Omega and static/persistent factorized action
     spectrum.rs                  bounded dense Jacobi eigenpairs and measured errors
   eigensolver.rs                 shared real block LOBPCG and small dense Ritz solver
   persistence/
@@ -218,6 +219,8 @@ No backend registry or Alpha/cubical construction is implied. See the
 | Capability | Implemented owner and selection |
 | --- | --- |
 | Supplied diagrams | Generic filtered cells and general simplicial filtrations share `boundary::diagram` / `reduce_pairs`; zero-born concrete simplices retain the existing shared coface route |
+| Directed paths | Ordered complex data; field-bound Omega and compatible chains in persistence/path; generic/direct H0/H1 presentations use the existing ordinary reducer and PersistenceData |
+| Real directed paths | Concrete Hodge path chains recompute over f64, retain tolerance/residuals and apply factorized static/persistent operators without modular or integer-cell adaptation |
 | Implicit flag/Rips | Existing specialized dispatch, including the admitted F2 H0/H1-to-H2+ continuation and generic fallbacks |
 | Representatives | Separate requested output; basis transformations are retained only when needed |
 | Critical sets | Opt-in sparse `CriticalSetWorkspace` with lazy dual and bounded Partial U |
