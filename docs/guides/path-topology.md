@@ -278,7 +278,7 @@ On Windows append `.exe` to the worker filename. Use a fresh output directory
 per attempt. The verifier records source/worker/input hashes, package versions,
 complete certificates and maximum errors. CI runs it and uploads these artifacts
 for 14 days; the full workflow's optional performance dispatch runs the
-[matched-output protocol](../../benches/path/README.md).
+[matched-output protocol](https://github.com/Aequiludium/cocycle-rs/blob/84556cf532a77435af0ae1c6504c5567554fbefb/benches/path/README.md).
 
 The Rust series does not include the research Python Grounded, Weighted, Mayer,
 cup-product or large-network workstreams, nor a sparse path eigensolver.
