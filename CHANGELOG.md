@@ -2,12 +2,20 @@
 
 ## Unreleased
 
+- Keep minimum-basis search diagnostics private; expose exact cycles and costs.
+  Projection/cohomology coordinates use the same read-only mathematical views.
+
 - Default directed path persistence returns the shared PersistenceResult. Request
   compatible-chain data explicitly with the certificate terminal; stage setup
   constructs Omega without computing unused static homology representatives.
 
 - Refine the draft path API: sparse coordinates are read-only mathematical views,
   without exposing a BTreeMap representation or promising elimination/basis choices.
+
+- Add endpoint-block Omega construction, exact linear duals, checked algebraic
+  projections/chain homotopies and bounded global minimum F2 path H1 bases with
+  checked integer support costs. These carry neither real metric meaning nor
+  polynomial-time or performance guarantees.
 
 - Add compatible-basis directed path persistence through the existing ordinary
   boundary reducer and canonical diagram/context assembly. Path source context

@@ -4,6 +4,8 @@
 //! selected field; its modular coordinate boundaries never implement that trait.
 mod filtered;
 mod linear;
+mod minimum;
+mod projection;
 use crate::algebra::PrimeField;
 use crate::complex::{Path, PathBoundaryMode, PathComplex, path_boundary_budget};
 use crate::execution::{Execution, WorkBudget};
@@ -13,6 +15,8 @@ pub use filtered::{
     compute_path_persistence_certificate_with, compute_path_persistence_with,
 };
 use linear::*;
+pub use minimum::{MinimumPathBasis, compute_minimum_path_basis, compute_minimum_path_basis_with};
+pub use projection::{PathCohomology, PathProjection};
 use std::collections::BTreeMap;
 
 type SparseVector = BTreeMap<usize, u32>;
@@ -272,7 +276,7 @@ fn omega(
             push(&mut allowed, a)?;
             push(&mut forbidden, f)?;
         }
-        let basis = kernel(&forbidden, field, limit, budget)?.1;
+        let basis = omega_kernel(source.paths(q), &forbidden, field, limit, budget)?;
         if apply(&forbidden, &basis, field, limit, budget)?
             .iter()
             .any(|v| !v.is_empty())
@@ -368,4 +372,41 @@ fn homology(
         boundary_ranks,
         representatives,
     })
+}
+
+// Endpoint closure makes only internal deletions forbidden, preserving both
+// endpoints. Independent endpoint blocks therefore have disjoint forbidden rows.
+fn omega_kernel(
+    paths: &[Path],
+    forbidden: &[SparseVector],
+    field: PrimeField,
+    limit: usize,
+    budget: &mut WorkBudget<'_>,
+) -> Result<Vec<SparseVector>> {
+    let mut blocks = BTreeMap::<_, Vec<usize>>::new();
+    for (j, path) in paths.iter().enumerate() {
+        budget.step()?;
+        let endpoints = (path[0], path[path.len() - 1]);
+        push(blocks.entry(endpoints).or_default(), j)?;
+    }
+    let mut basis = Vec::new();
+    let mut entries = 0;
+    for indices in blocks.values() {
+        budget.step()?;
+        let mut columns = Vec::new();
+        for &j in indices {
+            push(&mut columns, copy_vector(&forbidden[j], budget)?)?;
+        }
+        for local in kernel(&columns, field, limit, budget)?.1 {
+            let mut vector = SparseVector::new();
+            for (j, value) in local {
+                budget.step()?;
+                vector.insert(indices[j], value);
+            }
+            entries = sum(entries, vector.len())?;
+            count(entries, limit)?;
+            push(&mut basis, vector)?;
+        }
+    }
+    Ok(basis)
 }

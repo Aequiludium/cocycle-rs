@@ -130,3 +130,36 @@ NonRegularDirectedPaths. External exhaustive matches must add these variants.
 `FiltrationSource` is already non-exhaustive. Existing Rips, flag, simplicial and
 filtered-cell dispatch are unchanged. Run
 `cargo run --locked --example path_persistence` for result composition.
+
+## Algebraic duals, projections and minimum bases
+
+`PathHomology::projection(max_entries)` returns annotations A, projections P,
+and homotopies h in the stored Omega coordinates. The construction checks
+P squared = P, B P = 0, A B = 0, identity evaluation on the stored homology
+basis, and I-P = B h+h B through degree d. The last h lands in Omega_(d+1).
+`cohomology(max_entries)` transposes the annotations into cocycles in Omega dual
+coordinates. Both have `_with` execution variants with one terminal-wide budget.
+They are algebraic splittings and linear duals, without an orthogonal/harmonic
+interpretation, cup product or canonical extension to all path coordinates.
+
+`compute_minimum_path_basis` takes a DirectedGraph, one nonnegative u64 cost per
+lexicographic directed edge, the model, and positive path, sparse-entry, candidate
+and search-state caps. It computes a global minimum F2 H1 basis by exhaustively
+enumerating elementary cycles of the underlying edge multigraph and greedily
+selecting independent homology annotations. Reverse edges keep different
+coordinates; their two-edge cycles remain eligible. Nonnegative costs, including
+zero, justify elementary-cycle candidates. Costs and their total use checked
+u128 arithmetic. The `_with` variant shares work controls across enumeration,
+homology, projection, cycle search, selection and certificate checks.
+
+This search is exponential. Candidate/support/frontier and search exhaustion are
+errors; no partial basis is reported as optimal. Caps are independent counts,
+not total-memory guarantees. Sparse projection and search use the same exact
+field arithmetic; B-tree allocations retain the standard allocation limitation.
+
+Omega construction groups forbidden rows by path endpoints before computing
+independent kernels. Endpoint closure guarantees that only internal deletions
+can be forbidden. The independent dense tests check the resulting complete spaces
+in both models, including characteristic-sensitive and high-prime examples.
+This grouping has no public tuning switch and no claimed speedup. The minimum
+basis is independently checked against all cycle subsets of three-vertex graphs.
