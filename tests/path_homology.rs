@@ -86,12 +86,16 @@ fn apply(columns: &[Vec<u32>], vector: &[u32], rows: usize, p: u32) -> Vec<u32> 
     }
     result
 }
-fn dense(columns: &[PathVector], rows: usize, p: u32) -> Vec<Vec<u32>> {
+fn dense<'a>(
+    columns: impl IntoIterator<Item = PathVector<'a>>,
+    rows: usize,
+    p: u32,
+) -> Vec<Vec<u32>> {
     columns
-        .iter()
+        .into_iter()
         .map(|c| {
             let mut v = vec![0; rows];
-            for (&i, &value) in c {
+            for (i, value) in c.terms() {
                 assert!(i < rows && value > 0 && value < p);
                 v[i] = value;
             }

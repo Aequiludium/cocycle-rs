@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Refine the draft path API: sparse coordinates are read-only mathematical views,
+  without exposing a BTreeMap representation or promising elimination/basis choices.
+
 - Add compatible-basis directed path persistence through the existing ordinary
   boundary reducer and canonical diagram/context assembly. Path source context
   records the regular/full model with unspecified geometric units. The exhaustive
