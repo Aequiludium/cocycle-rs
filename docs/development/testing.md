@@ -19,6 +19,41 @@ and then exercises source/field/representative integration. The CI quality job e
 commands; platform jobs run their examples and explicitly execute the construction
 example's colocated tests in debug/release. MSRV also runs those example tests.
 
+## Feature plans and execution evidence
+
+The root [governance.json](https://github.com/Aequiludium/cocycle-rs/blob/main/governance.json) maps existing public-path,
+independent-oracle and resource tests to `persistence.correctness`. An optional
+Node caller can run `node tools/verify-feature.mjs persistence.correctness --plan`
+and then the same command without `--plan`, adding `--input fixture=repository-v1`.
+This tooling is outside the Rust runtime and introduces no crate dependency.
+
+`performance.integrated` additionally requires the existing pipeline protocol's
+own tests and `tools/verify_governance_performance.py`. That thin entry point uses
+a fresh output directory and the unchanged quick pipeline with 12 measured rounds.
+Linux, Rust/C++ toolchains and the pinned source setup from
+[native measurements](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/README.md) are required. Set
+`GOVERNANCE_GUDHI_SOURCE`, `GOVERNANCE_RIPSER_SOURCE` and, when necessary,
+`GOVERNANCE_BOOST_INCLUDE`; `PYTHON` can select an installed interpreter.
+
+Evidence under ignored `target/governance-verification` binds the actual integrated
+commit, index, inputs and environment. The original protocol records source/build
+hashes, public calling paths, preparation/conversion/construction/compute/export
+costs, diagram parity, exclusions, failures and workload-specific measurements.
+No optimized PR's earlier timing is inherited by a different integrated version.
+The quick bounded cases are validation evidence, not a universal speedup or a
+complexity theorem. Do not benchmark concurrently with other compilation or load.
+
+The adapter also records total controller wall time in `governance-run.json`,
+including build, fixture I/O, warmups, independent comparisons and artifact writes.
+This separate task cost is not a per-backend speed ranking. Worker comparisons
+retain the original protocol's declared cost exclusions; external validation
+cost is never silently assigned to a worker's compute bin.
+
+Missing setup (exit 78), dirty/changed source, skipped or zero-test commands and
+missing property results remain incomplete. Caller reports and CI source URLs
+remain separate from independently verified execution provenance. Existing full
+CI and native mathematical comparison requirements still apply.
+
 ## Test layers
 
 CI's quality job runs Rust doctests from the README, usage guides, contributor
