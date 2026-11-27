@@ -31,7 +31,7 @@ This tooling is outside the Rust runtime and introduces no crate dependency.
 own tests and `tools/verify_governance_performance.py`. That thin entry point uses
 a fresh output directory and the unchanged quick pipeline with 12 measured rounds.
 Linux, Rust/C++ toolchains and the pinned source setup from
-[native measurements](../../benches/native/README.md) are required. Set
+[native measurements](https://github.com/Aequiludium/cocycle-rs/blob/main/benches/native/README.md) are required. Set
 `GOVERNANCE_GUDHI_SOURCE`, `GOVERNANCE_RIPSER_SOURCE` and, when necessary,
 `GOVERNANCE_BOOST_INCLUDE`; `PYTHON` can select an installed interpreter.
 
