@@ -73,6 +73,10 @@ domains use the checks below as well.
 
 ## Verification
 
+The optional [feature index](https://github.com/Aequiludium/cocycle-rs/blob/main/governance.json) reuses existing checks and records
+version-bound caller evidence; see [feature plans](docs/development/testing.md#feature-plans-and-execution-evidence).
+It does not replace the full checks or the native/performance protocols below.
+
 Run these from the repository root for Rust changes. CI distributes them across
 quality, test, and MSRV jobs:
 
