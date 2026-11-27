@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "outputDirectory": "target/governance-verification",
+  "inputs": [
+    "fixture"
+  ],
+  "features": [
+    {
+      "id": "persistence.correctness",
+      "description": "Public persistence, independent oracle, fields and resource recovery.",
+      "documentation": [
+        "CONTRIBUTING.md",
+        "docs/development/testing.md"
+      ],
+      "checks": [
+        "public-paths"
+      ]
+    },
+    {
+      "id": "performance.integrated",
+      "description": "Actual integrated public paths and complete cost under the existing native pipeline protocol.",
+      "documentation": [
+        "benches/pipeline/README.md",
+        "benches/reporting.md"
+      ],
+      "checks": [
+        "public-paths",
+        "pipeline-protocol",
+        "pipeline-measurement"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "public-paths",
+      "kind": "command",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--all-features",
+        "--test",
+        "rips",
+        "--test",
+        "rips_resources",
+        "--test",
+        "prime_fields",
+        "--test",
+        "rips_expansion"
+      ],
+      "properties": [
+        "persistence.output_semantics",
+        "persistence.independent_oracle",
+        "persistence.resource_recovery"
+      ],
+      "requires": [],
+      "timeoutSeconds": 1200
+    },
+    {
+      "id": "pipeline-protocol",
+      "kind": "command",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_benchmark_rips_pipeline.py",
+        "-v"
+      ],
+      "properties": [
+        "performance.protocol_integrity"
+      ],
+      "requires": [],
+      "timeoutSeconds": 600,
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "pipeline-measurement",
+      "kind": "command",
+      "command": [
+        "python3",
+        "tools/verify_governance_performance.py"
+      ],
+      "properties": [
+        "performance.integrated_public_paths",
+        "performance.complete_cost",
+        "performance.exact_revision",
+        "performance.output_parity"
+      ],
+      "requires": [
+        "GOVERNANCE_GUDHI_SOURCE",
+        "GOVERNANCE_RIPSER_SOURCE"
+      ],
+      "timeoutSeconds": 7200,
+      "platforms": [
+        "linux"
+      ]
+    }
+  ]
+}
